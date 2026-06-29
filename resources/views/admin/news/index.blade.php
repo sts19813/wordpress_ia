@@ -1,0 +1,165 @@
+@extends('layouts.admin')
+
+@section('title', 'Noticias Obtenidas | '.config('app.name'))
+
+@php
+    $currentSort = request('sort', 'published_at');
+    $currentDirection = request('direction', 'desc');
+    $sortUrl = function (string $field) use ($currentSort, $currentDirection) {
+        return request()->fullUrlWithQuery([
+            'sort' => $field,
+            'direction' => $currentSort === $field && $currentDirection === 'asc' ? 'desc' : 'asc',
+            'page' => null,
+        ]);
+    };
+    $sortIcon = fn (string $field) => $currentSort === $field
+        ? ($currentDirection === 'asc' ? 'ki-arrow-up' : 'ki-arrow-down')
+        : 'ki-arrow-up-down';
+    $statusClasses = [
+        'fetched' => 'badge-light-success',
+        'duplicate' => 'badge-light-warning',
+        'discarded' => 'badge-light-danger',
+    ];
+@endphp
+
+@section('toolbar')
+    <div>
+        <h1 class="page-heading text-gray-900 fw-bold fs-3 my-0">Noticias Obtenidas</h1>
+        <div class="text-muted fw-semibold fs-7 pt-1">Lectura de noticias obtenidas desde sitios fuente.</div>
+    </div>
+@endsection
+
+@section('content')
+    <div class="card card-flush">
+        <div class="card-header align-items-center gap-4 py-5">
+            <div class="card-title w-100">
+                <form method="GET" action="{{ route('admin.news.index') }}" class="d-flex flex-column flex-xl-row align-items-xl-center gap-3 w-100">
+                    <div class="position-relative">
+                        <i class="ki-outline ki-magnifier fs-3 position-absolute ms-4 top-50 translate-middle-y text-gray-500"></i>
+                        <input type="text" name="search" value="{{ request('search') }}" class="form-control form-control-solid ps-12 w-275px" placeholder="Buscar título, contenido, URL...">
+                    </div>
+
+                    <select name="source_site_id" class="form-select form-select-solid w-200px">
+                        <option value="">Todas las fuentes</option>
+                        @foreach ($filterOptions['sourceSites'] as $id => $name)
+                            <option value="{{ $id }}" @selected((string) request('source_site_id') === (string) $id)>{{ $name }}</option>
+                        @endforeach
+                    </select>
+
+                    <select name="status" class="form-select form-select-solid w-160px">
+                        <option value="">Estado</option>
+                        @foreach ($statusOptions as $value => $label)
+                            <option value="{{ $value }}" @selected(request('status') === $value)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+
+                    <select name="language" class="form-select form-select-solid w-125px">
+                        <option value="">Idioma</option>
+                        @foreach ($filterOptions['languages'] as $language)
+                            <option value="{{ $language }}" @selected(request('language') === $language)>{{ strtoupper($language) }}</option>
+                        @endforeach
+                    </select>
+
+                    <select name="category" class="form-select form-select-solid w-175px">
+                        <option value="">Categoría</option>
+                        @foreach ($filterOptions['categories'] as $category)
+                            <option value="{{ $category }}" @selected(request('category') === $category)>{{ $category }}</option>
+                        @endforeach
+                    </select>
+
+                    <select name="tag" class="form-select form-select-solid w-175px">
+                        <option value="">Tag</option>
+                        @foreach ($filterOptions['tags'] as $tag)
+                            <option value="{{ $tag }}" @selected(request('tag') === $tag)>{{ $tag }}</option>
+                        @endforeach
+                    </select>
+
+                    <input type="date" name="date_from" value="{{ request('date_from') }}" class="form-control form-control-solid w-150px" aria-label="Fecha desde">
+                    <input type="date" name="date_to" value="{{ request('date_to') }}" class="form-control form-control-solid w-150px" aria-label="Fecha hasta">
+
+                    <input type="hidden" name="sort" value="{{ request('sort', 'published_at') }}">
+                    <input type="hidden" name="direction" value="{{ request('direction', 'desc') }}">
+
+                    <button type="submit" class="btn btn-light-primary">
+                        <i class="ki-outline ki-filter fs-2"></i>
+                        Filtrar
+                    </button>
+                    <a href="{{ route('admin.news.index') }}" class="btn btn-light">Limpiar</a>
+                </form>
+            </div>
+        </div>
+
+        <div class="card-body pt-0">
+            <div class="table-responsive">
+                <table class="table align-middle table-row-dashed fs-6 gy-5">
+                    <thead>
+                        <tr class="text-start text-gray-500 fw-bold fs-7 text-uppercase gs-0">
+                            <th class="min-w-300px">
+                                <a href="{{ $sortUrl('title') }}" class="text-gray-500 text-hover-primary">
+                                    Título <i class="ki-outline {{ $sortIcon('title') }} fs-7"></i>
+                                </a>
+                            </th>
+                            <th class="min-w-170px">Fuente</th>
+                            <th class="min-w-150px">
+                                <a href="{{ $sortUrl('author') }}" class="text-gray-500 text-hover-primary">
+                                    Autor <i class="ki-outline {{ $sortIcon('author') }} fs-7"></i>
+                                </a>
+                            </th>
+                            <th class="min-w-150px">
+                                <a href="{{ $sortUrl('published_at') }}" class="text-gray-500 text-hover-primary">
+                                    Fecha <i class="ki-outline {{ $sortIcon('published_at') }} fs-7"></i>
+                                </a>
+                            </th>
+                            <th class="min-w-125px">
+                                <a href="{{ $sortUrl('status') }}" class="text-gray-500 text-hover-primary">
+                                    Estado <i class="ki-outline {{ $sortIcon('status') }} fs-7"></i>
+                                </a>
+                            </th>
+                            <th class="min-w-100px">
+                                <a href="{{ $sortUrl('language') }}" class="text-gray-500 text-hover-primary">
+                                    Idioma <i class="ki-outline {{ $sortIcon('language') }} fs-7"></i>
+                                </a>
+                            </th>
+                            <th class="text-end min-w-100px">Detalle</th>
+                        </tr>
+                    </thead>
+                    <tbody class="fw-semibold text-gray-700">
+                        @forelse ($sourcePosts as $sourcePost)
+                            <tr>
+                                <td>
+                                    <a href="{{ route('admin.news.show', $sourcePost) }}" class="text-gray-900 text-hover-primary fw-bold">{{ $sourcePost->title }}</a>
+                                    <div class="text-muted text-truncate mw-400px">{{ $sourcePost->url }}</div>
+                                    <div class="d-flex flex-wrap gap-1 mt-2">
+                                        @foreach (array_slice($sourcePost->categories ?: [], 0, 3) as $category)
+                                            <span class="badge badge-light-primary">{{ $category }}</span>
+                                        @endforeach
+                                    </div>
+                                </td>
+                                <td>{{ $sourcePost->sourceSite?->name ?: '-' }}</td>
+                                <td>{{ $sourcePost->author ?: '-' }}</td>
+                                <td>{{ $sourcePost->published_at?->format('d/m/Y H:i') ?: '-' }}</td>
+                                <td><span class="badge {{ $statusClasses[$sourcePost->status] ?? 'badge-light' }}">{{ $sourcePost->statusLabel() }}</span></td>
+                                <td>{{ $sourcePost->language ? strtoupper($sourcePost->language) : '-' }}</td>
+                                <td class="text-end">
+                                    <a href="{{ route('admin.news.show', $sourcePost) }}" class="btn btn-icon btn-light btn-sm" aria-label="Ver detalle">
+                                        <i class="ki-outline ki-eye fs-3"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="7" class="text-center py-15">
+                                    <div class="text-gray-500 fw-semibold">Todavía no hay noticias obtenidas.</div>
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="d-flex justify-content-end pt-5">
+                {{ $sourcePosts->links() }}
+            </div>
+        </div>
+    </div>
+@endsection

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SourceSite extends Model
@@ -117,5 +118,10 @@ class SourceSite extends Model
     public function authMethodLabel(): string
     {
         return self::authMethodOptions()[$this->auth_method] ?? $this->auth_method;
+    }
+
+    public function sourcePosts(): HasMany
+    {
+        return $this->hasMany(SourcePost::class);
     }
 }
