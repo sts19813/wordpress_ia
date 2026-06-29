@@ -57,6 +57,7 @@ class WordPressSourceStrategy implements SourceStrategyInterface
                 'resumen' => strip_tags((string) data_get($post, 'excerpt.rendered', '')),
                 'slug' => data_get($post, 'slug'),
                 'idioma' => $sourceSite->language,
+                'original_json' => $post,
             ], $sourceSite))
             ->filter(fn (array $item) => filled($item['titulo']) && filled($item['url']))
             ->values();

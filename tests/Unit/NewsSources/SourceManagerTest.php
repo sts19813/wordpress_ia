@@ -60,10 +60,12 @@ class SourceManagerTest extends TestCase
             'resumen',
             'slug',
             'idioma',
+            'original_json',
         ], array_keys($items->first()));
         $this->assertSame('Nota WP', $items->first()['titulo']);
         $this->assertSame(['Mercado'], $items->first()['categorias']);
         $this->assertSame(['IA'], $items->first()['tags']);
+        $this->assertSame('nota-wp', $items->first()['original_json']['slug']);
     }
 
     public function test_rss_strategy_parses_feed_items(): void

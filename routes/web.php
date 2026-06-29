@@ -52,6 +52,7 @@ Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
 Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::get('noticias', [NewsController::class, 'index'])->name('news.index');
+    Route::post('noticias/obtener', [NewsController::class, 'fetch'])->name('news.fetch');
     Route::get('noticias/{sourcePost}', [NewsController::class, 'show'])->name('news.show');
     Route::resource('sitios-fuente', SourceSiteController::class)
         ->names('source-sites')

@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
+//controlador para administrar la sesion de los usuarios.
 class AuthenticatedSessionController extends Controller
 {
     public function create(): View

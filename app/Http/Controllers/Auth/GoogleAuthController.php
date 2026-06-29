@@ -11,6 +11,8 @@ use Laravel\Socialite\Facades\Socialite;
 use Symfony\Component\HttpFoundation\RedirectResponse as SymfonyRedirectResponse;
 use Throwable;
 
+
+//controlador para administrar la autenticacion de los usuarios con Google.
 class GoogleAuthController extends Controller
 {
     public function redirect(): SymfonyRedirectResponse

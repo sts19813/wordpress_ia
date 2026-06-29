@@ -33,6 +33,7 @@ trait NormalizesSourceItems
             'resumen' => $resumen,
             'slug' => $this->nullableString($item['slug'] ?? null) ?: str($titulo ?: $url)->slug()->toString(),
             'idioma' => $this->nullableString($item['idioma'] ?? null) ?: $sourceSite->language,
+            'original_json' => $item['original_json'] ?? $item,
         ];
     }
 
