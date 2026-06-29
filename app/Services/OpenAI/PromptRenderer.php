@@ -32,10 +32,14 @@ class PromptRenderer
 
         if (is_array($value)) {
             if (array_is_list($value)) {
-                return collect($value)->map(fn (mixed $item) => $this->stringValue($item))->implode(', ');
+                if (collect($value)->every(fn (mixed $item) => is_scalar($item) || $item === null)) {
+                    return collect($value)->map(fn (mixed $item) => $this->stringValue($item))->implode(', ');
+                }
+
+                return json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '';
             }
 
-            return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '';
+            return json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '';
         }
 
         return method_exists($value, '__toString') ? (string) $value : '';
