@@ -6,6 +6,9 @@ use App\Contracts\SourceStrategyInterface;
 use App\Models\SourceSite;
 use App\Services\NewsSources\Strategies\Concerns\BuildsSourceRequests;
 use App\Services\NewsSources\Strategies\Concerns\NormalizesSourceItems;
+use DOMDocument;
+use DOMElement;
+use DOMXPath;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
 use SimpleXMLElement;
@@ -28,8 +31,23 @@ class RSSSourceStrategy implements SourceStrategyInterface
 
     public function fetch(SourceSite $sourceSite): mixed
     {
-        return $this->requestFor($sourceSite)
+        $body = $this->requestFor($sourceSite)
             ->get($sourceSite->url)
+            ->throw()
+            ->body();
+
+        if ($this->looksLikeFeed($body)) {
+            return $body;
+        }
+
+        $feedUrl = $this->feedUrlFromHtml($body, $sourceSite->url);
+
+        if (! $feedUrl) {
+            return $body;
+        }
+
+        return $this->requestFor($sourceSite)
+            ->get($feedUrl)
             ->throw()
             ->body();
     }
@@ -146,5 +164,78 @@ class RSSSourceStrategy implements SourceStrategyInterface
         $text = trim((string) $value);
 
         return $text !== '' ? $text : null;
+    }
+
+    private function looksLikeFeed(string $body): bool
+    {
+        $body = ltrim($body);
+
+        return str_starts_with($body, '<rss')
+            || str_starts_with($body, '<feed')
+            || (str_starts_with($body, '<?xml') && (str_contains($body, '<rss') || str_contains($body, '<feed')));
+    }
+
+    private function feedUrlFromHtml(string $html, string $baseUrl): ?string
+    {
+        $document = new DOMDocument;
+
+        libxml_use_internal_errors(true);
+        $document->loadHTML('<?xml encoding="UTF-8">'.$html, LIBXML_NOWARNING | LIBXML_NOERROR);
+        libxml_clear_errors();
+
+        $xpath = new DOMXPath($document);
+        $links = collect($xpath->query('//link[@href]') ?: [])
+            ->filter(fn (mixed $node) => $node instanceof DOMElement)
+            ->filter(function (DOMElement $link): bool {
+                $type = strtolower($link->getAttribute('type'));
+
+                return str_contains($type, 'rss+xml') || str_contains($type, 'atom+xml');
+            });
+
+        $preferred = $links->first(function (DOMElement $link): bool {
+            $href = $link->getAttribute('href');
+            $title = strtolower($link->getAttribute('title'));
+
+            return str_contains($href, '/category/')
+                || str_contains($title, 'categor')
+                || str_contains($title, 'category');
+        }) ?: $links->first(fn (DOMElement $link): bool => ! str_contains($link->getAttribute('href'), '/comments/feed/'));
+
+        if (! $preferred instanceof DOMElement) {
+            return null;
+        }
+
+        return $this->absoluteUrl($preferred->getAttribute('href'), $baseUrl);
+    }
+
+    private function absoluteUrl(?string $url, string $baseUrl): ?string
+    {
+        if (blank($url)) {
+            return null;
+        }
+
+        if (str_starts_with($url, 'http://') || str_starts_with($url, 'https://')) {
+            return $url;
+        }
+
+        $base = parse_url($baseUrl);
+        $scheme = $base['scheme'] ?? 'https';
+        $host = $base['host'] ?? null;
+
+        if (! $host) {
+            return $url;
+        }
+
+        if (str_starts_with($url, '//')) {
+            return $scheme.':'.$url;
+        }
+
+        if (str_starts_with($url, '/')) {
+            return "{$scheme}://{$host}{$url}";
+        }
+
+        $path = trim(dirname($base['path'] ?? '/'), '/');
+
+        return "{$scheme}://{$host}/".($path ? "{$path}/" : '').$url;
     }
 }

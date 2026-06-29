@@ -28,14 +28,15 @@ class WordPressSourceStrategy implements SourceStrategyInterface
     public function fetch(SourceSite $sourceSite): mixed
     {
         $limit = min(max((int) ($sourceSite->daily_limit ?: 20), 1), 100);
+        [$endpoint, $extraQuery] = $this->endpointFor($sourceSite);
 
         return $this->requestFor($sourceSite)
-            ->get($this->endpointFor($sourceSite), [
+            ->get($endpoint, array_merge([
                 '_embed' => 1,
                 'per_page' => $limit,
                 'orderby' => 'date',
                 'order' => 'desc',
-            ])
+            ], $extraQuery))
             ->throw()
             ->json();
     }
@@ -63,15 +64,77 @@ class WordPressSourceStrategy implements SourceStrategyInterface
             ->values();
     }
 
-    private function endpointFor(SourceSite $sourceSite): string
+    /**
+     * @return array{0: string, 1: array<string, mixed>}
+     */
+    private function endpointFor(SourceSite $sourceSite): array
     {
-        $url = rtrim($sourceSite->url, '/');
+        $url = rtrim((string) $sourceSite->url, '/');
 
         if (str_contains($url, '/wp-json/wp/v2/posts')) {
-            return $url;
+            return [$url, []];
         }
 
-        return $url.'/wp-json/wp/v2/posts';
+        if (preg_match('#/wp-json/wp/v2/categories/(\d+)#', $url, $matches)) {
+            return [$this->apiRootFor($url).'wp/v2/posts', ['categories' => (int) $matches[1]]];
+        }
+
+        $discovery = $this->requiresDiscovery($url)
+            ? $this->discoverWordPressEndpoint($sourceSite)
+            : [];
+
+        return [
+            rtrim($discovery['api_root'] ?? $this->apiRootFor($url), '/').'/wp/v2/posts',
+            filled($discovery['category_id'] ?? null) ? ['categories' => (int) $discovery['category_id']] : [],
+        ];
+    }
+
+    private function requiresDiscovery(string $url): bool
+    {
+        $path = trim((string) parse_url($url, PHP_URL_PATH), '/');
+
+        return $path !== '' && ! str_contains($path, 'wp-json');
+    }
+
+    /**
+     * @return array{api_root?: string, category_id?: int}
+     */
+    private function discoverWordPressEndpoint(SourceSite $sourceSite): array
+    {
+        $response = $this->requestFor($sourceSite)
+            ->head($sourceSite->url);
+
+        if (! $response->successful()) {
+            $response = $this->requestFor($sourceSite)->get($sourceSite->url);
+        }
+
+        $linkHeader = (string) $response->header('Link', '');
+
+        $discovery = [];
+
+        if (preg_match('#<([^>]+/wp-json/)>;\s*rel="https://api\.w\.org/"#', $linkHeader, $matches)) {
+            $discovery['api_root'] = $matches[1];
+        }
+
+        if (preg_match('#<[^>]+/wp-json/wp/v2/categories/(\d+)[^>]*>;\s*rel="alternate"#', $linkHeader, $matches)) {
+            $discovery['category_id'] = (int) $matches[1];
+        }
+
+        return $discovery;
+    }
+
+    private function apiRootFor(string $url): string
+    {
+        if (preg_match('#^(https?://.+?/wp-json/)#', $url, $matches)) {
+            return $matches[1];
+        }
+
+        $parts = parse_url($url);
+        $scheme = $parts['scheme'] ?? 'https';
+        $host = $parts['host'] ?? rtrim($url, '/');
+        $port = isset($parts['port']) ? ':'.$parts['port'] : '';
+
+        return "{$scheme}://{$host}{$port}/wp-json/";
     }
 
     /**

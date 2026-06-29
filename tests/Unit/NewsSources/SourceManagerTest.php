@@ -17,24 +17,7 @@ class SourceManagerTest extends TestCase
     {
         Http::fake([
             'example.com/wp-json/wp/v2/posts*' => Http::response([
-                [
-                    'title' => ['rendered' => 'Nota WP'],
-                    'content' => ['rendered' => '<p>Contenido completo</p>'],
-                    'excerpt' => ['rendered' => '<p>Resumen WP</p>'],
-                    'date' => '2026-06-29T10:00:00',
-                    'link' => 'https://example.com/nota-wp',
-                    'slug' => 'nota-wp',
-                    '_embedded' => [
-                        'author' => [['name' => 'Editora']],
-                        'wp:featuredmedia' => [['source_url' => 'https://example.com/image.jpg']],
-                        'wp:term' => [
-                            [
-                                ['taxonomy' => 'category', 'name' => 'Mercado'],
-                                ['taxonomy' => 'post_tag', 'name' => 'IA'],
-                            ],
-                        ],
-                    ],
-                ],
+                $this->wordpressPost(),
             ]),
         ]);
 
@@ -66,6 +49,77 @@ class SourceManagerTest extends TestCase
         $this->assertSame(['Mercado'], $items->first()['categorias']);
         $this->assertSame(['IA'], $items->first()['tags']);
         $this->assertSame('nota-wp', $items->first()['original_json']['slug']);
+    }
+
+    public function test_wordpress_strategy_discovers_category_archives(): void
+    {
+        Http::fake([
+            'example.com/category/noticias/' => Http::response('', 200, [
+                'Link' => '<https://example.com/wp-json/>; rel="https://api.w.org/", <https://example.com/wp-json/wp/v2/categories/220>; rel="alternate"; title="JSON"; type="application/json"',
+            ]),
+            'example.com/wp-json/wp/v2/posts*' => Http::response([
+                $this->wordpressPost(['title' => ['rendered' => 'Nota categoria']]),
+            ]),
+        ]);
+
+        $items = app(SourceManager::class)->fetch(new SourceSite([
+            'name' => 'WP Categoria',
+            'url' => 'https://example.com/category/noticias/',
+            'type' => SourceSite::TYPE_WORDPRESS_REST,
+            'language' => 'es',
+            'auth_method' => SourceSite::AUTH_NONE,
+        ]));
+
+        $this->assertCount(1, $items);
+        $this->assertSame('Nota categoria', $items->first()['titulo']);
+
+        Http::assertSent(fn ($request) => $request->method() === 'GET'
+            && str_starts_with($request->url(), 'https://example.com/wp-json/wp/v2/posts')
+            && str_contains($request->url(), 'categories=220'));
+    }
+
+    public function test_rss_strategy_discovers_feed_from_category_html(): void
+    {
+        $html = <<<'HTML'
+        <html>
+            <head>
+                <link rel="alternate" type="application/rss+xml" title="Global" href="https://example.com/feed/" />
+                <link rel="alternate" type="application/rss+xml" title="Noticias RSS de la categoría" href="https://example.com/category/noticias/feed/" />
+            </head>
+        </html>
+        HTML;
+
+        $xml = <<<'XML'
+        <rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+            <channel>
+                <item>
+                    <title>Nota RSS categoria</title>
+                    <link>https://example.com/rss-categoria</link>
+                    <dc:creator>Reportera</dc:creator>
+                    <pubDate>Mon, 29 Jun 2026 12:00:00 GMT</pubDate>
+                    <category>Noticias</category>
+                    <content:encoded><![CDATA[<p>Contenido RSS</p>]]></content:encoded>
+                </item>
+            </channel>
+        </rss>
+        XML;
+
+        Http::fake([
+            'example.com/category/noticias/' => Http::response($html),
+            'example.com/category/noticias/feed/' => Http::response($xml),
+        ]);
+
+        $items = app(SourceManager::class)->fetch(new SourceSite([
+            'name' => 'RSS Categoria',
+            'url' => 'https://example.com/category/noticias/',
+            'type' => SourceSite::TYPE_RSS,
+            'language' => 'es',
+            'auth_method' => SourceSite::AUTH_NONE,
+        ]));
+
+        $this->assertCount(1, $items);
+        $this->assertSame('Nota RSS categoria', $items->first()['titulo']);
+        Http::assertSent(fn ($request) => $request->url() === 'https://example.com/category/noticias/feed/');
     }
 
     public function test_rss_strategy_parses_feed_items(): void
@@ -160,5 +214,31 @@ class SourceManagerTest extends TestCase
         ]));
 
         $this->assertSame('Custom', $items->first()['titulo']);
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    private function wordpressPost(array $overrides = []): array
+    {
+        return array_replace_recursive([
+            'title' => ['rendered' => 'Nota WP'],
+            'content' => ['rendered' => '<p>Contenido completo</p>'],
+            'excerpt' => ['rendered' => '<p>Resumen WP</p>'],
+            'date' => '2026-06-29T10:00:00',
+            'link' => 'https://example.com/nota-wp',
+            'slug' => 'nota-wp',
+            '_embedded' => [
+                'author' => [['name' => 'Editora']],
+                'wp:featuredmedia' => [['source_url' => 'https://example.com/image.jpg']],
+                'wp:term' => [
+                    [
+                        ['taxonomy' => 'category', 'name' => 'Mercado'],
+                        ['taxonomy' => 'post_tag', 'name' => 'IA'],
+                    ],
+                ],
+            ],
+        ], $overrides);
     }
 }

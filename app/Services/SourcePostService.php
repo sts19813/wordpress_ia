@@ -28,8 +28,25 @@ class SourcePostService
     public function storeMany(SourceSite $sourceSite, iterable $items): Collection
     {
         return collect($items)
+            ->filter(fn (array $item) => $this->shouldStore($item))
             ->map(fn (array $item) => $this->storeNormalizedItem($sourceSite, $item))
             ->values();
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     */
+    private function shouldStore(array $item): bool
+    {
+        $url = trim((string) ($item['url'] ?? ''));
+
+        if (blank($item['titulo'] ?? null) || blank($url)) {
+            return false;
+        }
+
+        $path = trim((string) parse_url($url, PHP_URL_PATH), '/');
+
+        return $path !== '';
     }
 
     /**

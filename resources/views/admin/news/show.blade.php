@@ -11,13 +11,24 @@
 @endphp
 
 @section('toolbar')
-    <div>
-        <a href="{{ route('admin.news.index') }}" class="text-muted text-hover-primary fw-semibold d-inline-flex align-items-center mb-3">
-            <i class="ki-outline ki-left fs-4 me-1"></i>
-            Noticias Obtenidas
-        </a>
-        <h1 class="page-heading text-gray-900 fw-bold fs-3 my-0">{{ $sourcePost->title }}</h1>
-        <div class="text-muted fw-semibold fs-7 pt-1">{{ $sourcePost->url }}</div>
+    <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-4 w-100">
+        <div>
+            <a href="{{ route('admin.news.index') }}" class="text-muted text-hover-primary fw-semibold d-inline-flex align-items-center mb-3">
+                <i class="ki-outline ki-left fs-4 me-1"></i>
+                Noticias Obtenidas
+            </a>
+            <h1 class="page-heading text-gray-900 fw-bold fs-3 my-0">{{ $sourcePost->title }}</h1>
+            <div class="text-muted fw-semibold fs-7 pt-1">{{ $sourcePost->url }}</div>
+        </div>
+
+        <form method="POST" action="{{ route('admin.news.destroy', $sourcePost) }}" data-confirm-delete data-confirm-title="Eliminar noticia" data-confirm-text="Se eliminará {{ $sourcePost->title }}. Esta acción no se puede deshacer.">
+            @csrf
+            @method('DELETE')
+            <button type="submit" class="btn btn-light-danger">
+                <i class="ki-outline ki-trash fs-2"></i>
+                Eliminar
+            </button>
+        </form>
     </div>
 @endsection
 

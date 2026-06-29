@@ -49,6 +49,38 @@ class SourceImportServiceTest extends TestCase
         $this->assertSame('entrada-1', SourcePost::query()->first()->original_json['slug']);
     }
 
+    public function test_it_skips_items_that_point_to_a_homepage_instead_of_a_post(): void
+    {
+        Http::fake([
+            'example.com/wp-json/wp/v2/posts*' => Http::response([
+                $this->wordpressPost(1),
+                array_merge($this->wordpressPost(2), [
+                    'link' => 'https://example.com/',
+                    'title' => ['rendered' => 'Example Site'],
+                ]),
+            ]),
+        ]);
+
+        $sourceSite = SourceSite::query()->create([
+            'name' => 'WordPress demo',
+            'url' => 'https://example.com',
+            'type' => SourceSite::TYPE_WORDPRESS_REST,
+            'status' => SourceSite::STATUS_ACTIVE,
+            'frequency_minutes' => 60,
+            'language' => 'es',
+            'priority' => 5,
+            'auth_method' => SourceSite::AUTH_NONE,
+            'active' => true,
+        ]);
+
+        $result = app(SourceImportService::class)->import($sourceSite->id);
+
+        $this->assertSame(2, $result['fetched']);
+        $this->assertSame(1, $result['created']);
+        $this->assertSame(1, SourcePost::query()->count());
+        $this->assertSame('https://example.com/entrada-1', SourcePost::query()->value('url'));
+    }
+
     /**
      * @return array<string, mixed>
      */

@@ -145,7 +145,7 @@
                                     Idioma <i class="ki-outline {{ $sortIcon('language') }} fs-7"></i>
                                 </a>
                             </th>
-                            <th class="text-end min-w-100px">Detalle</th>
+                            <th class="text-end min-w-125px">Acciones</th>
                         </tr>
                     </thead>
                     <tbody class="fw-semibold text-gray-700">
@@ -166,9 +166,16 @@
                                 <td><span class="badge {{ $statusClasses[$sourcePost->status] ?? 'badge-light' }}">{{ $sourcePost->statusLabel() }}</span></td>
                                 <td>{{ $sourcePost->language ? strtoupper($sourcePost->language) : '-' }}</td>
                                 <td class="text-end">
-                                    <a href="{{ route('admin.news.show', $sourcePost) }}" class="btn btn-icon btn-light btn-sm" aria-label="Ver detalle">
+                                    <a href="{{ route('admin.news.show', $sourcePost) }}" class="btn btn-icon btn-light btn-sm me-2" aria-label="Ver detalle">
                                         <i class="ki-outline ki-eye fs-3"></i>
                                     </a>
+                                    <form method="POST" action="{{ route('admin.news.destroy', $sourcePost) }}" class="d-inline" data-confirm-delete data-confirm-title="Eliminar noticia" data-confirm-text="Se eliminará {{ $sourcePost->title }}. Esta acción no se puede deshacer.">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-icon btn-light-danger btn-sm" aria-label="Eliminar">
+                                            <i class="ki-outline ki-trash fs-3"></i>
+                                        </button>
+                                    </form>
                                 </td>
                             </tr>
                         @empty

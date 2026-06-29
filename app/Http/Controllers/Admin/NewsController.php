@@ -54,4 +54,15 @@ class NewsController extends Controller
             'sourcePost' => $sourcePost,
         ]);
     }
+
+    public function destroy(SourcePost $sourcePost): RedirectResponse
+    {
+        $title = $sourcePost->title;
+
+        $sourcePost->delete();
+
+        return redirect()
+            ->route('admin.news.index')
+            ->with('status', "Noticia eliminada correctamente: {$title}");
+    }
 }
