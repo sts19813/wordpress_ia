@@ -21,7 +21,7 @@ class SourceSiteController extends Controller
     public function index(Request $request): View
     {
         return view('admin.source-sites.index', [
-            'sourceSites' => $this->sourceSites->paginateForAdmin($request->query()),
+            'sourceSites' => $this->sourceSites->getForAdmin($request->query()),
             'filterOptions' => $this->sourceSites->distinctFilterOptions(),
             'typeOptions' => SourceSite::typeOptions(),
             'statusOptions' => SourceSite::statusOptions(),

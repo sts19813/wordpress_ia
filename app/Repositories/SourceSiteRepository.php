@@ -3,15 +3,15 @@
 namespace App\Repositories;
 
 use App\Models\SourceSite;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 
 class SourceSiteRepository
 {
     /**
      * @param  array<string, mixed>  $filters
      */
-    public function paginateForAdmin(array $filters): LengthAwarePaginator
+    public function getForAdmin(array $filters): Collection
     {
         $sort = $this->allowedSorts()[$filters['sort'] ?? 'created_at'] ?? 'created_at';
         $direction = ($filters['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
@@ -35,8 +35,7 @@ class SourceSiteRepository
             ->when($filters['country'] ?? null, fn (Builder $query, string $country) => $query->where('country', $country))
             ->orderBy($sort, $direction)
             ->orderBy('id', 'desc')
-            ->paginate(15)
-            ->withQueryString();
+            ->get();
     }
 
     /**

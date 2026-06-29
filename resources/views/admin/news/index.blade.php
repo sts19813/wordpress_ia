@@ -3,18 +3,6 @@
 @section('title', 'Noticias Obtenidas | '.config('app.name'))
 
 @php
-    $currentSort = request('sort', 'published_at');
-    $currentDirection = request('direction', 'desc');
-    $sortUrl = function (string $field) use ($currentSort, $currentDirection) {
-        return request()->fullUrlWithQuery([
-            'sort' => $field,
-            'direction' => $currentSort === $field && $currentDirection === 'asc' ? 'desc' : 'asc',
-            'page' => null,
-        ]);
-    };
-    $sortIcon = fn (string $field) => $currentSort === $field
-        ? ($currentDirection === 'asc' ? 'ki-arrow-up' : 'ki-arrow-down')
-        : 'ki-arrow-up-down';
     $statusClasses = [
         'fetched' => 'badge-light-success',
         'duplicate' => 'badge-light-warning',
@@ -102,9 +90,6 @@
                     <input type="date" name="date_from" value="{{ request('date_from') }}" class="form-control form-control-solid w-150px" aria-label="Fecha desde">
                     <input type="date" name="date_to" value="{{ request('date_to') }}" class="form-control form-control-solid w-150px" aria-label="Fecha hasta">
 
-                    <input type="hidden" name="sort" value="{{ request('sort', 'published_at') }}">
-                    <input type="hidden" name="direction" value="{{ request('direction', 'desc') }}">
-
                     <button type="submit" class="btn btn-light-primary">
                         <i class="ki-outline ki-filter fs-2"></i>
                         Filtrar
@@ -116,40 +101,20 @@
 
         <div class="card-body pt-0">
             <div class="table-responsive">
-                <table class="table align-middle table-row-dashed fs-6 gy-5">
+                <table class="table align-middle table-row-dashed fs-6 gy-5 admin-datatable">
                     <thead>
                         <tr class="text-start text-gray-500 fw-bold fs-7 text-uppercase gs-0">
-                            <th class="min-w-300px">
-                                <a href="{{ $sortUrl('title') }}" class="text-gray-500 text-hover-primary">
-                                    Título <i class="ki-outline {{ $sortIcon('title') }} fs-7"></i>
-                                </a>
-                            </th>
+                            <th class="min-w-300px">Título</th>
                             <th class="min-w-170px">Fuente</th>
-                            <th class="min-w-150px">
-                                <a href="{{ $sortUrl('author') }}" class="text-gray-500 text-hover-primary">
-                                    Autor <i class="ki-outline {{ $sortIcon('author') }} fs-7"></i>
-                                </a>
-                            </th>
-                            <th class="min-w-150px">
-                                <a href="{{ $sortUrl('published_at') }}" class="text-gray-500 text-hover-primary">
-                                    Fecha <i class="ki-outline {{ $sortIcon('published_at') }} fs-7"></i>
-                                </a>
-                            </th>
-                            <th class="min-w-125px">
-                                <a href="{{ $sortUrl('status') }}" class="text-gray-500 text-hover-primary">
-                                    Estado <i class="ki-outline {{ $sortIcon('status') }} fs-7"></i>
-                                </a>
-                            </th>
-                            <th class="min-w-100px">
-                                <a href="{{ $sortUrl('language') }}" class="text-gray-500 text-hover-primary">
-                                    Idioma <i class="ki-outline {{ $sortIcon('language') }} fs-7"></i>
-                                </a>
-                            </th>
-                            <th class="text-end min-w-125px">Acciones</th>
+                            <th class="min-w-150px">Autor</th>
+                            <th class="min-w-150px">Fecha</th>
+                            <th class="min-w-125px">Estado</th>
+                            <th class="min-w-100px">Idioma</th>
+                            <th class="text-end min-w-125px no-sort no-search">Acciones</th>
                         </tr>
                     </thead>
                     <tbody class="fw-semibold text-gray-700">
-                        @forelse ($sourcePosts as $sourcePost)
+                        @foreach ($sourcePosts as $sourcePost)
                             <tr>
                                 <td>
                                     <a href="{{ route('admin.news.show', $sourcePost) }}" class="text-gray-900 text-hover-primary fw-bold">{{ $sourcePost->title }}</a>
@@ -162,7 +127,7 @@
                                 </td>
                                 <td>{{ $sourcePost->sourceSite?->name ?: '-' }}</td>
                                 <td>{{ $sourcePost->author ?: '-' }}</td>
-                                <td>{{ $sourcePost->published_at?->format('d/m/Y H:i') ?: '-' }}</td>
+                                <td data-order="{{ $sourcePost->published_at?->timestamp ?: 0 }}">{{ $sourcePost->published_at?->format('d/m/Y H:i') ?: '-' }}</td>
                                 <td><span class="badge {{ $statusClasses[$sourcePost->status] ?? 'badge-light' }}">{{ $sourcePost->statusLabel() }}</span></td>
                                 <td>{{ $sourcePost->language ? strtoupper($sourcePost->language) : '-' }}</td>
                                 <td class="text-end">
@@ -178,19 +143,9 @@
                                     </form>
                                 </td>
                             </tr>
-                        @empty
-                            <tr>
-                                <td colspan="7" class="text-center py-15">
-                                    <div class="text-gray-500 fw-semibold">Todavía no hay noticias obtenidas.</div>
-                                </td>
-                            </tr>
-                        @endforelse
+                        @endforeach
                     </tbody>
                 </table>
-            </div>
-
-            <div class="d-flex justify-content-end pt-5">
-                {{ $sourcePosts->links() }}
             </div>
         </div>
     </div>

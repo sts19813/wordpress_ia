@@ -3,24 +3,6 @@
 @section('title', 'Sitios Fuente | '.config('app.name'))
 
 @php
-    $currentSort = request('sort', 'created_at');
-    $currentDirection = request('direction', 'desc');
-    $sortUrl = function (string $field) use ($currentSort, $currentDirection) {
-        $direction = $currentSort === $field && $currentDirection === 'asc' ? 'desc' : 'asc';
-
-        return request()->fullUrlWithQuery([
-            'sort' => $field,
-            'direction' => $direction,
-            'page' => null,
-        ]);
-    };
-    $sortIcon = function (string $field) use ($currentSort, $currentDirection) {
-        if ($currentSort !== $field) {
-            return 'ki-arrow-up-down';
-        }
-
-        return $currentDirection === 'asc' ? 'ki-arrow-up' : 'ki-arrow-down';
-    };
     $statusClasses = [
         'pending' => 'badge-light-warning',
         'active' => 'badge-light-success',
@@ -91,9 +73,6 @@
                         @endforeach
                     </select>
 
-                    <input type="hidden" name="sort" value="{{ request('sort', 'created_at') }}">
-                    <input type="hidden" name="direction" value="{{ request('direction', 'desc') }}">
-
                     <button type="submit" class="btn btn-light-primary">
                         <i class="ki-outline ki-filter fs-2"></i>
                         Filtrar
@@ -106,54 +85,22 @@
 
         <div class="card-body pt-0">
             <div class="table-responsive">
-                <table class="table align-middle table-row-dashed fs-6 gy-5">
+                <table class="table align-middle table-row-dashed fs-6 gy-5 admin-datatable">
                     <thead>
                         <tr class="text-start text-gray-500 fw-bold fs-7 text-uppercase gs-0">
-                            <th class="min-w-220px">
-                                <a href="{{ $sortUrl('name') }}" class="text-gray-500 text-hover-primary">
-                                    Nombre <i class="ki-outline {{ $sortIcon('name') }} fs-7"></i>
-                                </a>
-                            </th>
-                            <th class="min-w-160px">
-                                <a href="{{ $sortUrl('type') }}" class="text-gray-500 text-hover-primary">
-                                    Tipo <i class="ki-outline {{ $sortIcon('type') }} fs-7"></i>
-                                </a>
-                            </th>
-                            <th class="min-w-125px">
-                                <a href="{{ $sortUrl('status') }}" class="text-gray-500 text-hover-primary">
-                                    Estado <i class="ki-outline {{ $sortIcon('status') }} fs-7"></i>
-                                </a>
-                            </th>
-                            <th class="min-w-125px">
-                                <a href="{{ $sortUrl('frequency_minutes') }}" class="text-gray-500 text-hover-primary">
-                                    Frecuencia <i class="ki-outline {{ $sortIcon('frequency_minutes') }} fs-7"></i>
-                                </a>
-                            </th>
-                            <th class="min-w-125px">
-                                <a href="{{ $sortUrl('category') }}" class="text-gray-500 text-hover-primary">
-                                    Categoría <i class="ki-outline {{ $sortIcon('category') }} fs-7"></i>
-                                </a>
-                            </th>
-                            <th class="min-w-100px">
-                                <a href="{{ $sortUrl('priority') }}" class="text-gray-500 text-hover-primary">
-                                    Prioridad <i class="ki-outline {{ $sortIcon('priority') }} fs-7"></i>
-                                </a>
-                            </th>
-                            <th class="min-w-150px">
-                                <a href="{{ $sortUrl('last_synced_at') }}" class="text-gray-500 text-hover-primary">
-                                    Última sync <i class="ki-outline {{ $sortIcon('last_synced_at') }} fs-7"></i>
-                                </a>
-                            </th>
-                            <th class="min-w-100px">
-                                <a href="{{ $sortUrl('active') }}" class="text-gray-500 text-hover-primary">
-                                    Activo <i class="ki-outline {{ $sortIcon('active') }} fs-7"></i>
-                                </a>
-                            </th>
-                            <th class="text-end min-w-100px">Acciones</th>
+                            <th class="min-w-220px">Nombre</th>
+                            <th class="min-w-160px">Tipo</th>
+                            <th class="min-w-125px">Estado</th>
+                            <th class="min-w-125px">Frecuencia</th>
+                            <th class="min-w-125px">Categoría</th>
+                            <th class="min-w-100px">Prioridad</th>
+                            <th class="min-w-150px">Última sync</th>
+                            <th class="min-w-100px">Activo</th>
+                            <th class="text-end min-w-100px no-sort no-search">Acciones</th>
                         </tr>
                     </thead>
                     <tbody class="fw-semibold text-gray-700">
-                        @forelse ($sourceSites as $sourceSite)
+                        @foreach ($sourceSites as $sourceSite)
                             <tr>
                                 <td>
                                     <a href="{{ route('admin.source-sites.edit', $sourceSite) }}" class="text-gray-900 text-hover-primary fw-bold">{{ $sourceSite->name }}</a>
@@ -162,11 +109,11 @@
                                 </td>
                                 <td>{{ $sourceSite->typeLabel() }}</td>
                                 <td><span class="badge {{ $statusClasses[$sourceSite->status] ?? 'badge-light' }}">{{ $sourceSite->statusLabel() }}</span></td>
-                                <td>{{ $sourceSite->frequency_minutes }} min</td>
+                                <td data-order="{{ $sourceSite->frequency_minutes }}">{{ $sourceSite->frequency_minutes }} min</td>
                                 <td>{{ $sourceSite->category ?: '-' }}</td>
-                                <td><span class="badge badge-light-primary">{{ $sourceSite->priority }}</span></td>
-                                <td>{{ $sourceSite->last_synced_at?->format('d/m/Y H:i') ?: '-' }}</td>
-                                <td>
+                                <td data-order="{{ $sourceSite->priority }}"><span class="badge badge-light-primary">{{ $sourceSite->priority }}</span></td>
+                                <td data-order="{{ $sourceSite->last_synced_at?->timestamp ?: 0 }}">{{ $sourceSite->last_synced_at?->format('d/m/Y H:i') ?: '-' }}</td>
+                                <td data-order="{{ $sourceSite->active ? 1 : 0 }}">
                                     @if ($sourceSite->active)
                                         <span class="badge badge-light-success">Sí</span>
                                     @else
@@ -186,23 +133,9 @@
                                     </form>
                                 </td>
                             </tr>
-                        @empty
-                            <tr>
-                                <td colspan="9" class="text-center py-15">
-                                    <div class="text-gray-500 fw-semibold">No hay sitios fuente registrados.</div>
-                                    <a href="{{ route('admin.source-sites.create') }}" class="btn btn-primary mt-5">
-                                        <i class="ki-outline ki-plus fs-2"></i>
-                                        Crear primer sitio
-                                    </a>
-                                </td>
-                            </tr>
-                        @endforelse
+                        @endforeach
                     </tbody>
                 </table>
-            </div>
-
-            <div class="d-flex justify-content-end pt-5">
-                {{ $sourceSites->links() }}
             </div>
         </div>
     </div>

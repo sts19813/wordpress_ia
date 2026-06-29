@@ -20,7 +20,7 @@ class NewsController extends Controller
     public function index(Request $request): View
     {
         return view('admin.news.index', [
-            'sourcePosts' => $this->sourcePosts->paginateForAdmin($request->query()),
+            'sourcePosts' => $this->sourcePosts->getForAdmin($request->query()),
             'filterOptions' => $this->sourcePosts->filterOptions(),
             'statusOptions' => SourcePost::statusOptions(),
         ]);

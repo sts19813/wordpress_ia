@@ -71,6 +71,64 @@
         .table-responsive thead tr th:last-child {
             padding-right: 10px !important;
         }
+
+        .admin-datatable-wrapper .dataTables_length label,
+        .admin-datatable-wrapper .dataTables_filter label {
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+            margin-bottom: 0;
+            color: #4b5675;
+            font-weight: 600 !important;
+        }
+
+        .admin-datatable-wrapper .dataTables_filter input,
+        .admin-datatable-wrapper .dataTables_length select {
+            min-height: 42px;
+            border: 1px solid var(--bs-gray-300);
+            border-radius: .475rem;
+            background-color: var(--bs-gray-100);
+            color: #1f2a44;
+            box-shadow: none;
+        }
+
+        .admin-datatable-wrapper .dataTables_filter input {
+            min-width: min(100%, 260px);
+            margin-left: 0 !important;
+            padding: .65rem 1rem;
+        }
+
+        .admin-datatable-wrapper .dataTables_length select {
+            padding: .65rem 2.75rem .65rem 1rem;
+        }
+
+        .admin-datatable-wrapper .dataTables_info {
+            color: #667085;
+            font-weight: 600;
+        }
+
+        .admin-datatable-wrapper .pagination {
+            gap: .35rem;
+        }
+
+        .admin-datatable-wrapper .page-link {
+            min-width: 36px;
+            border-radius: .475rem !important;
+            text-align: center;
+        }
+
+        @media (max-width: 575.98px) {
+            .admin-datatable-wrapper .dataTables_length label,
+            .admin-datatable-wrapper .dataTables_filter label {
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+
+            .admin-datatable-wrapper .dataTables_filter input {
+                width: 100% !important;
+            }
+        }
+
         .app-sidebar-menu-primary.menu>.menu-item>.menu-link .menu-title {
             color: #d7d7d7 !important;
         }
@@ -901,6 +959,55 @@
                     });
                 });
             });
+
+            if (window.jQuery && jQuery.fn.DataTable) {
+                jQuery('.admin-datatable').each(function () {
+                    var table = jQuery(this);
+
+                    if (jQuery.fn.DataTable.isDataTable(this)) {
+                        return;
+                    }
+
+                    table.DataTable({
+                        pageLength: 25,
+                        lengthMenu: [[25, 50, 100, -1], [25, 50, 100, 'Todos']],
+                        order: [],
+                        autoWidth: false,
+                        columnDefs: [
+                            {
+                                targets: 'no-sort',
+                                orderable: false,
+                            },
+                            {
+                                targets: 'no-search',
+                                searchable: false,
+                            },
+                        ],
+                        dom: "<'admin-datatable-wrapper'<'row align-items-center g-3 mb-4'<'col-sm-6 d-flex align-items-center'l><'col-sm-6 d-flex justify-content-sm-end'f>>" +
+                            "<'row dt-row'<'col-sm-12'tr>>" +
+                            "<'row align-items-center g-3 mt-4'<'col-sm-5'i><'col-sm-7'p>>>",
+                        language: {
+                            search: 'Buscar:',
+                            lengthMenu: 'Mostrar _MENU_ registros',
+                            info: 'Mostrando _START_ a _END_ de _TOTAL_ registros',
+                            infoEmpty: 'Mostrando 0 registros',
+                            infoFiltered: '(filtrado de _MAX_ registros)',
+                            zeroRecords: 'No se encontraron registros',
+                            emptyTable: 'No hay registros disponibles',
+                            paginate: {
+                                first: 'Primero',
+                                previous: 'Anterior',
+                                next: 'Siguiente',
+                                last: 'Último',
+                            },
+                            aria: {
+                                sortAscending: ': activar para ordenar ascendente',
+                                sortDescending: ': activar para ordenar descendente',
+                            },
+                        },
+                    });
+                });
+            }
         });
     </script>
     @stack('scripts')

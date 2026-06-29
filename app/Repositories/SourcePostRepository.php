@@ -4,15 +4,15 @@ namespace App\Repositories;
 
 use App\Models\SourcePost;
 use App\Models\SourceSite;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 
 class SourcePostRepository
 {
     /**
      * @param  array<string, mixed>  $filters
      */
-    public function paginateForAdmin(array $filters): LengthAwarePaginator
+    public function getForAdmin(array $filters): Collection
     {
         $sort = $this->allowedSorts()[$filters['sort'] ?? 'published_at'] ?? 'published_at';
         $direction = ($filters['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
@@ -40,8 +40,7 @@ class SourcePostRepository
             ->when($filters['date_to'] ?? null, fn (Builder $query, string $date) => $query->whereDate('published_at', '<=', $date))
             ->orderBy($sort, $direction)
             ->orderBy('id', 'desc')
-            ->paginate(15)
-            ->withQueryString();
+            ->get();
     }
 
     /**
