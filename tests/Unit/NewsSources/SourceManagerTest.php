@@ -135,6 +135,15 @@ class SourceManagerTest extends TestCase
                     <category>Noticias</category>
                     <content:encoded><![CDATA[<p>Contenido RSS</p>]]></content:encoded>
                 </item>
+                <item>
+                    <title>Segunda Nota RSS</title>
+                    <link>https://example.com/rss-2</link>
+                    <dc:creator>Editora</dc:creator>
+                    <pubDate>Mon, 29 Jun 2026 13:00:00 GMT</pubDate>
+                    <category>Noticias</category>
+                    <category>Tulum</category>
+                    <content:encoded><![CDATA[<p>Segundo contenido RSS</p>]]></content:encoded>
+                </item>
             </channel>
         </rss>
         XML;
@@ -146,10 +155,12 @@ class SourceManagerTest extends TestCase
             'language' => 'es',
         ]));
 
-        $this->assertCount(1, $items);
+        $this->assertCount(2, $items);
         $this->assertSame('Nota RSS', $items->first()['titulo']);
         $this->assertSame('Reportera', $items->first()['autor']);
         $this->assertSame(['Noticias'], $items->first()['categorias']);
+        $this->assertSame('Segunda Nota RSS', $items->last()['titulo']);
+        $this->assertSame(['Noticias', 'Tulum'], $items->last()['categorias']);
         $this->assertSame('es', $items->first()['idioma']);
     }
 

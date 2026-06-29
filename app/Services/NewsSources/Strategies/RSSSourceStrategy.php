@@ -85,11 +85,23 @@ class RSSSourceStrategy implements SourceStrategyInterface
     private function itemsFrom(SimpleXMLElement $xml): Collection
     {
         if (isset($xml->channel->item)) {
-            return collect($xml->channel->item);
+            $items = [];
+
+            foreach ($xml->channel->item as $item) {
+                $items[] = $item;
+            }
+
+            return collect($items);
         }
 
         if (isset($xml->entry)) {
-            return collect($xml->entry);
+            $items = [];
+
+            foreach ($xml->entry as $item) {
+                $items[] = $item;
+            }
+
+            return collect($items);
         }
 
         return collect();
@@ -152,11 +164,13 @@ class RSSSourceStrategy implements SourceStrategyInterface
      */
     private function categoriesFor(SimpleXMLElement $item): array
     {
-        return collect($item->category)
-            ->map(fn (SimpleXMLElement $category) => $this->text($category))
-            ->filter()
-            ->values()
-            ->all();
+        $categories = [];
+
+        foreach ($item->category as $category) {
+            $categories[] = $this->text($category);
+        }
+
+        return collect($categories)->filter()->values()->all();
     }
 
     private function text(mixed $value): ?string

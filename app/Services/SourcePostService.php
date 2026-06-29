@@ -14,11 +14,16 @@ class SourcePostService
     public function storeNormalizedItem(SourceSite $sourceSite, array $item): SourcePost
     {
         $payload = $this->payloadFor($sourceSite, $item);
+        $existingPost = SourcePost::query()
+            ->where('hash', $payload['hash'])
+            ->orWhere('url', $payload['url'])
+            ->first();
 
-        return SourcePost::query()->firstOrCreate(
-            ['hash' => $payload['hash']],
-            $payload,
-        );
+        if ($existingPost) {
+            return $existingPost;
+        }
+
+        return SourcePost::query()->create($payload);
     }
 
     /**
