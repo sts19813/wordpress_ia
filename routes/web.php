@@ -52,7 +52,10 @@ Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
 Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::get('noticias', NewsController::class)->name('news.index');
-    Route::get('sitios-fuente', SourceSiteController::class)->name('source-sites.index');
+    Route::resource('sitios-fuente', SourceSiteController::class)
+        ->names('source-sites')
+        ->parameters(['sitios-fuente' => 'sourceSite'])
+        ->except('show');
     Route::get('articulos-ia', AiArticleController::class)->name('ai-articles.index');
     Route::get('imagenes-ia', AiImageController::class)->name('ai-images.index');
     Route::get('publicaciones', PublicationController::class)->name('publications.index');
