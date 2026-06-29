@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+
+//Modelos de publicaciones generadas por IA
 class Publication extends Model
 {
     public const STATUS_DRAFT = 'draft';

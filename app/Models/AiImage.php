@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-
+//Modelos de imágenes generadas por IA
 class AiImage extends Model
 {
     public const TYPE_MAIN = 'main';

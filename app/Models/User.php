@@ -21,6 +21,8 @@ use Illuminate\Support\Facades\Storage;
     'email_verified_at',
 ])]
 #[Hidden(['password', 'remember_token'])]
+
+//Modelos de usuarios del sistema.
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -52,7 +54,7 @@ class User extends Authenticatable
     {
         return collect(preg_split('/\s+/', trim($this->name)))
             ->filter()
-            ->map(fn (string $word) => mb_substr($word, 0, 1))
+            ->map(fn(string $word) => mb_substr($word, 0, 1))
             ->take(2)
             ->join('');
     }

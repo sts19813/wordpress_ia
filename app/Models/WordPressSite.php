@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+
+//Modelos de sitios de Wordpress para publicar el contenido generado por la Ia.
 class WordPressSite extends Model
 {
     protected $table = 'wordpress_sites';
@@ -56,6 +58,6 @@ class WordPressSite extends Model
 
     public function endpoint(string $path): string
     {
-        return rtrim($this->rest_api_url, '/').'/'.ltrim($path, '/');
+        return rtrim($this->rest_api_url, '/') . '/' . ltrim($path, '/');
     }
 }

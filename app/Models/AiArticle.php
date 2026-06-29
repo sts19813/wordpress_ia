@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 
+//Modelos de artículos generados por IA
 class AiArticle extends Model
 {
     public const STATUS_PENDING = 'pending_generation';

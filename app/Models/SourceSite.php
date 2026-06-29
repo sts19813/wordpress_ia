@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+
+//Modelos de stios fuentes para obtener publicaciones generadas por Ia.
 class SourceSite extends Model
 {
     use SoftDeletes;
