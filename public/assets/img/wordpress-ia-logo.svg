@@ -1,0 +1,10 @@
+<svg width="330" height="54" viewBox="0 0 330 54" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+    <title id="title">WordPress IA</title>
+    <desc id="desc">Logo de WordPress IA</desc>
+    <rect x="2" y="2" width="50" height="50" rx="12" fill="#2F80ED"/>
+    <path d="M18 15H34C38.4183 15 42 18.5817 42 23V39H26C21.5817 39 18 35.4183 18 31V15Z" fill="white" fill-opacity="0.96"/>
+    <path d="M12 15H27C31.4183 15 35 18.5817 35 23V39H20C15.5817 39 12 35.4183 12 31V15Z" fill="#DDEBFF"/>
+    <path d="M20 21H30M20 27H30M20 33H27" stroke="#2F80ED" stroke-width="2.4" stroke-linecap="round"/>
+    <text x="68" y="25" fill="#1F2A44" font-family="Inter, Arial, sans-serif" font-size="21" font-weight="800">WordPress</text>
+    <text x="68" y="45" fill="#2F80ED" font-family="Inter, Arial, sans-serif" font-size="21" font-weight="700">IA</text>
+</svg>

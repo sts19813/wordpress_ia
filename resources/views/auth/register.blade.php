@@ -3,7 +3,10 @@
 @section('title', 'Crear cuenta | '.config('app.name'))
 
 @section('content')
-    <form method="POST" action="{{ route('register') }}" class="form w-100 px-lg-5" enctype="multipart/form-data" novalidate>
+    <div class="d-flex flex-column-fluid flex-lg-row-auto justify-content-center justify-content-lg-end p-12 p-lg-20">
+        <div class="bg-body d-flex flex-column align-items-stretch flex-center rounded-4 w-md-600px p-20">
+            <div class="d-flex flex-center flex-column flex-column-fluid px-lg-10 pb-15 pb-lg-20">
+    <form method="POST" action="{{ route('register') }}" class="form w-100" enctype="multipart/form-data" novalidate>
         @csrf
         <div class="text-center mb-10">
             <h1 class="text-gray-900 fw-bolder mb-3">Crear cuenta</h1>
@@ -34,7 +37,10 @@
         <div class="fv-row mb-9">
             <input type="password" name="password_confirmation" class="form-control form-control-lg bg-transparent" placeholder="Confirmar contraseña" autocomplete="new-password" required>
         </div>
-        <div class="d-grid mb-10"><button type="submit" class="btn btn-primary btn-lg">Crear cuenta</button></div>
+        <div class="d-grid mb-10"><button type="submit" class="btn btn-primary">Crear cuenta</button></div>
         <div class="text-gray-500 text-center fw-semibold fs-6">¿Ya tienes cuenta? <a href="{{ route('login') }}" class="link-primary">Inicia sesión</a></div>
     </form>
+            </div>
+        </div>
+    </div>
 @endsection

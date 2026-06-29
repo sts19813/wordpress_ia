@@ -1,7 +1,15 @@
 <?php
 
 use App\Http\Controllers\Admin\AccountController;
+use App\Http\Controllers\Admin\AiArticleController;
+use App\Http\Controllers\Admin\AiImageController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\NewsController;
+use App\Http\Controllers\Admin\PublicationController;
+use App\Http\Controllers\Admin\SchedulerController;
+use App\Http\Controllers\Admin\SettingController;
+use App\Http\Controllers\Admin\SourceSiteController;
+use App\Http\Controllers\Admin\SystemLogController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\Auth\NewPasswordController;
@@ -34,6 +42,7 @@ Route::middleware('guest')->group(function () {
 
     Route::get('auth/google', [GoogleAuthController::class, 'redirect'])->name('google.redirect');
     Route::get('auth/google/callback', [GoogleAuthController::class, 'callback'])->name('google.callback');
+    Route::get('google-auth/callback', [GoogleAuthController::class, 'callback']);
 });
 
 Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
@@ -42,6 +51,14 @@ Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
 
 Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+    Route::get('noticias', NewsController::class)->name('news.index');
+    Route::get('sitios-fuente', SourceSiteController::class)->name('source-sites.index');
+    Route::get('articulos-ia', AiArticleController::class)->name('ai-articles.index');
+    Route::get('imagenes-ia', AiImageController::class)->name('ai-images.index');
+    Route::get('publicaciones', PublicationController::class)->name('publications.index');
+    Route::get('programador', SchedulerController::class)->name('scheduler.index');
+    Route::get('logs', SystemLogController::class)->name('system-logs.index');
+    Route::get('configuracion', SettingController::class)->name('settings.index');
     Route::get('cuenta', [AccountController::class, 'edit'])->name('account.edit');
     Route::patch('cuenta', [AccountController::class, 'update'])->name('account.update');
     Route::put('cuenta/contrasena', [AccountController::class, 'updatePassword'])->name('account.password.update');
