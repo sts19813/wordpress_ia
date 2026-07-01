@@ -59,12 +59,20 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         ->names('source-sites')
         ->parameters(['sitios-fuente' => 'sourceSite'])
         ->except('show');
-    Route::get('articulos-ia', AiArticleController::class)->name('ai-articles.index');
-    Route::get('imagenes-ia', AiImageController::class)->name('ai-images.index');
+    Route::resource('articulos-ia', AiArticleController::class)
+        ->names('ai-articles')
+        ->parameters(['articulos-ia' => 'aiArticle']);
+    Route::get('imagenes-ia', [AiImageController::class, 'index'])->name('ai-images.index');
+    Route::get('imagenes-ia/{aiImage}/archivo', [AiImageController::class, 'file'])->name('ai-images.file');
     Route::get('publicaciones', PublicationController::class)->name('publications.index');
     Route::get('programador', SchedulerController::class)->name('scheduler.index');
     Route::get('logs', SystemLogController::class)->name('system-logs.index');
-    Route::get('configuracion', SettingController::class)->name('settings.index');
+    Route::get('configuracion', [SettingController::class, 'index'])->name('settings.index');
+    Route::get('configuracion/prompts/nuevo', [SettingController::class, 'create'])->name('settings.prompts.create');
+    Route::post('configuracion/prompts', [SettingController::class, 'store'])->name('settings.prompts.store');
+    Route::get('configuracion/prompts/{aiPromptProfile}/editar', [SettingController::class, 'edit'])->name('settings.prompts.edit');
+    Route::put('configuracion/prompts/{aiPromptProfile}', [SettingController::class, 'update'])->name('settings.prompts.update');
+    Route::delete('configuracion/prompts/{aiPromptProfile}', [SettingController::class, 'destroy'])->name('settings.prompts.destroy');
     Route::get('cuenta', [AccountController::class, 'edit'])->name('account.edit');
     Route::patch('cuenta', [AccountController::class, 'update'])->name('account.update');
     Route::put('cuenta/contrasena', [AccountController::class, 'updatePassword'])->name('account.password.update');

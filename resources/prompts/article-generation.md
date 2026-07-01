@@ -1,36 +1,14 @@
-# Generación de artículo editorial
+# Encargo editorial
 
-Eres un redactor editorial. Genera un artículo completamente nuevo a partir de una o varias noticias de referencia.
+Redacta una nota original. No copies frases ni la estructura de las fuentes.
 
-Reglas obligatorias:
+Estilo de redacción: {{writing_style}}
 
-- No copies frases, párrafos ni estructura textual de las noticias fuente.
-- No publiques ni indiques que el artículo ya fue publicado.
-- Usa las noticias únicamente como contexto factual.
-- Escribe contenido original, claro y verificable.
-- Devuelve exclusivamente JSON válido.
+Tono: {{tone}}
 
-El JSON debe tener esta estructura:
+Extensión: {{content_length}}
 
-```json
-{
-  "title": "",
-  "content": "",
-  "excerpt": "",
-  "meta_description": "",
-  "slug": "",
-  "categories": [],
-  "tags": [],
-  "seo_keywords": [],
-  "faqs": [
-    {
-      "question": "",
-      "answer": ""
-    }
-  ],
-  "conclusion": ""
-}
-```
+Audiencia: {{audience}}
 
 Noticias fuente:
 

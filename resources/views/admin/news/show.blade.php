@@ -21,14 +21,13 @@
             <div class="text-muted fw-semibold fs-7 pt-1">{{ $sourcePost->url }}</div>
         </div>
 
-        <form method="POST" action="{{ route('admin.news.destroy', $sourcePost) }}" data-confirm-delete data-confirm-title="Eliminar noticia" data-confirm-text="Se eliminará {{ $sourcePost->title }}. Esta acción no se puede deshacer.">
-            @csrf
-            @method('DELETE')
-            <button type="submit" class="btn btn-light-danger">
-                <i class="ki-outline ki-trash fs-2"></i>
-                Eliminar
-            </button>
-        </form>
+        <div class="d-flex gap-3">
+            <a href="{{ route('admin.ai-articles.create', ['source_post_ids' => [$sourcePost->id]]) }}" class="btn btn-primary"><i class="ki-outline ki-sparkles fs-2"></i>Crear nota con IA</a>
+            <form method="POST" action="{{ route('admin.news.destroy', $sourcePost) }}" data-confirm-delete data-confirm-title="Eliminar noticia" data-confirm-text="Se eliminará {{ $sourcePost->title }}. Esta acción no se puede deshacer.">
+                @csrf @method('DELETE')
+                <button type="submit" class="btn btn-light-danger"><i class="ki-outline ki-trash fs-2"></i>Eliminar</button>
+            </form>
+        </div>
     </div>
 @endsection
 

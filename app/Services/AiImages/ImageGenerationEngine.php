@@ -38,27 +38,32 @@ class ImageGenerationEngine
             throw new InvalidArgumentException("Tipo de imagen no soportado [{$type}].");
         }
 
-        $model = (string) ($options['model'] ?? 'gpt-image-1');
+        $model = (string) ($options['model'] ?? config('services.openai.image_model', 'gpt-image-1.5'));
         $resolution = (string) ($options['resolution'] ?? self::DEFAULT_RESOLUTIONS[$type]);
+        $quality = (string) ($options['quality'] ?? 'medium');
         $seed = $options['seed'] ?? null;
-        $prompt = $this->openAI->renderer->render(
-            $this->openAI->prompts->get((string) ($options['prompt'] ?? self::PROMPTS[$type])),
-            $this->variablesFor($context, $options['variables'] ?? []),
-        );
+        $promptTemplate = isset($options['prompt_text'])
+            ? (string) $options['prompt_text']
+            : $this->openAI->prompts->get((string) ($options['prompt'] ?? self::PROMPTS[$type]));
+        $prompt = $this->openAI->renderer->render($promptTemplate, $this->variablesFor($context, $options['variables'] ?? []));
 
-        $request = $this->openAI->images->generate($prompt, array_filter([
+        $request = $this->openAI->images->generate($prompt, [
             'model' => $model,
             'size' => $resolution,
-            'seed' => $seed,
-        ], fn (mixed $value) => $value !== null));
+            'quality' => $quality,
+            'output_format' => 'png',
+            'n' => 1,
+        ]);
 
         $image = AiImage::query()->create([
+            'ai_article_id' => $options['ai_article_id'] ?? null,
             'type' => $type,
             'title' => $context['title'] ?? null,
             'prompt' => $prompt,
             'seed' => $seed,
             'model' => $model,
             'resolution' => $resolution,
+            'quality' => $quality,
             'status' => AiImage::STATUS_PENDING,
             'source_context' => $context,
         ]);
@@ -73,11 +78,15 @@ class ImageGenerationEngine
     {
         $image->update([
             'image_url' => $imageUrl ?? $this->imageUrlFromResponse($response),
-            'full_response' => is_string($response) ? $response : json_encode($response, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'full_response' => is_string($response) ? $response : json_encode($this->responseForStorage($response), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             'cost' => $metrics['cost'] ?? null,
             'duration_ms' => $metrics['duration_ms'] ?? null,
             'model' => $metrics['model'] ?? $image->model,
             'resolution' => $metrics['resolution'] ?? $image->resolution,
+            'quality' => $metrics['quality'] ?? $image->quality,
+            'file_path' => $metrics['file_path'] ?? $image->file_path,
+            'mime_type' => $metrics['mime_type'] ?? $image->mime_type,
+            'generation_error' => null,
             'status' => AiImage::STATUS_GENERATED,
         ]);
 
@@ -95,6 +104,7 @@ class ImageGenerationEngine
             'duration_ms' => $metrics['duration_ms'] ?? null,
             'model' => $metrics['model'] ?? $image->model,
             'resolution' => $metrics['resolution'] ?? $image->resolution,
+            'generation_error' => is_string($response) ? $response : (data_get($response, 'error.message') ?: 'No fue posible generar la imagen.'),
             'status' => AiImage::STATUS_FAILED,
         ]);
 
@@ -147,5 +157,18 @@ class ImageGenerationEngine
         return data_get($response, 'data.0.url')
             ?: data_get($response, 'url')
             ?: null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $response
+     * @return array<string, mixed>
+     */
+    private function responseForStorage(array $response): array
+    {
+        if (data_get($response, 'data.0.b64_json')) {
+            data_set($response, 'data.0.b64_json', '[imagen almacenada localmente]');
+        }
+
+        return $response;
     }
 }

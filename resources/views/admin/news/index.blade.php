@@ -131,6 +131,9 @@
                                 <td><span class="badge {{ $statusClasses[$sourcePost->status] ?? 'badge-light' }}">{{ $sourcePost->statusLabel() }}</span></td>
                                 <td>{{ $sourcePost->language ? strtoupper($sourcePost->language) : '-' }}</td>
                                 <td class="text-end">
+                                    <a href="{{ route('admin.ai-articles.create', ['source_post_ids' => [$sourcePost->id]]) }}" class="btn btn-icon btn-light-primary btn-sm me-2" aria-label="Crear nota con IA" title="Crear nota con IA">
+                                        <i class="ki-outline ki-sparkles fs-3"></i>
+                                    </a>
                                     <a href="{{ route('admin.news.show', $sourcePost) }}" class="btn btn-icon btn-light btn-sm me-2" aria-label="Ver detalle">
                                         <i class="ki-outline ki-eye fs-3"></i>
                                     </a>

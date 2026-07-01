@@ -7,6 +7,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Storage;
@@ -22,7 +23,7 @@ use Illuminate\Support\Facades\Storage;
 ])]
 #[Hidden(['password', 'remember_token'])]
 
-//Modelos de usuarios del sistema.
+// Modelos de usuarios del sistema.
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -54,8 +55,18 @@ class User extends Authenticatable
     {
         return collect(preg_split('/\s+/', trim($this->name)))
             ->filter()
-            ->map(fn(string $word) => mb_substr($word, 0, 1))
+            ->map(fn (string $word) => mb_substr($word, 0, 1))
             ->take(2)
             ->join('');
+    }
+
+    public function aiPromptProfiles(): HasMany
+    {
+        return $this->hasMany(AiPromptProfile::class);
+    }
+
+    public function aiArticles(): HasMany
+    {
+        return $this->hasMany(AiArticle::class);
     }
 }

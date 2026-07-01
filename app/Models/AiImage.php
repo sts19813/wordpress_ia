@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-//Modelos de imágenes generadas por IA
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+// Modelos de imágenes generadas por IA
 class AiImage extends Model
 {
     public const TYPE_MAIN = 'main';
@@ -24,6 +26,7 @@ class AiImage extends Model
 
     protected $fillable = [
         'type',
+        'ai_article_id',
         'title',
         'prompt',
         'seed',
@@ -31,10 +34,14 @@ class AiImage extends Model
         'cost',
         'duration_ms',
         'resolution',
+        'quality',
         'status',
         'source_context',
         'full_response',
         'image_url',
+        'file_path',
+        'mime_type',
+        'generation_error',
     ];
 
     protected function casts(): array
@@ -75,5 +82,10 @@ class AiImage extends Model
     public function statusLabel(): string
     {
         return self::statusOptions()[$this->status] ?? $this->status;
+    }
+
+    public function article(): BelongsTo
+    {
+        return $this->belongsTo(AiArticle::class, 'ai_article_id');
     }
 }

@@ -5,6 +5,7 @@ namespace App\Services\AiArticles;
 use App\Models\AiArticle;
 use App\Models\SourcePost;
 use App\Services\OpenAI\OpenAIService;
+use App\Support\SafeHtml;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
 
@@ -28,7 +29,7 @@ class ArticleGenerationEngine
             throw new InvalidArgumentException('Se requiere al menos una noticia para generar un artículo.');
         }
 
-        $model = (string) ($options['model'] ?? 'gpt-4.1');
+        $model = (string) ($options['model'] ?? config('services.openai.text_model', 'gpt-4.1-mini'));
         $temperature = (float) ($options['temperature'] ?? 0.7);
         $promptName = (string) ($options['prompt'] ?? self::DEFAULT_PROMPT);
         $variables = $this->variablesFor($posts, $options['variables'] ?? []);
@@ -37,17 +38,45 @@ class ArticleGenerationEngine
             $variables,
         );
 
-        $request = $this->openAI->responses->create($prompt, [
+        $systemPrompt = trim((string) ($options['system_prompt'] ?? ''));
+        $maxOutputTokens = (int) ($options['max_output_tokens'] ?? 4000);
+        $requestOptions = [
             'model' => $model,
-            'temperature' => $temperature,
-            'response_format' => ['type' => 'json_object'],
-        ]);
+            'instructions' => $systemPrompt !== '' ? $systemPrompt : null,
+            'max_output_tokens' => $maxOutputTokens,
+            'store' => false,
+            'text' => [
+                'format' => [
+                    'type' => 'json_schema',
+                    'name' => 'draft_article',
+                    'strict' => true,
+                    'schema' => $this->articleSchema(),
+                ],
+            ],
+        ];
+
+        if ($this->supportsTemperature($model)) {
+            $requestOptions['temperature'] = $temperature;
+        }
+
+        $request = $this->openAI->responses->create($prompt, array_filter(
+            $requestOptions,
+            fn (mixed $value) => $value !== null,
+        ));
 
         $article = AiArticle::query()->create([
             'source_post_ids' => $posts->pluck('id')->filter()->values()->all(),
-            'prompt_used' => $prompt,
+            'user_id' => $options['user_id'] ?? null,
+            'ai_prompt_profile_id' => $options['ai_prompt_profile_id'] ?? null,
+            'prompt_used' => trim($systemPrompt."\n\n".$prompt),
             'model' => $model,
             'temperature' => $temperature,
+            'writing_style' => $options['writing_style'] ?? null,
+            'tone' => $options['tone'] ?? null,
+            'content_length' => $options['content_length'] ?? null,
+            'language' => $options['language'] ?? $posts->first()?->language ?? 'es',
+            'audience' => $options['audience'] ?? null,
+            'max_output_tokens' => $maxOutputTokens,
             'status' => AiArticle::STATUS_PENDING,
         ]);
 
@@ -64,7 +93,7 @@ class ArticleGenerationEngine
 
         $article->update([
             'title' => $decoded['title'] ?? null,
-            'content' => $decoded['content'] ?? null,
+            'content' => SafeHtml::clean($decoded['content'] ?? null),
             'excerpt' => $decoded['excerpt'] ?? null,
             'meta_description' => $decoded['meta_description'] ?? null,
             'slug' => $decoded['slug'] ?? str($decoded['title'] ?? '')->slug()->toString(),
@@ -80,6 +109,8 @@ class ArticleGenerationEngine
             'model' => $metrics['model'] ?? $article->model,
             'temperature' => $metrics['temperature'] ?? $article->temperature,
             'status' => AiArticle::STATUS_GENERATED,
+            'generation_error' => null,
+            'generated_at' => now(),
         ]);
 
         return $article;
@@ -98,6 +129,7 @@ class ArticleGenerationEngine
             'model' => $metrics['model'] ?? $article->model,
             'temperature' => $metrics['temperature'] ?? $article->temperature,
             'status' => AiArticle::STATUS_FAILED,
+            'generation_error' => is_string($response) ? $response : (data_get($response, 'error.message') ?: 'No fue posible generar el artículo.'),
         ]);
 
         return $article;
@@ -140,8 +172,12 @@ class ArticleGenerationEngine
             ])->values()->all(),
             'categories' => $categories,
             'tags' => $tags,
-            'language' => $posts->first()?->language ?: 'es',
             ...$extraVariables,
+            'language' => $extraVariables['language'] ?? $posts->first()?->language ?: 'es',
+            'writing_style' => $extraVariables['writing_style'] ?? 'periodístico informativo',
+            'tone' => $extraVariables['tone'] ?? 'claro, objetivo y profesional',
+            'content_length' => $this->contentLengthInstruction((string) ($extraVariables['content_length'] ?? 'medium')),
+            'audience' => $extraVariables['audience'] ?? 'público general',
         ];
     }
 
@@ -178,5 +214,54 @@ class ArticleGenerationEngine
             ->unique()
             ->values()
             ->all();
+    }
+
+    private function contentLengthInstruction(string $length): string
+    {
+        return match ($length) {
+            'short' => 'Entre 400 y 600 palabras.',
+            'long' => 'Entre 1,200 y 1,600 palabras.',
+            default => 'Entre 700 y 1,000 palabras.',
+        };
+    }
+
+    private function supportsTemperature(string $model): bool
+    {
+        return ! str($model)->startsWith(['gpt-5', 'o1', 'o3', 'o4']);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function articleSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'additionalProperties' => false,
+            'required' => ['title', 'content', 'excerpt', 'meta_description', 'slug', 'categories', 'tags', 'seo_keywords', 'faqs', 'conclusion'],
+            'properties' => [
+                'title' => ['type' => 'string'],
+                'content' => ['type' => 'string'],
+                'excerpt' => ['type' => 'string'],
+                'meta_description' => ['type' => 'string'],
+                'slug' => ['type' => 'string'],
+                'categories' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'tags' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'seo_keywords' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'faqs' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'additionalProperties' => false,
+                        'required' => ['question', 'answer'],
+                        'properties' => [
+                            'question' => ['type' => 'string'],
+                            'answer' => ['type' => 'string'],
+                        ],
+                    ],
+                ],
+                'conclusion' => ['type' => 'string'],
+            ],
+        ];
     }
 }
