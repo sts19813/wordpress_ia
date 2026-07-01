@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AiPromptProfile extends Model
 {
+    public const DEFAULT_IMAGE_MODEL = 'gpt-image-2';
+
     public const DEFAULT_SYSTEM_PROMPT = <<<'PROMPT'
 Eres un periodista y editor digital experto. Crea una nota nueva, útil y rigurosa a partir de las fuentes proporcionadas.
 
@@ -58,6 +60,30 @@ PROMPT;
             'medium' => 'Media (700–1,000 palabras)',
             'long' => 'Larga (1,200–1,600 palabras)',
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function imageModelOptions(): array
+    {
+        return [
+            'gpt-image-2' => 'GPT Image 2 — recomendado, mejor calidad',
+            'gpt-image-2-2026-04-21' => 'GPT Image 2 — versión fija 2026-04-21',
+            'gpt-image-1.5' => 'GPT Image 1.5 — legado/deprecado, solo compatibilidad',
+        ];
+    }
+
+    public static function normalizeImageModel(?string $model): string
+    {
+        $model = match ($model) {
+            'gpt-image-2.0' => self::DEFAULT_IMAGE_MODEL,
+            default => $model,
+        };
+
+        return array_key_exists((string) $model, self::imageModelOptions())
+            ? (string) $model
+            : self::DEFAULT_IMAGE_MODEL;
     }
 
     public function user(): BelongsTo

@@ -100,6 +100,7 @@ class AiArticleService
     private function generateMainImage(AiArticle $article, AiPromptProfile $profile): void
     {
         $startedAt = hrtime(true);
+        $imageModel = AiPromptProfile::normalizeImageModel($profile->image_model);
         $result = $this->images->prepareMain([
             'title' => $article->title,
             'summary' => $article->excerpt,
@@ -107,7 +108,7 @@ class AiArticleService
             'style' => $profile->image_style,
         ], [
             'ai_article_id' => $article->id,
-            'model' => $profile->image_model,
+            'model' => $imageModel,
             'resolution' => $profile->image_size,
             'quality' => $profile->image_quality,
         ]);
@@ -125,7 +126,7 @@ class AiArticleService
 
             $this->images->completeGeneration($result->image, $response, metrics: [
                 'duration_ms' => $this->elapsedMilliseconds($startedAt),
-                'model' => $profile->image_model,
+                'model' => $imageModel,
                 'resolution' => data_get($response, 'size', $profile->image_size),
                 'quality' => data_get($response, 'quality', $profile->image_quality),
                 'file_path' => $path,
@@ -134,7 +135,7 @@ class AiArticleService
         } catch (Throwable $exception) {
             $this->images->failGeneration($result->image, $exception->getMessage(), [
                 'duration_ms' => $this->elapsedMilliseconds($startedAt),
-                'model' => $profile->image_model,
+                'model' => $imageModel,
                 'resolution' => $profile->image_size,
             ]);
         }

@@ -20,7 +20,7 @@ class AiPromptProfileService
             'name' => 'Editorial general',
             'system_prompt' => AiPromptProfile::DEFAULT_SYSTEM_PROMPT,
             'model' => config('services.openai.text_model', 'gpt-4.1-mini'),
-            'image_model' => config('services.openai.image_model', 'gpt-image-1.5'),
+            'image_model' => AiPromptProfile::normalizeImageModel(config('services.openai.image_model')),
             'is_default' => true,
         ]);
     }

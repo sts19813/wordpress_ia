@@ -42,7 +42,7 @@ class SettingController extends Controller
                 'audience' => 'público general',
                 'max_output_tokens' => 4000,
                 'generate_image' => true,
-                'image_model' => config('services.openai.image_model', 'gpt-image-1.5'),
+                'image_model' => AiPromptProfile::normalizeImageModel(config('services.openai.image_model')),
                 'image_size' => '1536x1024',
                 'image_quality' => 'medium',
                 'image_style' => 'fotografía editorial realista, composición horizontal, sin texto incrustado',

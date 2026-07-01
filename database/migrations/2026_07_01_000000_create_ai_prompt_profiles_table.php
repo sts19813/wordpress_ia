@@ -22,7 +22,7 @@ return new class extends Migration
             $table->string('audience')->default('público general');
             $table->unsignedInteger('max_output_tokens')->default(4000);
             $table->boolean('generate_image')->default(true);
-            $table->string('image_model')->default('gpt-image-1.5');
+            $table->string('image_model')->default('gpt-image-2');
             $table->string('image_size', 30)->default('1536x1024');
             $table->string('image_quality', 20)->default('medium');
             $table->string('image_style')->default('fotografía editorial realista, sin texto incrustado');

@@ -46,7 +46,15 @@
                     <div class="card-header"><div class="card-title"><h3 class="fw-bold mb-0">Imagen principal</h3></div></div>
                     <div class="card-body">
                         <label class="form-check form-switch form-check-custom form-check-solid mb-6"><input type="checkbox" name="generate_image" value="1" class="form-check-input" @checked(old('generate_image', $profile->generate_image))><span class="form-check-label fw-semibold">Generar imagen con la nota</span></label>
-                        <div class="mb-5"><label class="form-label">Modelo</label><input name="image_model" class="form-control form-control-solid" value="{{ old('image_model', $profile->image_model) }}"></div>
+                        <div class="mb-5">
+                            <label class="form-label">Modelo</label>
+                            <select name="image_model" class="form-select form-select-solid">
+                                @foreach (App\Models\AiPromptProfile::imageModelOptions() as $value => $label)
+                                    <option value="{{ $value }}" @selected(old('image_model', App\Models\AiPromptProfile::normalizeImageModel($profile->image_model)) === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                            <div class="form-text">GPT Image 2 es la opción recomendada. La versión fija evita cambios de comportamiento del alias.</div>
+                        </div>
                         <div class="mb-5"><label class="form-label">Resolución</label><select name="image_size" class="form-select form-select-solid">@foreach (['1024x1024' => 'Cuadrada · 1024×1024', '1024x1536' => 'Vertical · 1024×1536', '1536x1024' => 'Horizontal · 1536×1024'] as $value => $label)<option value="{{ $value }}" @selected(old('image_size', $profile->image_size) === $value)>{{ $label }}</option>@endforeach</select></div>
                         <div class="mb-5"><label class="form-label">Calidad</label><select name="image_quality" class="form-select form-select-solid">@foreach (['low' => 'Baja', 'medium' => 'Media', 'high' => 'Alta'] as $value => $label)<option value="{{ $value }}" @selected(old('image_quality', $profile->image_quality) === $value)>{{ $label }}</option>@endforeach</select></div>
                         <div><label class="form-label">Estilo visual</label><textarea name="image_style" rows="4" class="form-control form-control-solid">{{ old('image_style', $profile->image_style) }}</textarea></div>

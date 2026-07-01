@@ -36,4 +36,23 @@ class AiPromptProfileTest extends TestCase
             ->get(route('admin.settings.prompts.edit', $profile))
             ->assertForbidden();
     }
+
+    public function test_invalid_gpt_image_2_alias_is_normalized_and_not_offered(): void
+    {
+        $this->assertSame('gpt-image-2', AiPromptProfile::normalizeImageModel('gpt-image-2.0'));
+        $this->assertArrayHasKey('gpt-image-2', AiPromptProfile::imageModelOptions());
+        $this->assertArrayHasKey('gpt-image-2-2026-04-21', AiPromptProfile::imageModelOptions());
+        $this->assertArrayNotHasKey('gpt-image-2.0', AiPromptProfile::imageModelOptions());
+    }
+
+    public function test_article_generation_form_contains_the_sweet_alert_loader(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('admin.ai-articles.create'))
+            ->assertOk()
+            ->assertSee('Generando borrador con IA')
+            ->assertSee('No cierres esta ventana.');
+    }
 }

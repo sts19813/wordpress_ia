@@ -38,7 +38,7 @@ class ImageGenerationEngine
             throw new InvalidArgumentException("Tipo de imagen no soportado [{$type}].");
         }
 
-        $model = (string) ($options['model'] ?? config('services.openai.image_model', 'gpt-image-1.5'));
+        $model = (string) ($options['model'] ?? config('services.openai.image_model', 'gpt-image-2'));
         $resolution = (string) ($options['resolution'] ?? self::DEFAULT_RESOLUTIONS[$type]);
         $quality = (string) ($options['quality'] ?? 'medium');
         $seed = $options['seed'] ?? null;

@@ -37,7 +37,7 @@ class AiPromptProfileRequest extends FormRequest
             'audience' => ['required', 'string', 'max:255'],
             'max_output_tokens' => ['required', 'integer', 'min:512', 'max:32000'],
             'generate_image' => ['boolean'],
-            'image_model' => ['required_if:generate_image,true', 'nullable', 'string', 'max:100', 'regex:/^[A-Za-z0-9._-]+$/'],
+            'image_model' => ['required_if:generate_image,true', 'nullable', Rule::in(array_keys(AiPromptProfile::imageModelOptions()))],
             'image_size' => ['required_if:generate_image,true', 'nullable', 'regex:/^\d{3,4}x\d{3,4}$/'],
             'image_quality' => ['required_if:generate_image,true', 'nullable', Rule::in(['low', 'medium', 'high'])],
             'image_style' => ['required_if:generate_image,true', 'nullable', 'string', 'max:500'],
