@@ -37,7 +37,15 @@
                 <div class="card card-flush mb-7">
                     <div class="card-header"><div class="card-title"><h3 class="fw-bold mb-0">Modelo de texto</h3></div></div>
                     <div class="card-body">
-                        <div class="mb-6"><label class="form-label required">Modelo</label><input name="model" class="form-control form-control-solid" value="{{ old('model', $profile->model) }}" required><div class="form-text">El predeterminado admite temperatura y salida estructurada.</div></div>
+                        <div class="mb-6">
+                            <label class="form-label required">Modelo</label>
+                            <select name="model" class="form-select form-select-solid" required>
+                                @foreach (App\Models\AiPromptProfile::textModelOptions() as $value => $label)
+                                    <option value="{{ $value }}" @selected(old('model', App\Models\AiPromptProfile::normalizeTextModel($profile->model)) === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                            <div class="form-text">GPT-5.4 mini ofrece la mejor calidad compacta. GPT-4.1 mini conserva control de temperatura sin razonamiento.</div>
+                        </div>
                         <div><div class="d-flex justify-content-between"><label class="form-label required">Temperatura</label><strong id="temperature-value">{{ old('temperature', $profile->temperature) }}</strong></div><input type="range" name="temperature" min="0" max="2" step="0.05" class="form-range" value="{{ old('temperature', $profile->temperature) }}" oninput="document.getElementById('temperature-value').textContent=this.value"><div class="form-text">0 = más estable; 2 = más variación. Algunos modelos de razonamiento ignoran este control.</div></div>
                     </div>
                 </div>

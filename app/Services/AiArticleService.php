@@ -27,10 +27,11 @@ class AiArticleService
     public function generateDraft(User $user, AiPromptProfile $profile, iterable $sourcePosts): AiArticle
     {
         $startedAt = hrtime(true);
+        $textModel = AiPromptProfile::normalizeTextModel($profile->model);
         $result = $this->prepareGeneration($sourcePosts, [
             'user_id' => $user->id,
             'ai_prompt_profile_id' => $profile->id,
-            'model' => $profile->model,
+            'model' => $textModel,
             'temperature' => (float) $profile->temperature,
             'system_prompt' => $profile->system_prompt,
             'max_output_tokens' => $profile->max_output_tokens,
@@ -53,14 +54,14 @@ class AiArticleService
             $article = $this->completeGeneration($result->article, $this->client->outputText($response), [
                 'tokens' => $this->client->usage($response),
                 'duration_ms' => $this->elapsedMilliseconds($startedAt),
-                'model' => data_get($response, 'model', $profile->model),
+                'model' => data_get($response, 'model', $textModel),
                 'temperature' => $profile->temperature,
             ]);
             $article->update(['status' => AiArticle::STATUS_DRAFT]);
         } catch (Throwable $exception) {
             return $this->failGeneration($result->article, $exception->getMessage(), [
                 'duration_ms' => $this->elapsedMilliseconds($startedAt),
-                'model' => $profile->model,
+                'model' => $textModel,
                 'temperature' => $profile->temperature,
             ]);
         }

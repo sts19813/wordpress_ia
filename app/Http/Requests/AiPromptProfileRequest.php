@@ -28,7 +28,7 @@ class AiPromptProfileRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255', Rule::unique('ai_prompt_profiles')->where('user_id', $this->user()?->id)->ignore($profile)],
             'system_prompt' => ['required', 'string', 'min:50', 'max:20000'],
-            'model' => ['required', 'string', 'max:100', 'regex:/^[A-Za-z0-9._-]+$/'],
+            'model' => ['required', Rule::in(array_keys(AiPromptProfile::textModelOptions()))],
             'temperature' => ['required', 'numeric', 'min:0', 'max:2'],
             'writing_style' => ['required', 'string', 'max:255'],
             'tone' => ['required', 'string', 'max:255'],

@@ -45,6 +45,17 @@ class AiPromptProfileTest extends TestCase
         $this->assertArrayNotHasKey('gpt-image-2.0', AiPromptProfile::imageModelOptions());
     }
 
+    public function test_text_model_selector_offers_the_best_compact_models(): void
+    {
+        $options = AiPromptProfile::textModelOptions();
+
+        $this->assertArrayHasKey('gpt-5.4-mini', $options);
+        $this->assertArrayHasKey('gpt-5-mini', $options);
+        $this->assertArrayHasKey('gpt-5.4-nano', $options);
+        $this->assertArrayHasKey('gpt-4.1-mini', $options);
+        $this->assertSame('gpt-4.1-mini', AiPromptProfile::normalizeTextModel('modelo-inventado'));
+    }
+
     public function test_article_generation_form_contains_the_sweet_alert_loader(): void
     {
         $user = User::factory()->create();

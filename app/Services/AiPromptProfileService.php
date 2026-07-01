@@ -19,7 +19,7 @@ class AiPromptProfileService
         return $user->aiPromptProfiles()->create([
             'name' => 'Editorial general',
             'system_prompt' => AiPromptProfile::DEFAULT_SYSTEM_PROMPT,
-            'model' => config('services.openai.text_model', 'gpt-4.1-mini'),
+            'model' => AiPromptProfile::normalizeTextModel(config('services.openai.text_model')),
             'image_model' => AiPromptProfile::normalizeImageModel(config('services.openai.image_model')),
             'is_default' => true,
         ]);

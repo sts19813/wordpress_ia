@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AiPromptProfile extends Model
 {
+    public const DEFAULT_TEXT_MODEL = 'gpt-4.1-mini';
+
     public const DEFAULT_IMAGE_MODEL = 'gpt-image-2';
 
     public const DEFAULT_SYSTEM_PROMPT = <<<'PROMPT'
@@ -60,6 +62,26 @@ PROMPT;
             'medium' => 'Media (700–1,000 palabras)',
             'long' => 'Larga (1,200–1,600 palabras)',
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function textModelOptions(): array
+    {
+        return [
+            'gpt-5.4-mini' => 'GPT-5.4 mini — recomendado, mayor calidad',
+            'gpt-5-mini' => 'GPT-5 mini — equilibrado y económico',
+            'gpt-5.4-nano' => 'GPT-5.4 nano — más rápido y económico',
+            'gpt-4.1-mini' => 'GPT-4.1 mini — rápido, sin razonamiento y con temperatura',
+        ];
+    }
+
+    public static function normalizeTextModel(?string $model): string
+    {
+        return array_key_exists((string) $model, self::textModelOptions())
+            ? (string) $model
+            : self::DEFAULT_TEXT_MODEL;
     }
 
     /**

@@ -33,7 +33,7 @@ class SettingController extends Controller
         return view('admin.settings.prompt-form', [
             'profile' => new AiPromptProfile([
                 'system_prompt' => AiPromptProfile::DEFAULT_SYSTEM_PROMPT,
-                'model' => config('services.openai.text_model', 'gpt-4.1-mini'),
+                'model' => AiPromptProfile::normalizeTextModel(config('services.openai.text_model')),
                 'temperature' => 0.7,
                 'writing_style' => 'periodístico informativo',
                 'tone' => 'claro, objetivo y profesional',
