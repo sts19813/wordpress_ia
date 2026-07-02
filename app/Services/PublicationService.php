@@ -7,11 +7,16 @@ use App\Models\AiImage;
 use App\Models\Publication;
 use App\Models\WordPressSite;
 use App\Services\Publications\PublicationEngine;
+use App\Services\Publications\WordPressRestClient;
+use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Facades\Storage;
+use Throwable;
 
 class PublicationService
 {
     public function __construct(
         private readonly PublicationEngine $engine,
+        private readonly WordPressRestClient $client,
     ) {}
 
     public function createPublication(WordPressSite $site, AiArticle $article, ?AiImage $image = null): Publication
@@ -52,5 +57,61 @@ class PublicationService
     public function deletePublication(Publication $publication, bool $force = false): Publication
     {
         return $this->engine->deletePublication($publication, $force);
+    }
+
+    public function testConnection(WordPressSite $site): array
+    {
+        $response = $this->client->testConnection($site);
+
+        return [
+            'id' => $response->json('id'),
+            'name' => $response->json('name'),
+            'roles' => $response->json('roles', []),
+        ];
+    }
+
+    public function publishNow(WordPressSite $site, AiArticle $article, ?AiImage $image = null): Publication
+    {
+        $publication = Publication::query()
+            ->where('wordpress_site_id', $site->id)
+            ->where('ai_article_id', $article->id)
+            ->where('status', '!=', Publication::STATUS_DELETED)
+            ->latest('id')
+            ->first();
+
+        if (! $publication) {
+            $publication = $this->createPublication($site, $article, $image);
+        } else {
+            $publication->update(['ai_image_id' => $image?->id]);
+        }
+
+        $publication->load(['wordpressSite', 'aiArticle']);
+        $this->engine->refreshPayload($publication);
+
+        if ($image?->file_path && ! $publication->remote_featured_media_id && Storage::disk('local')->exists($image->file_path)) {
+            try {
+                $this->uploadImage(
+                    $publication,
+                    Storage::disk('local')->get($image->file_path),
+                    basename($image->file_path),
+                    $image->mime_type ?: Storage::disk('local')->mimeType($image->file_path) ?: 'image/jpeg',
+                );
+            } catch (Throwable) {
+                // A missing media permission should not prevent publishing the text.
+            }
+        }
+
+        try {
+            return $publication->remote_post_id
+                ? $this->updateArticle($publication, ['status' => 'publish'])
+                : $this->createArticle($publication, 'publish');
+        } catch (Throwable $exception) {
+            $response = $exception instanceof RequestException ? ($exception->response?->json() ?: []) : [];
+            $message = is_string($response['message'] ?? null)
+                ? $response['message']
+                : 'No se pudo conectar con WordPress. Revisa el dominio, el usuario y la contraseña de aplicación.';
+
+            return $this->engine->recordFailure($publication, $message, $response);
+        }
     }
 }

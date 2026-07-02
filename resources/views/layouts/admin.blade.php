@@ -869,6 +869,13 @@
                                     </div>
                                 @endif
 
+                                @if (session('warning'))
+                                    <div class="alert alert-warning d-flex align-items-center mb-6">
+                                        <i class="ki-outline ki-information-5 fs-2hx text-warning me-4"></i>
+                                        <div class="fw-semibold">{{ session('warning') }}</div>
+                                    </div>
+                                @endif
+
                                 @if ($errors->any())
                                     <div class="alert alert-danger mb-6">
                                         <div class="fw-bold mb-1">Revisa la informacion capturada.</div>

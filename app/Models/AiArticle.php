@@ -99,6 +99,11 @@ class AiArticle extends Model
         return $this->hasMany(AiImage::class);
     }
 
+    public function publications(): HasMany
+    {
+        return $this->hasMany(Publication::class);
+    }
+
     public function mainImage(): ?AiImage
     {
         return $this->images->firstWhere('type', AiImage::TYPE_MAIN);

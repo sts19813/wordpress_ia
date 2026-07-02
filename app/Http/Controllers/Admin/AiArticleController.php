@@ -73,14 +73,26 @@ class AiArticleController extends Controller
         return redirect()->route('admin.ai-articles.show', $article)->with('status', $message);
     }
 
-    public function show(AiArticle $aiArticle): View
+    public function show(Request $request, AiArticle $aiArticle): View
     {
         Gate::authorize('view', $aiArticle);
-        $aiArticle->load(['images', 'promptProfile:id,name']);
+        $aiArticle->load([
+            'images',
+            'promptProfile:id,name',
+            'publications' => fn ($query) => $query
+                ->where('user_id', $request->user()->id)
+                ->with('wordpressSite:id,user_id,name,rest_api_url')
+                ->latest(),
+        ]);
 
         return view('admin.ai-articles.show', [
             'article' => $aiArticle,
             'sourcePosts' => $aiArticle->sourcePosts()->load('sourceSite:id,name'),
+            'wordpressSites' => $request->user()->wordpressSites()
+                ->where('active', true)
+                ->where('status', 'active')
+                ->orderBy('name')
+                ->get(),
         ]);
     }
 

@@ -10,6 +10,14 @@ use Illuminate\Support\Facades\Http;
 class WordPressRestClient
 {
     /**
+     * @param  array<string, mixed>  $query
+     */
+    public function get(WordPressSite $site, string $path, array $query = []): Response
+    {
+        return $this->request($site)->get($site->endpoint($path), $query)->throw();
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      */
     public function post(WordPressSite $site, string $path, array $payload): Response
@@ -40,6 +48,11 @@ class WordPressRestClient
             ->withBody($contents, $mimeType)
             ->post($site->endpoint('/wp-json/wp/v2/media'))
             ->throw();
+    }
+
+    public function testConnection(WordPressSite $site): Response
+    {
+        return $this->get($site, '/wp-json/wp/v2/users/me', ['context' => 'edit']);
     }
 
     private function request(WordPressSite $site): PendingRequest

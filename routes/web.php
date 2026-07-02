@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\SchedulerController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\SourceSiteController;
 use App\Http\Controllers\Admin\SystemLogController;
+use App\Http\Controllers\Admin\WordPressSiteController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\Auth\NewPasswordController;
@@ -64,7 +65,14 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         ->parameters(['articulos-ia' => 'aiArticle']);
     Route::get('imagenes-ia', [AiImageController::class, 'index'])->name('ai-images.index');
     Route::get('imagenes-ia/{aiImage}/archivo', [AiImageController::class, 'file'])->name('ai-images.file');
-    Route::get('publicaciones', PublicationController::class)->name('publications.index');
+    Route::get('publicaciones', [PublicationController::class, 'index'])->name('publications.index');
+    Route::post('publicaciones/articulos/{aiArticle}', [PublicationController::class, 'publish'])->name('publications.publish');
+    Route::resource('publicaciones/sitios-wordpress', WordPressSiteController::class)
+        ->names('wordpress-sites')
+        ->parameters(['sitios-wordpress' => 'wordpressSite'])
+        ->except('show');
+    Route::post('publicaciones/sitios-wordpress/{wordpressSite}/probar', [WordPressSiteController::class, 'test'])
+        ->name('wordpress-sites.test');
     Route::get('programador', SchedulerController::class)->name('scheduler.index');
     Route::get('logs', SystemLogController::class)->name('system-logs.index');
     Route::get('configuracion', [SettingController::class, 'index'])->name('settings.index');

@@ -3,10 +3,10 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-
-//Modelos de sitios de Wordpress para publicar el contenido generado por la Ia.
+// Modelos de sitios de Wordpress para publicar el contenido generado por la Ia.
 class WordPressSite extends Model
 {
     protected $table = 'wordpress_sites';
@@ -18,6 +18,7 @@ class WordPressSite extends Model
     public const STATUS_ERROR = 'error';
 
     protected $fillable = [
+        'user_id',
         'name',
         'rest_api_url',
         'username',
@@ -26,6 +27,8 @@ class WordPressSite extends Model
         'tags',
         'status',
         'active',
+        'last_tested_at',
+        'connection_error',
     ];
 
     protected $hidden = [
@@ -39,6 +42,7 @@ class WordPressSite extends Model
             'categories' => 'array',
             'tags' => 'array',
             'active' => 'boolean',
+            'last_tested_at' => 'datetime',
         ];
     }
 
@@ -53,11 +57,16 @@ class WordPressSite extends Model
 
     public function publications(): HasMany
     {
-        return $this->hasMany(Publication::class);
+        return $this->hasMany(Publication::class, 'wordpress_site_id');
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
     public function endpoint(string $path): string
     {
-        return rtrim($this->rest_api_url, '/') . '/' . ltrim($path, '/');
+        return rtrim($this->rest_api_url, '/').'/'.ltrim($path, '/');
     }
 }
