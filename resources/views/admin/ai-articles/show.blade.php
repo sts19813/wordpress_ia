@@ -2,18 +2,33 @@
 
 @section('title', ($article->title ?: 'Borrador').' | '.config('app.name'))
 
-@php($mainImage = $article->mainImage())
+@php
+    $mainImage = $article->mainImage();
+    $publishedDestinations = $article->publications->where('status', App\Models\Publication::STATUS_PUBLISHED)->count();
+@endphp
 
 @section('toolbar')
     <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-4 w-100">
         <div>
             <a href="{{ route('admin.ai-articles.index') }}" class="text-muted text-hover-primary fw-semibold d-inline-flex align-items-center mb-3"><i class="ki-outline ki-left fs-4 me-1"></i>Artículos IA</a>
             <h1 class="page-heading text-gray-900 fw-bold fs-3 my-0">{{ $article->title ?: 'Generación #'.$article->id }}</h1>
-            <div class="text-muted fw-semibold fs-7 pt-1">Vista previa privada · no publicada</div>
+            <div class="text-muted fw-semibold fs-7 pt-1">Vista previa del contenido{{ $publishedDestinations ? ' · publicado en '.$publishedDestinations.' sitio(s)' : ' · aún no publicado' }}</div>
         </div>
         <div class="d-flex gap-3">
             @if ($article->status === 'draft')
                 <a href="{{ route('admin.ai-articles.edit', $article) }}" class="btn btn-primary"><i class="ki-outline ki-pencil fs-2"></i>Editar borrador</a>
+            @endif
+            @if ($article->status !== 'failed')
+                @if ($wordpressSites->isEmpty())
+                    <a href="{{ route('admin.wordpress-sites.create') }}" class="btn btn-success"><i class="ki-outline ki-send fs-2"></i>Configurar y publicar</a>
+                @elseif ($wordpressSites->count() === 1)
+                    <form method="POST" action="{{ route('admin.publications.publish', $article) }}">
+                        @csrf
+                        <button class="btn btn-success" type="submit"><i class="ki-outline ki-send fs-2"></i>Publicar</button>
+                    </form>
+                @else
+                    <button class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#publish-sites-modal"><i class="ki-outline ki-send fs-2"></i>Publicar</button>
+                @endif
             @endif
             <form method="POST" action="{{ route('admin.ai-articles.destroy', $article) }}" data-confirm-delete data-confirm-title="Eliminar borrador" data-confirm-text="Se eliminarán también sus imágenes. Esta acción no se puede deshacer.">
                 @csrf @method('DELETE')
@@ -67,6 +82,27 @@
                 </div>
             </div>
 
+            @if ($article->publications->isNotEmpty())
+                <div class="card card-flush mb-7">
+                    <div class="card-header"><div class="card-title"><h3 class="fw-bold mb-0">Publicaciones</h3></div></div>
+                    <div class="card-body">
+                        @foreach ($article->publications as $publication)
+                            <div class="d-flex justify-content-between align-items-center gap-3 {{ $loop->last ? '' : 'border-bottom pb-4 mb-4' }}">
+                                <div>
+                                    <div class="fw-bold text-gray-900">{{ $publication->wordpressSite?->name ?: 'Sitio eliminado' }}</div>
+                                    <div class="text-muted fs-8">{{ $publication->updated_at->format('d/m/Y H:i') }}</div>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge {{ $publication->status === 'published' ? 'badge-light-success' : ($publication->status === 'failed' ? 'badge-light-danger' : 'badge-light-warning') }}">{{ $publication->statusLabel() }}</span>
+                                    @if ($publication->remote_url)<div class="mt-2"><a href="{{ $publication->remote_url }}" target="_blank" rel="noopener noreferrer" class="fs-8 fw-bold">Ver entrada</a></div>@endif
+                                </div>
+                            </div>
+                        @endforeach
+                        <a href="{{ route('admin.publications.index') }}" class="btn btn-sm btn-light-primary w-100 mt-5">Ver todo el historial</a>
+                    </div>
+                </div>
+            @endif
+
             <div class="card card-flush mb-7">
                 <div class="card-header"><div class="card-title"><h3 class="fw-bold mb-0">SEO y clasificación</h3></div></div>
                 <div class="card-body">
@@ -91,7 +127,46 @@
             </div>
         </div>
     </div>
+
+    @if ($wordpressSites->count() > 1)
+        <div class="modal fade" id="publish-sites-modal" tabindex="-1" aria-labelledby="publish-sites-title" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <form method="POST" action="{{ route('admin.publications.publish', $article) }}">
+                        @csrf
+                        <div class="modal-header">
+                            <div><h2 class="fw-bold mb-1" id="publish-sites-title">¿Dónde quieres publicar?</h2><div class="text-muted fs-7">Puedes enviar el artículo a uno o varios sitios.</div></div>
+                            <button type="button" class="btn btn-icon btn-sm btn-active-light-primary" data-bs-dismiss="modal" aria-label="Cerrar"><i class="ki-outline ki-cross fs-2"></i></button>
+                        </div>
+                        <div class="modal-body py-7">
+                            <div class="d-flex flex-column gap-4">
+                                @foreach ($wordpressSites as $site)
+                                    @php($existing = $article->publications->firstWhere('wordpress_site_id', $site->id))
+                                    <label class="border rounded p-4 d-flex align-items-center gap-4 cursor-pointer">
+                                        <input class="form-check-input" type="checkbox" name="site_ids[]" value="{{ $site->id }}" @checked(in_array($site->id, old('site_ids', [])))>
+                                        <span class="flex-grow-1"><span class="fw-bold text-gray-900 d-block">{{ $site->name }}</span><span class="text-muted fs-8">{{ $site->rest_api_url }}</span></span>
+                                        @if ($existing)<span class="badge badge-light-info">Se actualizará</span>@endif
+                                    </label>
+                                @endforeach
+                            </div>
+                            @error('site_ids')<div class="text-danger fs-7 mt-4">{{ $message }}</div>@enderror
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-success"><i class="ki-outline ki-send fs-2"></i>Publicar ahora</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
 @endsection
+
+@if ($errors->has('site_ids'))
+    @push('scripts')
+        <script>document.addEventListener('DOMContentLoaded', function () { var element = document.getElementById('publish-sites-modal'); if (element && window.bootstrap) { bootstrap.Modal.getOrCreateInstance(element).show(); } });</script>
+    @endpush
+@endif
 
 @push('styles')
 <style>

@@ -5,8 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-
-//Modelos de publicaciones generadas por IA
+// Modelos de publicaciones generadas por IA
 class Publication extends Model
 {
     public const STATUS_DRAFT = 'draft';
@@ -22,6 +21,7 @@ class Publication extends Model
     public const STATUS_FAILED = 'failed';
 
     protected $fillable = [
+        'user_id',
         'wordpress_site_id',
         'ai_article_id',
         'ai_image_id',
@@ -30,15 +30,18 @@ class Publication extends Model
         'remote_url',
         'status',
         'scheduled_at',
+        'published_at',
         'last_action',
         'request_payload',
         'full_response',
+        'error_message',
     ];
 
     protected function casts(): array
     {
         return [
             'scheduled_at' => 'datetime',
+            'published_at' => 'datetime',
             'request_payload' => 'array',
             'full_response' => 'array',
         ];
@@ -58,7 +61,12 @@ class Publication extends Model
 
     public function wordpressSite(): BelongsTo
     {
-        return $this->belongsTo(WordPressSite::class);
+        return $this->belongsTo(WordPressSite::class, 'wordpress_site_id');
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
     public function aiArticle(): BelongsTo
@@ -74,5 +82,10 @@ class Publication extends Model
     public function statusLabel(): string
     {
         return self::statusOptions()[$this->status] ?? $this->status;
+    }
+
+    public function isSuccessful(): bool
+    {
+        return in_array($this->status, [self::STATUS_PUBLISHED, self::STATUS_PENDING, self::STATUS_SCHEDULED], true);
     }
 }
