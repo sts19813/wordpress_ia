@@ -151,7 +151,7 @@ class SchedulerService
                 $job = new GenerateAiImage($task->id);
                 $job->handle(app(AiArticleService::class), $this);
             } else {
-                $job = new GenerateAiArticle($task->id, dispatchImage: false);
+                $job = (new GenerateAiArticle($task->id))->withoutImageDispatch();
                 $job->handle(app(AiArticleService::class), $this);
 
                 $task->refresh()->load('article.images');

@@ -26,10 +26,16 @@ class GenerateAiArticle implements ShouldBeUnique, ShouldQueue
 
     public int $uniqueFor = 600;
 
-    public function __construct(
-        public readonly int $taskId,
-        public readonly bool $dispatchImage = true,
-    ) {}
+    private bool $dispatchImage = true;
+
+    public function __construct(public readonly int $taskId) {}
+
+    public function withoutImageDispatch(): self
+    {
+        $this->dispatchImage = false;
+
+        return $this;
+    }
 
     /**
      * @return array<int, int>
