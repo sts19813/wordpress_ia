@@ -3,7 +3,7 @@
 @section('title', 'Imágenes IA | '.config('app.name'))
 
 @section('toolbar')
-    <div><h1 class="page-heading text-gray-900 fw-bold fs-3 my-0">Imágenes IA</h1><div class="text-muted fw-semibold fs-7 pt-1">Recursos generados y asociados a borradores privados.</div></div>
+    <div><h1 class="page-heading text-gray-900 fw-bold fs-3 my-0">Imágenes IA</h1><div class="text-muted fw-semibold fs-7 pt-1">Todos los recursos generados y asociados a borradores.</div></div>
 @endsection
 
 @section('content')

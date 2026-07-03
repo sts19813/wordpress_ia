@@ -24,7 +24,6 @@ class PublicationController extends Controller
 
         $publications = Publication::query()
             ->with(['wordpressSite:id,user_id,name,rest_api_url', 'aiArticle:id,user_id,title,slug'])
-            ->where('user_id', $request->user()->id)
             ->latest()
             ->get();
 

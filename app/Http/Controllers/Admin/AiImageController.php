@@ -18,7 +18,6 @@ class AiImageController extends Controller
 
         return view('admin.ai-images.index', [
             'images' => AiImage::query()
-                ->whereHas('article', fn ($query) => $query->where('user_id', $request->user()->id))
                 ->with('article:id,title,user_id')
                 ->latest()
                 ->get(),

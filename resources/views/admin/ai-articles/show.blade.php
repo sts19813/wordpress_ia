@@ -15,10 +15,10 @@
             <div class="text-muted fw-semibold fs-7 pt-1">Vista previa del contenido{{ $publishedDestinations ? ' · publicado en '.$publishedDestinations.' sitio(s)' : ' · aún no publicado' }}</div>
         </div>
         <div class="d-flex gap-3">
-            @if ($article->status === 'draft')
+            @if ($article->status === 'draft' && auth()->user()->can('update', $article))
                 <a href="{{ route('admin.ai-articles.edit', $article) }}" class="btn btn-primary"><i class="ki-outline ki-pencil fs-2"></i>Editar borrador</a>
             @endif
-            @if ($article->status !== 'failed')
+            @if ($article->status !== 'failed' && auth()->user()->can('update', $article))
                 @if ($wordpressSites->isEmpty())
                     <a href="{{ route('admin.wordpress-sites.create') }}" class="btn btn-success"><i class="ki-outline ki-send fs-2"></i>Configurar y publicar</a>
                 @elseif ($wordpressSites->count() === 1)
@@ -30,10 +30,12 @@
                     <button class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#publish-sites-modal"><i class="ki-outline ki-send fs-2"></i>Publicar</button>
                 @endif
             @endif
-            <form method="POST" action="{{ route('admin.ai-articles.destroy', $article) }}" data-confirm-delete data-confirm-title="Eliminar borrador" data-confirm-text="Se eliminarán también sus imágenes. Esta acción no se puede deshacer.">
-                @csrf @method('DELETE')
-                <button class="btn btn-light-danger" type="submit"><i class="ki-outline ki-trash fs-2"></i>Eliminar</button>
-            </form>
+            @can('delete', $article)
+                <form method="POST" action="{{ route('admin.ai-articles.destroy', $article) }}" data-confirm-delete data-confirm-title="Eliminar borrador" data-confirm-text="Se eliminarán también sus imágenes. Esta acción no se puede deshacer.">
+                    @csrf @method('DELETE')
+                    <button class="btn btn-light-danger" type="submit"><i class="ki-outline ki-trash fs-2"></i>Eliminar</button>
+                </form>
+            @endcan
         </div>
     </div>
 @endsection

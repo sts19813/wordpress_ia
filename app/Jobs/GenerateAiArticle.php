@@ -26,7 +26,10 @@ class GenerateAiArticle implements ShouldBeUnique, ShouldQueue
 
     public int $uniqueFor = 600;
 
-    public function __construct(public readonly int $taskId) {}
+    public function __construct(
+        public readonly int $taskId,
+        public readonly bool $dispatchImage = true,
+    ) {}
 
     /**
      * @return array<int, int>
@@ -54,7 +57,7 @@ class GenerateAiArticle implements ShouldBeUnique, ShouldQueue
 
         if ($task->article?->status === AiArticle::STATUS_DRAFT) {
             if ($profile->generate_image) {
-                $scheduler->awaitingImage($task, $task->article);
+                $scheduler->awaitingImage($task, $task->article, $this->dispatchImage);
             } else {
                 $scheduler->completed($task, 'El borrador de texto quedó listo.');
             }
@@ -95,7 +98,7 @@ class GenerateAiArticle implements ShouldBeUnique, ShouldQueue
         }
 
         if ($profile->generate_image) {
-            $scheduler->awaitingImage($task, $article);
+            $scheduler->awaitingImage($task, $article, $this->dispatchImage);
         } else {
             $scheduler->completed($task, 'El borrador de texto quedó listo.');
         }

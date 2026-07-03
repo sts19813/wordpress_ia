@@ -14,12 +14,12 @@ class PublicationPolicy
 
     public function view(User $user, Publication $publication): bool
     {
-        return $publication->user_id === $user->id
-            || $publication->wordpressSite?->user_id === $user->id;
+        return true;
     }
 
     public function update(User $user, Publication $publication): bool
     {
-        return $this->view($user, $publication);
+        return $publication->user_id === $user->id
+            || $publication->wordpressSite?->user_id === $user->id;
     }
 }

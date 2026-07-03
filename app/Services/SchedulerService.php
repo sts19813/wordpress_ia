@@ -8,6 +8,7 @@ use App\Models\AiArticle;
 use App\Models\AiPromptProfile;
 use App\Models\Scheduler;
 use App\Models\User;
+use Throwable;
 
 class SchedulerService
 {
@@ -55,7 +56,7 @@ class SchedulerService
         return $task->fresh();
     }
 
-    public function awaitingImage(Scheduler $task, AiArticle $article): Scheduler
+    public function awaitingImage(Scheduler $task, AiArticle $article, bool $dispatch = true): Scheduler
     {
         $task->update([
             'ai_article_id' => $article->id,
@@ -64,9 +65,17 @@ class SchedulerService
             'progress' => 70,
         ]);
         $this->addEvent($task, 'success', 'El borrador de texto quedó guardado.');
-        $this->addEvent($task, 'info', 'La imagen principal se añadió a una cola independiente.');
+        $this->addEvent(
+            $task,
+            'info',
+            $dispatch
+                ? 'La imagen principal se añadió a una cola independiente.'
+                : 'La ejecución manual continuará con la imagen principal.',
+        );
 
-        GenerateAiImage::dispatch($task->id)->onQueue('ai-image');
+        if ($dispatch) {
+            GenerateAiImage::dispatch($task->id)->onQueue('ai-image');
+        }
 
         return $task->fresh();
     }
@@ -132,6 +141,39 @@ class SchedulerService
         return $task->fresh();
     }
 
+    public function executeNow(Scheduler $task): Scheduler
+    {
+        $task->load('article.images');
+        $this->addEvent($task, 'info', 'Ejecución manual iniciada desde el programador.');
+
+        try {
+            if ($this->shouldGenerateImage($task)) {
+                $job = new GenerateAiImage($task->id);
+                $job->handle(app(AiArticleService::class), $this);
+            } else {
+                $job = new GenerateAiArticle($task->id, dispatchImage: false);
+                $job->handle(app(AiArticleService::class), $this);
+
+                $task->refresh()->load('article.images');
+
+                if ($task->status === Scheduler::STATUS_QUEUED && $this->shouldGenerateImage($task)) {
+                    $imageJob = new GenerateAiImage($task->id);
+                    $imageJob->handle(app(AiArticleService::class), $this);
+                }
+            }
+        } catch (Throwable $exception) {
+            $task->refresh();
+
+            if ($task->status !== Scheduler::STATUS_COMPLETED) {
+                $this->failed($task, $exception->getMessage() ?: 'La ejecución manual no pudo completarse.');
+            }
+
+            report($exception);
+        }
+
+        return $task->fresh(['article.images']);
+    }
+
     public function addEvent(Scheduler $task, string $level, string $message): void
     {
         $events = $task->events ?: [];
@@ -142,5 +184,11 @@ class SchedulerService
         ];
 
         $task->update(['events' => array_slice($events, -30)]);
+    }
+
+    private function shouldGenerateImage(Scheduler $task): bool
+    {
+        return $task->article?->status === AiArticle::STATUS_DRAFT
+            && (bool) ($task->payload['generate_image'] ?? false);
     }
 }

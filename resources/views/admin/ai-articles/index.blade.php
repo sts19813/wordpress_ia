@@ -48,7 +48,7 @@
                                 <td data-order="{{ $article->created_at->timestamp }}">{{ $article->created_at->format('d/m/Y H:i') }}</td>
                                 <td class="text-end">
                                     <a href="{{ route('admin.ai-articles.show', $article) }}" class="btn btn-icon btn-light btn-sm me-2" aria-label="Vista previa"><i class="ki-outline ki-eye fs-3"></i></a>
-                                    @if ($article->status === 'draft')
+                                    @if ($article->status === 'draft' && auth()->user()->can('update', $article))
                                         <a href="{{ route('admin.ai-articles.edit', $article) }}" class="btn btn-icon btn-light-primary btn-sm" aria-label="Editar"><i class="ki-outline ki-pencil fs-3"></i></a>
                                     @endif
                                 </td>

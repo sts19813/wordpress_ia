@@ -55,26 +55,71 @@ class AiGenerationQueueTest extends TestCase
             ->assertJsonPath('progress', 0);
     }
 
-    public function test_a_user_cannot_read_or_retry_another_users_task(): void
+    public function test_every_authenticated_user_can_see_and_execute_queued_tasks(): void
     {
+        Queue::fake();
+        Storage::fake('local');
+        config(['services.openai.api_key' => 'test-key']);
         $owner = User::factory()->create();
         $other = User::factory()->create();
-        $task = Scheduler::query()->create([
-            'user_id' => $owner->id,
-            'type' => 'ai_article',
-            'name' => 'Trabajo privado',
-            'status' => Scheduler::STATUS_FAILED,
-            'step' => 'Falló',
-            'payload' => [],
+        $profile = app(AiPromptProfileService::class)->ensureDefaultFor($owner);
+        $source = SourcePost::query()->create([
+            'title' => 'Noticia visible para todos',
+            'content' => 'Contenido base.',
+            'url' => 'https://example.com/global-task',
+            'hash' => hash('sha256', 'global-task'),
+            'status' => SourcePost::STATUS_FETCHED,
         ]);
+        $generated = json_encode([
+            'title' => 'Borrador ejecutado manualmente',
+            'content' => '<p>Contenido generado.</p>',
+            'excerpt' => 'Extracto',
+            'meta_description' => 'Descripción',
+            'slug' => 'borrador-ejecutado-manualmente',
+            'categories' => ['Noticias'],
+            'tags' => ['Demo'],
+            'seo_keywords' => ['manual'],
+            'faqs' => [],
+            'conclusion' => 'Fin.',
+        ], JSON_THROW_ON_ERROR);
+
+        Http::fake([
+            '*/responses' => Http::response([
+                'model' => 'gpt-4.1-mini',
+                'output' => [['content' => [['type' => 'output_text', 'text' => $generated]]]],
+                'usage' => ['total_tokens' => 100],
+            ]),
+            '*/images/generations' => Http::response([
+                'data' => [['b64_json' => base64_encode('fake-image')]],
+                'size' => '1536x1024',
+                'quality' => 'medium',
+            ]),
+        ]);
+
+        $this->actingAs($owner)->post(route('admin.ai-articles.store'), [
+            'source_post_ids' => [$source->id],
+            'ai_prompt_profile_id' => $profile->id,
+        ])->assertRedirect();
+
+        $task = Scheduler::query()->sole();
 
         $this->actingAs($other)
             ->get(route('admin.scheduler.status', $task))
-            ->assertNotFound();
+            ->assertOk()
+            ->assertJsonPath('status', Scheduler::STATUS_QUEUED);
 
         $this->actingAs($other)
-            ->post(route('admin.scheduler.retry', $task))
-            ->assertNotFound();
+            ->get(route('admin.scheduler.index'))
+            ->assertOk()
+            ->assertSee('Ejecutar ahora');
+
+        $this->actingAs($other)
+            ->post(route('admin.scheduler.execute', $task))
+            ->assertRedirect(route('admin.scheduler.index', ['task' => $task->id]));
+
+        $this->assertSame(Scheduler::STATUS_COMPLETED, $task->fresh()->status);
+        $this->assertSame(AiArticle::STATUS_DRAFT, AiArticle::query()->sole()->status);
+        $this->assertSame(AiImage::STATUS_GENERATED, AiImage::query()->sole()->status);
     }
 
     public function test_database_worker_processes_text_and_image_as_separate_stages(): void

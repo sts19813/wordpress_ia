@@ -99,6 +99,12 @@
                             @endif
                         </div>
                         <div class="d-flex flex-wrap gap-2 flex-shrink-0">
+                            @if ($task->status === 'queued')
+                                <form method="POST" action="{{ route('admin.scheduler.execute', $task) }}" data-manual-execute-form>
+                                    @csrf
+                                    <button type="submit" class="btn btn-sm btn-primary"><i class="ki-outline ki-play fs-3"></i>Ejecutar ahora</button>
+                                </form>
+                            @endif
                             @if ($task->article)
                                 <a href="{{ route('admin.ai-articles.show', $task->article) }}" class="btn btn-sm btn-light-primary task-article-link"><i class="ki-outline ki-eye fs-3"></i>Ver borrador</a>
                             @else
@@ -140,6 +146,14 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('[data-manual-execute-form]').forEach(function (form) {
+        form.addEventListener('submit', function () {
+            const button = form.querySelector('button[type="submit"]');
+            button.disabled = true;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Ejecutando...';
+        });
+    });
+
     const tasks = Array.from(document.querySelectorAll('.queue-task[data-active="1"]'));
     const selected = document.getElementById('task-{{ $selectedTaskId }}');
     selected?.scrollIntoView({ behavior: 'smooth', block: 'center' });

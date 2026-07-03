@@ -6,7 +6,7 @@
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-4 w-100">
         <div>
             <h1 class="page-heading text-gray-900 fw-bold fs-3 my-0">Publicaciones</h1>
-            <div class="text-muted fw-semibold fs-7 pt-1">Todas las entradas enviadas a tus sitios WordPress.</div>
+            <div class="text-muted fw-semibold fs-7 pt-1">Todas las entradas enviadas a los sitios WordPress.</div>
         </div>
         <div class="d-flex gap-3">
             <a href="{{ route('admin.wordpress-sites.index') }}" class="btn btn-light-primary"><i class="ki-outline ki-setting-2 fs-2"></i>Configurar sitios</a>

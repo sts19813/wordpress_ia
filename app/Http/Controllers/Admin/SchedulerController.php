@@ -18,10 +18,9 @@ class SchedulerController extends Controller
 
     public function index(Request $request): View
     {
-        $tasks = $request->user()->scheduledTasks()
+        $tasks = Scheduler::query()
             ->with(['article:id,user_id,title,status', 'article.images:id,ai_article_id,status,type'])
             ->latest()
-            ->limit(100)
             ->get();
 
         $counts = collect(Scheduler::statusOptions())
@@ -41,7 +40,6 @@ class SchedulerController extends Controller
 
     public function status(Request $request, Scheduler $scheduler): JsonResponse
     {
-        abort_unless($scheduler->user_id === $request->user()->id, 404);
         $scheduler->load('article:id,user_id,title,status');
 
         return response()->json([
@@ -59,9 +57,24 @@ class SchedulerController extends Controller
         ]);
     }
 
+    public function execute(Scheduler $scheduler): RedirectResponse
+    {
+        abort_unless($scheduler->status === Scheduler::STATUS_QUEUED, 422, 'Sólo se pueden ejecutar trabajos que estén en cola.');
+
+        $task = $this->scheduler->executeNow($scheduler);
+
+        return redirect()
+            ->route('admin.scheduler.index', ['task' => $task->id])
+            ->with(
+                $task->status === Scheduler::STATUS_COMPLETED ? 'status' : 'warning',
+                $task->status === Scheduler::STATUS_COMPLETED
+                    ? 'El trabajo se ejecutó manualmente y quedó completado.'
+                    : 'La ejecución manual terminó con un error. Revisa la bitácora del trabajo.',
+            );
+    }
+
     public function retry(Request $request, Scheduler $scheduler): RedirectResponse
     {
-        abort_unless($scheduler->user_id === $request->user()->id, 404);
         abort_unless($scheduler->status === Scheduler::STATUS_FAILED, 422, 'Sólo se pueden reintentar trabajos con error.');
 
         $this->scheduler->retry($scheduler);

@@ -14,6 +14,6 @@ class AiImagePolicy
 
     public function view(User $user, AiImage $image): bool
     {
-        return $image->article?->user_id === $user->id;
+        return true;
     }
 }

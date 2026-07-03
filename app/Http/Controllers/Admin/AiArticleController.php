@@ -28,7 +28,7 @@ class AiArticleController extends Controller
         Gate::authorize('viewAny', AiArticle::class);
 
         return view('admin.ai-articles.index', [
-            'articles' => $request->user()->aiArticles()
+            'articles' => AiArticle::query()
                 ->with(['images', 'promptProfile:id,name'])
                 ->latest()
                 ->get(),
@@ -92,7 +92,6 @@ class AiArticleController extends Controller
             'images',
             'promptProfile:id,name',
             'publications' => fn ($query) => $query
-                ->where('user_id', $request->user()->id)
                 ->with('wordpressSite:id,user_id,name,rest_api_url')
                 ->latest(),
         ]);

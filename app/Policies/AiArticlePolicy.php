@@ -19,16 +19,16 @@ class AiArticlePolicy
 
     public function view(User $user, AiArticle $article): bool
     {
-        return $article->user_id === $user->id;
+        return true;
     }
 
     public function update(User $user, AiArticle $article): bool
     {
-        return $this->view($user, $article);
+        return $article->user_id === $user->id;
     }
 
     public function delete(User $user, AiArticle $article): bool
     {
-        return $this->view($user, $article);
+        return $article->user_id === $user->id;
     }
 }
