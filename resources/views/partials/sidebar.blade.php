@@ -3,7 +3,7 @@
     $menuItems = [
         ['label' => 'Dashboard', 'route' => 'admin.dashboard', 'active' => 'admin.dashboard', 'icon' => 'ki-chart-line'],
         ['label' => 'Noticias', 'route' => 'admin.news.index', 'active' => 'admin.news.*', 'icon' => 'ki-document'],
-        ['label' => 'Sitios Fuente', 'route' => 'admin.source-sites.index', 'active' => 'admin.source-sites.*', 'icon' => 'ki-global'],
+        ['label' => 'Sitios Fuente', 'route' => 'admin.source-sites.index', 'active' => 'admin.source-sites.*', 'icon' => 'ki-satellite'],
         ['label' => 'Artículos IA', 'route' => 'admin.ai-articles.index', 'active' => 'admin.ai-articles.*', 'icon' => 'ki-abstract-26'],
         ['label' => 'Imágenes IA', 'route' => 'admin.ai-images.index', 'active' => 'admin.ai-images.*', 'icon' => 'ki-picture'],
         ['label' => 'Publicaciones', 'route' => 'admin.publications.index', 'active' => 'admin.publications.*', 'icon' => 'ki-send'],
