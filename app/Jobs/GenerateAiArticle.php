@@ -1,0 +1,130 @@
+<?php
+
+namespace App\Jobs;
+
+use App\Models\AiArticle;
+use App\Models\Scheduler;
+use App\Models\SourcePost;
+use App\Services\AiArticleService;
+use App\Services\SchedulerService;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+use RuntimeException;
+use Throwable;
+
+class GenerateAiArticle implements ShouldBeUnique, ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public int $tries = 3;
+
+    public int $timeout = 240;
+
+    public int $uniqueFor = 600;
+
+    public function __construct(public readonly int $taskId) {}
+
+    /**
+     * @return array<int, int>
+     */
+    public function backoff(): array
+    {
+        return [15, 60];
+    }
+
+    public function uniqueId(): string
+    {
+        return (string) $this->taskId;
+    }
+
+    public function handle(AiArticleService $articles, SchedulerService $scheduler): void
+    {
+        $task = Scheduler::query()->with('article')->findOrFail($this->taskId);
+
+        if ($task->status === Scheduler::STATUS_COMPLETED) {
+            return;
+        }
+
+        $payload = $task->payload ?: [];
+        $profile = $task->user?->aiPromptProfiles()->findOrFail($payload['profile_id'] ?? null);
+
+        if ($task->article?->status === AiArticle::STATUS_DRAFT) {
+            if ($profile->generate_image) {
+                $scheduler->awaitingImage($task, $task->article);
+            } else {
+                $scheduler->completed($task, 'El borrador de texto quedó listo.');
+            }
+
+            return;
+        }
+
+        if (in_array($task->article?->status, [AiArticle::STATUS_PENDING, AiArticle::STATUS_FAILED], true)) {
+            $task->article->delete();
+            $task->update(['ai_article_id' => null]);
+        }
+
+        $attempt = max(1, $this->attempts());
+        $scheduler->running($task, 'Analizando fuentes y redactando el artículo', 15, $attempt);
+
+        $sourceIds = array_map('intval', $payload['source_post_ids'] ?? []);
+        $sourcePosts = SourcePost::query()
+            ->whereIn('id', $sourceIds)
+            ->where('status', SourcePost::STATUS_FETCHED)
+            ->get();
+
+        if ($sourcePosts->count() !== count(array_unique($sourceIds))) {
+            throw new RuntimeException('Una o más noticias seleccionadas ya no están disponibles.');
+        }
+
+        $article = $articles->generateTextDraft(
+            $task->user,
+            $profile,
+            $sourcePosts,
+            fn (AiArticle $pendingArticle) => $task->update(['ai_article_id' => $pendingArticle->id]),
+        );
+        $task->update(['ai_article_id' => $article->id]);
+
+        if ($article->status === AiArticle::STATUS_FAILED) {
+            $this->handleAttemptFailure($task, $scheduler, $article->generation_error ?: 'No fue posible generar el artículo.');
+
+            return;
+        }
+
+        if ($profile->generate_image) {
+            $scheduler->awaitingImage($task, $article);
+        } else {
+            $scheduler->completed($task, 'El borrador de texto quedó listo.');
+        }
+    }
+
+    public function failed(?Throwable $exception): void
+    {
+        $task = Scheduler::query()->find($this->taskId);
+
+        if ($task && $task->status !== Scheduler::STATUS_COMPLETED) {
+            app(SchedulerService::class)->failed(
+                $task,
+                $exception?->getMessage() ?: 'La generación del artículo agotó sus reintentos.',
+            );
+        }
+    }
+
+    private function handleAttemptFailure(Scheduler $task, SchedulerService $scheduler, string $message): void
+    {
+        if (config('queue.default') === 'sync') {
+            $scheduler->failed($task, $message);
+
+            return;
+        }
+
+        if ($this->attempts() < $this->tries) {
+            $scheduler->retrying($task, $message);
+        }
+
+        throw new RuntimeException($message);
+    }
+}

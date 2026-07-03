@@ -99,7 +99,6 @@ class OpenAIClient
             ->acceptJson()
             ->asJson()
             ->connectTimeout((int) config('services.openai.connect_timeout', 15))
-            ->timeout((int) config('services.openai.timeout', 180))
-            ->retry(2, 500, throw: false);
+            ->timeout((int) config('services.openai.timeout', 180));
     }
 }

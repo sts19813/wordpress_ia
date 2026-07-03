@@ -61,7 +61,7 @@
 
                         <div class="notice d-flex bg-light-warning rounded border-warning border border-dashed p-5 mt-7">
                             <i class="ki-outline ki-shield-tick fs-2x text-warning me-3"></i>
-                            <div class="fs-7 text-gray-700">La generación puede tardar. No se enviará nada a WordPress y podrás editar todo antes de publicar.</div>
+                            <div class="fs-7 text-gray-700">Se enviará a una cola en segundo plano. Podrás cerrar la página y revisar el avance en Programador.</div>
                         </div>
                     </div>
                 </div>
@@ -108,42 +108,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         submitButton.disabled = true;
-        submitButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Generando borrador...';
-
-        if (!window.Swal) {
-            return;
-        }
-
-        const selectedProfile = form.querySelector('[name="ai_prompt_profile_id"] option:checked');
-        const generatesImage = selectedProfile?.dataset.generateImage === '1';
-        const messages = [
-            'Analizando las noticias seleccionadas…',
-            'Redactando el contenido original…',
-            'Preparando metadatos y SEO…',
-            ...(generatesImage ? ['Generando la imagen principal…'] : []),
-            'Guardando el borrador privado…',
-        ];
-        let messageIndex = 0;
-        let loaderInterval;
-
-        Swal.fire({
-            title: 'Generando borrador con IA',
-            html: '<div id="ai-generation-message" class="text-gray-700 mb-3">' + messages[0] + '</div><div class="text-muted fs-7">Puede tardar uno o varios minutos. No cierres esta ventana.</div>',
-            allowOutsideClick: false,
-            allowEscapeKey: false,
-            showConfirmButton: false,
-            didOpen: function () {
-                Swal.showLoading();
-                loaderInterval = window.setInterval(function () {
-                    messageIndex = Math.min(messageIndex + 1, messages.length - 1);
-                    const message = document.getElementById('ai-generation-message');
-                    if (message) message.textContent = messages[messageIndex];
-                }, 12000);
-            },
-            willClose: function () {
-                if (loaderInterval) window.clearInterval(loaderInterval);
-            },
-        });
+        submitButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Añadiendo a la cola...';
     });
     refresh();
 });

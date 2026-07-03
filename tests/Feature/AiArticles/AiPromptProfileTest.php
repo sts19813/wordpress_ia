@@ -56,14 +56,14 @@ class AiPromptProfileTest extends TestCase
         $this->assertSame('gpt-4.1-mini', AiPromptProfile::normalizeTextModel('modelo-inventado'));
     }
 
-    public function test_article_generation_form_contains_the_sweet_alert_loader(): void
+    public function test_article_generation_form_explains_background_queue_processing(): void
     {
         $user = User::factory()->create();
 
         $this->actingAs($user)
             ->get(route('admin.ai-articles.create'))
             ->assertOk()
-            ->assertSee('Generando borrador con IA')
-            ->assertSee('No cierres esta ventana.');
+            ->assertSee('cola en segundo plano')
+            ->assertSee('Podrás cerrar la página');
     }
 }

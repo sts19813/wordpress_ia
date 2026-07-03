@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\AiArticle;
+use App\Models\AiImage;
 use App\Models\AiPromptProfile;
 use App\Models\SourcePost;
 use App\Models\User;
@@ -25,6 +26,23 @@ class AiArticleService
      * @param  iterable<int, SourcePost>  $sourcePosts
      */
     public function generateDraft(User $user, AiPromptProfile $profile, iterable $sourcePosts): AiArticle
+    {
+        $article = $this->generateTextDraft($user, $profile, $sourcePosts);
+
+        if ($article->status === AiArticle::STATUS_DRAFT && $profile->generate_image) {
+            $this->generateMainImage($article, $profile);
+        }
+
+        return $article->fresh('images');
+    }
+
+    /**
+     * Genera únicamente el texto. La imagen se ejecuta en otra cola para que
+     * nunca bloquee ni invalide un borrador que ya quedó listo.
+     *
+     * @param  iterable<int, SourcePost>  $sourcePosts
+     */
+    public function generateTextDraft(User $user, AiPromptProfile $profile, iterable $sourcePosts, ?callable $onPrepared = null): AiArticle
     {
         $startedAt = hrtime(true);
         $textModel = AiPromptProfile::normalizeTextModel($profile->model);
@@ -49,6 +67,10 @@ class AiArticleService
             ],
         ]);
 
+        if ($onPrepared) {
+            $onPrepared($result->article);
+        }
+
         try {
             $response = $this->client->execute($result->request);
             $article = $this->completeGeneration($result->article, $this->client->outputText($response), [
@@ -66,11 +88,7 @@ class AiArticleService
             ]);
         }
 
-        if ($profile->generate_image) {
-            $this->generateMainImage($article, $profile);
-        }
-
-        return $article->fresh('images');
+        return $article->fresh();
     }
 
     /**
@@ -98,7 +116,7 @@ class AiArticleService
         return $this->engine->fail($article, $response, $metrics);
     }
 
-    private function generateMainImage(AiArticle $article, AiPromptProfile $profile): void
+    public function generateMainImage(AiArticle $article, AiPromptProfile $profile): AiImage
     {
         $startedAt = hrtime(true);
         $imageModel = AiPromptProfile::normalizeImageModel($profile->image_model);
@@ -125,7 +143,7 @@ class AiArticleService
             $path = 'ai-images/'.$article->id.'/'.Str::uuid().'.png';
             Storage::disk('local')->put($path, $binary);
 
-            $this->images->completeGeneration($result->image, $response, metrics: [
+            return $this->images->completeGeneration($result->image, $response, metrics: [
                 'duration_ms' => $this->elapsedMilliseconds($startedAt),
                 'model' => $imageModel,
                 'resolution' => data_get($response, 'size', $profile->image_size),
@@ -134,7 +152,7 @@ class AiArticleService
                 'mime_type' => 'image/png',
             ]);
         } catch (Throwable $exception) {
-            $this->images->failGeneration($result->image, $exception->getMessage(), [
+            return $this->images->failGeneration($result->image, $exception->getMessage(), [
                 'duration_ms' => $this->elapsedMilliseconds($startedAt),
                 'model' => $imageModel,
                 'resolution' => $profile->image_size,

@@ -7,8 +7,8 @@ use App\Http\Requests\AiArticleGenerateRequest;
 use App\Http\Requests\AiArticleUpdateRequest;
 use App\Models\AiArticle;
 use App\Models\SourcePost;
-use App\Services\AiArticleService;
 use App\Services\AiPromptProfileService;
+use App\Services\SchedulerService;
 use App\Support\SafeHtml;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -19,8 +19,8 @@ use Illuminate\Support\Facades\Storage;
 class AiArticleController extends Controller
 {
     public function __construct(
-        private readonly AiArticleService $articles,
         private readonly AiPromptProfileService $profiles,
+        private readonly SchedulerService $scheduler,
     ) {}
 
     public function index(Request $request): View
@@ -65,12 +65,24 @@ class AiArticleController extends Controller
 
         abort_unless($sourcePosts->count() === count($validated['source_post_ids']), 422, 'Una de las fuentes seleccionadas no está disponible.');
 
-        $article = $this->articles->generateDraft($request->user(), $profile, $sourcePosts);
-        $message = $article->status === AiArticle::STATUS_FAILED
-            ? 'La generación no pudo completarse. Revisa el detalle y la configuración de OpenAI.'
-            : 'Borrador generado y guardado. No se ha publicado en ningún sitio.';
+        $task = $this->scheduler->createArticleTask(
+            $request->user(),
+            $profile,
+            $sourcePosts->pluck('id')->all(),
+        );
 
-        return redirect()->route('admin.ai-articles.show', $article)->with('status', $message);
+        // Con la cola sync (pruebas/desarrollo puntual) el trabajo ya terminó.
+        if ($task->article && in_array($task->status, ['completed', 'failed'], true)) {
+            $message = $task->status === 'failed'
+                ? 'La generación terminó con observaciones. Revisa el detalle y la bitácora.'
+                : 'Borrador generado y guardado. No se ha publicado en ningún sitio.';
+
+            return redirect()->route('admin.ai-articles.show', $task->article)->with('status', $message);
+        }
+
+        return redirect()
+            ->route('admin.scheduler.index', ['task' => $task->id])
+            ->with('status', 'La generación se añadió a la cola. Puedes salir de esta página; continuará en segundo plano.');
     }
 
     public function show(Request $request, AiArticle $aiArticle): View
