@@ -22,7 +22,8 @@ class SourceSiteRepository
                     $query
                         ->where('name', 'like', "%{$search}%")
                         ->orWhere('url', 'like', "%{$search}%")
-                        ->orWhere('category', 'like', "%{$search}%")
+                        ->orWhere('filter_topics', 'like', "%{$search}%")
+                        ->orWhere('filter_instructions', 'like', "%{$search}%")
                         ->orWhere('country', 'like', "%{$search}%")
                         ->orWhere('language', 'like', "%{$search}%");
                 });
@@ -30,7 +31,7 @@ class SourceSiteRepository
             ->when($filters['type'] ?? null, fn (Builder $query, string $type) => $query->where('type', $type))
             ->when($filters['status'] ?? null, fn (Builder $query, string $status) => $query->where('status', $status))
             ->when(($filters['active'] ?? '') !== '', fn (Builder $query) => $query->where('active', $filters['active'] === '1'))
-            ->when($filters['category'] ?? null, fn (Builder $query, string $category) => $query->where('category', $category))
+            ->when($filters['topic'] ?? null, fn (Builder $query, string $topic) => $query->whereJsonContains('filter_topics', $topic))
             ->when($filters['language'] ?? null, fn (Builder $query, string $language) => $query->where('language', $language))
             ->when($filters['country'] ?? null, fn (Builder $query, string $country) => $query->where('country', $country))
             ->orderBy($sort, $direction)
@@ -44,7 +45,14 @@ class SourceSiteRepository
     public function distinctFilterOptions(): array
     {
         return [
-            'categories' => SourceSite::query()->whereNotNull('category')->distinct()->orderBy('category')->pluck('category'),
+            'topics' => SourceSite::query()
+                ->whereNotNull('filter_topics')
+                ->get(['filter_topics'])
+                ->flatMap(fn (SourceSite $sourceSite) => $sourceSite->filter_topics ?: [])
+                ->filter()
+                ->unique()
+                ->sort()
+                ->values(),
             'languages' => SourceSite::query()->whereNotNull('language')->distinct()->orderBy('language')->pluck('language'),
             'countries' => SourceSite::query()->whereNotNull('country')->distinct()->orderBy('country')->pluck('country'),
         ];

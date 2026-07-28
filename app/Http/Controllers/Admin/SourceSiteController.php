@@ -6,16 +6,22 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\SourceSiteRequest;
 use App\Models\SourceSite;
 use App\Repositories\SourceSiteRepository;
+use App\Services\AiPromptProfileService;
+use App\Services\NewsSources\SourceSiteTester;
 use App\Services\SourceSiteService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Throwable;
 
 class SourceSiteController extends Controller
 {
     public function __construct(
         private readonly SourceSiteRepository $sourceSites,
         private readonly SourceSiteService $sourceSiteService,
+        private readonly AiPromptProfileService $promptProfiles,
     ) {}
 
     public function index(Request $request): View
@@ -28,46 +34,119 @@ class SourceSiteController extends Controller
         ]);
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
+        $defaultProfile = $this->promptProfiles->ensureDefaultFor($request->user());
+        $wordpressSites = $request->user()->wordpressSites()
+            ->where('active', true)
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->get();
+
         return view('admin.source-sites.create', [
             'sourceSite' => new SourceSite([
-                'type' => SourceSite::TYPE_RSS,
+                'automation_user_id' => $request->user()->id,
+                'ai_prompt_profile_id' => $defaultProfile->id,
+                'wordpress_site_id' => $wordpressSites->count() === 1 ? $wordpressSites->first()->id : null,
+                'auto_generate' => true,
+                'auto_publish' => $wordpressSites->count() === 1,
+                'type' => SourceSite::TYPE_AUTO,
                 'status' => SourceSite::STATUS_PENDING,
                 'frequency_minutes' => 60,
                 'language' => 'es',
                 'priority' => 5,
                 'auth_method' => SourceSite::AUTH_NONE,
+                'daily_limit' => 20,
+                'max_posts_per_scan' => 20,
+                'max_generations_per_scan' => 5,
                 'active' => true,
             ]),
             'typeOptions' => SourceSite::typeOptions(),
-            'statusOptions' => SourceSite::statusOptions(),
             'authMethodOptions' => SourceSite::authMethodOptions(),
+            'promptProfiles' => $request->user()->aiPromptProfiles()->orderByDesc('is_default')->orderBy('name')->get(),
+            'wordpressSites' => $wordpressSites,
         ]);
     }
 
     public function store(SourceSiteRequest $request): RedirectResponse
     {
-        $this->sourceSiteService->create($request->validated());
+        $this->sourceSiteService->create([
+            ...$request->validated(),
+            'automation_user_id' => $request->user()->id,
+        ]);
 
         return redirect()
             ->route('admin.source-sites.index')
             ->with('status', 'Sitio fuente creado correctamente.');
     }
 
-    public function edit(SourceSite $sourceSite): View
+    public function test(Request $request, SourceSiteTester $tester): JsonResponse
+    {
+        $validated = $request->validate([
+            'url' => ['required', 'url:http,https', 'max:2048'],
+            'type' => ['required', Rule::in(array_keys(SourceSite::typeOptions()))],
+            'auth_method' => ['nullable', Rule::in(array_keys(SourceSite::authMethodOptions()))],
+            'api_key' => ['nullable', 'string', 'max:2048'],
+            'username' => ['nullable', 'string', 'max:255'],
+            'password' => ['nullable', 'string', 'max:2048'],
+            'custom_headers' => ['nullable', 'json'],
+            'cookies' => ['nullable', 'json'],
+            'source_site_id' => ['nullable', 'integer', 'exists:source_sites,id'],
+        ]);
+
+        foreach (['custom_headers', 'cookies'] as $field) {
+            $validated[$field] = filled($validated[$field] ?? null)
+                ? json_decode((string) $validated[$field], true)
+                : null;
+        }
+
+        if ($storedSourceSite = SourceSite::query()->find($validated['source_site_id'] ?? null)) {
+            foreach (['api_key', 'password'] as $secret) {
+                if (blank($validated[$secret] ?? null)) {
+                    $validated[$secret] = $storedSourceSite->{$secret};
+                }
+            }
+        }
+
+        unset($validated['source_site_id']);
+
+        try {
+            return response()->json($tester->test(new SourceSite([
+                ...$validated,
+                'name' => $request->string('name')->toString() ?: 'Prueba temporal',
+                'language' => 'es',
+                'daily_limit' => 20,
+                'auth_method' => $validated['auth_method'] ?? SourceSite::AUTH_NONE,
+            ])));
+        } catch (Throwable $exception) {
+            return response()->json([
+                'ok' => false,
+                'message' => $exception->getMessage(),
+            ], 422);
+        }
+    }
+
+    public function edit(Request $request, SourceSite $sourceSite): View
     {
         return view('admin.source-sites.edit', [
             'sourceSite' => $sourceSite,
             'typeOptions' => SourceSite::typeOptions(),
-            'statusOptions' => SourceSite::statusOptions(),
             'authMethodOptions' => SourceSite::authMethodOptions(),
+            'promptProfiles' => $request->user()->aiPromptProfiles()->orderByDesc('is_default')->orderBy('name')->get(),
+            'wordpressSites' => $request->user()->wordpressSites()
+                ->where('active', true)
+                ->where('status', 'active')
+                ->orderBy('name')
+                ->get(),
         ]);
     }
 
     public function update(SourceSiteRequest $request, SourceSite $sourceSite): RedirectResponse
     {
-        $this->sourceSiteService->update($sourceSite, $request->validated());
+        $this->sourceSiteService->update($sourceSite, [
+            ...$request->validated(),
+            'automation_user_id' => $request->user()->id,
+        ]);
 
         return redirect()
             ->route('admin.source-sites.index')

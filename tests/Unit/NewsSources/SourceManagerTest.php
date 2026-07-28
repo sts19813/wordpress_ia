@@ -5,8 +5,11 @@ namespace Tests\Unit\NewsSources;
 use App\Contracts\SourceStrategyInterface;
 use App\Models\SourceSite;
 use App\Services\NewsSources\SourceManager;
+use App\Services\NewsSources\Strategies\JsonFeedSourceStrategy;
 use App\Services\NewsSources\Strategies\RSSSourceStrategy;
 use App\Services\NewsSources\Strategies\ScrapingSourceStrategy;
+use App\Services\NewsSources\Strategies\SitemapSourceStrategy;
+use App\Services\NewsSources\Strategies\WordPressSourceStrategy;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -76,6 +79,33 @@ class SourceManagerTest extends TestCase
         Http::assertSent(fn ($request) => $request->method() === 'GET'
             && str_starts_with($request->url(), 'https://example.com/wp-json/wp/v2/posts')
             && str_contains($request->url(), 'categories=220'));
+    }
+
+    public function test_wordpress_strategy_uses_the_readable_yoast_author_instead_of_a_numeric_id(): void
+    {
+        $post = $this->wordpressPost([
+            'author' => 653,
+            '_embedded' => [
+                'author' => [[
+                    'code' => 'rest_no_route',
+                    'message' => 'No se encontró la ruta.',
+                    'name' => null,
+                ]],
+            ],
+            'yoast_head_json' => [
+                'author' => 'Mary Whitfill Roeloffs',
+            ],
+        ]);
+
+        $items = app(WordPressSourceStrategy::class)
+            ->parse([$post], new SourceSite([
+                'name' => 'Forbes',
+                'url' => 'https://forbes.test',
+                'type' => SourceSite::TYPE_WORDPRESS_REST,
+                'language' => 'es',
+            ]));
+
+        $this->assertSame('Mary Whitfill Roeloffs', $items->first()['autor']);
     }
 
     public function test_rss_strategy_discovers_feed_from_category_html(): void
@@ -199,6 +229,61 @@ class SourceManagerTest extends TestCase
         $this->assertSame('https://example.com/nota.jpg', $items->first()['imagen']);
         $this->assertSame(['Tecnología'], $items->first()['categorias']);
         $this->assertSame(['wordpress', 'ia'], $items->first()['tags']);
+    }
+
+    public function test_json_feed_strategy_parses_items(): void
+    {
+        $items = app(JsonFeedSourceStrategy::class)->parse([
+            'version' => 'https://jsonfeed.org/version/1.1',
+            'items' => [[
+                'title' => 'Nota JSON Feed',
+                'url' => 'https://example.com/nota-json',
+                'content_html' => '<p>Contenido completo</p>',
+                'summary' => 'Resumen',
+                'date_published' => '2026-07-28T10:00:00-06:00',
+                'authors' => [['name' => 'Redacción']],
+                'tags' => ['Economía'],
+            ]],
+        ], new SourceSite([
+            'type' => SourceSite::TYPE_JSON_FEED,
+            'url' => 'https://example.com/feed.json',
+            'language' => 'es',
+        ]));
+
+        $this->assertCount(1, $items);
+        $this->assertSame('Nota JSON Feed', $items->first()['titulo']);
+        $this->assertSame('Redacción', $items->first()['autor']);
+        $this->assertSame(['Economía'], $items->first()['tags']);
+    }
+
+    public function test_sitemap_strategy_parses_news_metadata(): void
+    {
+        $xml = <<<'XML'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+                xmlns:news="http://www.google.com/schemas/sitemap-news/0.9"
+                xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+            <url>
+                <loc>https://example.com/politica/reforma-fiscal</loc>
+                <lastmod>2026-07-28T10:00:00-06:00</lastmod>
+                <news:news>
+                    <news:publication_date>2026-07-28T09:00:00-06:00</news:publication_date>
+                    <news:title>Reforma fiscal aprobada</news:title>
+                </news:news>
+                <image:image><image:loc>https://example.com/reforma.jpg</image:loc></image:image>
+            </url>
+        </urlset>
+        XML;
+
+        $items = app(SitemapSourceStrategy::class)->parse($xml, new SourceSite([
+            'type' => SourceSite::TYPE_SITEMAP,
+            'url' => 'https://example.com/sitemap.xml',
+            'language' => 'es',
+        ]));
+
+        $this->assertCount(1, $items);
+        $this->assertSame('Reforma fiscal aprobada', $items->first()['titulo']);
+        $this->assertSame('https://example.com/reforma.jpg', $items->first()['imagen']);
     }
 
     public function test_source_manager_allows_registering_new_types(): void

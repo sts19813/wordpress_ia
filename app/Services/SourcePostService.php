@@ -11,15 +11,21 @@ class SourcePostService
     /**
      * @param  array<string, mixed>  $item
      */
-    public function storeNormalizedItem(SourceSite $sourceSite, array $item): SourcePost
+    public function storeNormalizedItem(SourceSite $sourceSite, array $item, array $filter = []): SourcePost
     {
-        $payload = $this->payloadFor($sourceSite, $item);
+        $payload = $this->payloadFor($sourceSite, $item, $filter);
         $existingPost = SourcePost::query()
             ->where('hash', $payload['hash'])
             ->orWhere('url', $payload['url'])
             ->first();
 
         if ($existingPost) {
+            if ($existingPost->source_site_id === $sourceSite->id) {
+                $existingPost->fill(collect($payload)
+                    ->except(['source_site_id', 'hash', 'url'])
+                    ->all())->save();
+            }
+
             return $existingPost;
         }
 
@@ -33,7 +39,7 @@ class SourcePostService
     public function storeMany(SourceSite $sourceSite, iterable $items): Collection
     {
         return collect($items)
-            ->filter(fn (array $item) => $this->shouldStore($item))
+            ->filter(fn (array $item) => $this->isStorable($item))
             ->map(fn (array $item) => $this->storeNormalizedItem($sourceSite, $item))
             ->values();
     }
@@ -41,7 +47,7 @@ class SourcePostService
     /**
      * @param  array<string, mixed>  $item
      */
-    private function shouldStore(array $item): bool
+    public function isStorable(array $item): bool
     {
         $url = trim((string) ($item['url'] ?? ''));
 
@@ -58,8 +64,9 @@ class SourcePostService
      * @param  array<string, mixed>  $item
      * @return array<string, mixed>
      */
-    private function payloadFor(SourceSite $sourceSite, array $item): array
+    private function payloadFor(SourceSite $sourceSite, array $item, array $filter = []): array
     {
+        $applies = (bool) ($filter['applies'] ?? true);
         $payload = [
             'source_site_id' => $sourceSite->id,
             'title' => (string) ($item['titulo'] ?? ''),
@@ -72,9 +79,14 @@ class SourcePostService
             'categories' => $this->listValue($item['categorias'] ?? []),
             'tags' => $this->listValue($item['tags'] ?? []),
             'url' => (string) ($item['url'] ?? ''),
-            'status' => SourcePost::STATUS_FETCHED,
+            'status' => $applies ? SourcePost::STATUS_FETCHED : SourcePost::STATUS_DISCARDED,
             'original_json' => $item['original_json'] ?? $item,
             'language' => $item['idioma'] ?? $sourceSite->language,
+            'filter_applies' => $applies,
+            'filter_reason' => $filter['reason'] ?? 'Sin filtros temáticos.',
+            'matched_topics' => $this->listValue($filter['matched_topics'] ?? []),
+            'filter_method' => $filter['method'] ?? 'no_filter',
+            'scanned_at' => now(),
         ];
 
         $payload['hash'] = $this->hashFor($payload);

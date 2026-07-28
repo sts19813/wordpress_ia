@@ -5,8 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-
-//Modelos de publicaciones generadas por IA.
+// Modelos de publicaciones generadas por IA.
 class SourcePost extends Model
 {
     public const STATUS_FETCHED = 'fetched';
@@ -31,6 +30,11 @@ class SourcePost extends Model
         'status',
         'original_json',
         'language',
+        'filter_applies',
+        'filter_reason',
+        'matched_topics',
+        'filter_method',
+        'scanned_at',
     ];
 
     protected function casts(): array
@@ -40,6 +44,9 @@ class SourcePost extends Model
             'categories' => 'array',
             'tags' => 'array',
             'original_json' => 'array',
+            'filter_applies' => 'boolean',
+            'matched_topics' => 'array',
+            'scanned_at' => 'datetime',
         ];
     }
 

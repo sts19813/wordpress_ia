@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Jobs\GenerateAiArticle;
 use App\Jobs\GenerateAiImage;
+use App\Jobs\GenerateSourceArticle;
+use App\Jobs\ScanSourceSite;
 use App\Models\AiArticle;
 use App\Models\AiPromptProfile;
 use App\Models\Scheduler;
@@ -19,7 +21,7 @@ class SchedulerService
     {
         $task = Scheduler::query()->create([
             'user_id' => $user->id,
-            'type' => 'ai_article',
+            'type' => Scheduler::TYPE_AI_ARTICLE,
             'name' => 'Generar borrador con IA',
             'status' => Scheduler::STATUS_QUEUED,
             'step' => 'Esperando un procesador de cola',
@@ -52,6 +54,24 @@ class SchedulerService
             'last_error' => null,
         ]);
         $this->addEvent($task, 'info', $step.' (intento '.$attempt.'/'.$task->max_attempts.').');
+
+        return $task->fresh();
+    }
+
+    public function progress(
+        Scheduler $task,
+        string $step,
+        int $progress,
+        string $message,
+        string $level = 'info',
+    ): Scheduler {
+        $task->update([
+            'status' => Scheduler::STATUS_RUNNING,
+            'step' => $step,
+            'progress' => min(99, max(0, $progress)),
+            'last_error' => null,
+        ]);
+        $this->addEvent($task, $level, $message);
 
         return $task->fresh();
     }
@@ -132,11 +152,7 @@ class SchedulerService
         ]);
         $this->addEvent($task, 'info', 'Se solicitó un reintento manual.');
 
-        if ($task->article?->status === AiArticle::STATUS_DRAFT && ($task->payload['generate_image'] ?? false)) {
-            GenerateAiImage::dispatch($task->id)->onQueue('ai-image');
-        } else {
-            GenerateAiArticle::dispatch($task->id)->onQueue('ai-text');
-        }
+        $this->dispatchTask($task);
 
         return $task->fresh();
     }
@@ -147,7 +163,11 @@ class SchedulerService
         $this->addEvent($task, 'info', 'Ejecución manual iniciada desde el programador.');
 
         try {
-            if ($this->shouldGenerateImage($task)) {
+            if ($task->type === Scheduler::TYPE_SOURCE_SCAN) {
+                app()->call([new ScanSourceSite($task->id, (int) $task->source_site_id), 'handle']);
+            } elseif ($task->type === Scheduler::TYPE_SOURCE_ARTICLE) {
+                app()->call([new GenerateSourceArticle($task->id, (int) $task->source_site_id), 'handle']);
+            } elseif ($this->shouldGenerateImage($task)) {
                 $job = new GenerateAiImage($task->id);
                 $job->handle(app(AiArticleService::class), $this);
             } else {
@@ -190,5 +210,26 @@ class SchedulerService
     {
         return $task->article?->status === AiArticle::STATUS_DRAFT
             && (bool) ($task->payload['generate_image'] ?? false);
+    }
+
+    private function dispatchTask(Scheduler $task): void
+    {
+        if ($task->type === Scheduler::TYPE_SOURCE_SCAN) {
+            ScanSourceSite::dispatch($task->id, (int) $task->source_site_id)->onQueue('source-pipeline');
+
+            return;
+        }
+
+        if ($task->type === Scheduler::TYPE_SOURCE_ARTICLE) {
+            GenerateSourceArticle::dispatch($task->id, (int) $task->source_site_id)->onQueue('source-pipeline');
+
+            return;
+        }
+
+        if ($task->article?->status === AiArticle::STATUS_DRAFT && ($task->payload['generate_image'] ?? false)) {
+            GenerateAiImage::dispatch($task->id)->onQueue('ai-image');
+        } else {
+            GenerateAiArticle::dispatch($task->id)->onQueue('ai-text');
+        }
     }
 }

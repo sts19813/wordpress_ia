@@ -14,22 +14,25 @@
     <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-4 w-100">
         <div>
             <h1 class="page-heading text-gray-900 fw-bold fs-3 my-0">Noticias Obtenidas</h1>
-            <div class="text-muted fw-semibold fs-7 pt-1">Lectura de noticias obtenidas desde sitios fuente.</div>
+            <div class="text-muted fw-semibold fs-7 pt-1">Solo se muestran por defecto las notas que aprobaron los filtros inteligentes.</div>
         </div>
 
-        <form method="POST" action="{{ route('admin.news.fetch') }}" class="d-flex flex-column flex-sm-row align-items-sm-center gap-3">
-            @csrf
-            <select name="source_site_id" class="form-select form-select-solid w-250px" aria-label="Sitio fuente para importar">
-                <option value="">Todos los sitios activos</option>
-                @foreach ($filterOptions['sourceSites'] as $id => $name)
-                    <option value="{{ $id }}" @selected((string) request('source_site_id') === (string) $id)>{{ $name }}</option>
-                @endforeach
-            </select>
-            <button type="submit" class="btn btn-primary">
-                <i class="ki-outline ki-cloud-download fs-2"></i>
-                Obtener noticias
-            </button>
-        </form>
+        <div class="d-flex flex-column flex-sm-row gap-3">
+            <a href="{{ route('admin.source-scan-logs.index') }}" class="btn btn-light-info"><i class="ki-outline ki-note-2 fs-2"></i>Ver bitácora</a>
+            <form method="POST" action="{{ route('admin.news.fetch') }}" class="d-flex flex-column flex-sm-row align-items-sm-center gap-3">
+                @csrf
+                <select name="source_site_id" class="form-select form-select-solid w-250px" aria-label="Sitio fuente para importar">
+                    <option value="">Todos los sitios activos</option>
+                    @foreach ($filterOptions['sourceSites'] as $id => $name)
+                        <option value="{{ $id }}" @selected((string) request('source_site_id') === (string) $id)>{{ $name }}</option>
+                    @endforeach
+                </select>
+                <button type="submit" class="btn btn-primary">
+                    <i class="ki-outline ki-cloud-download fs-2"></i>
+                    Escanear noticias
+                </button>
+            </form>
+        </div>
     </div>
 @endsection
 
@@ -131,9 +134,11 @@
                                 <td><span class="badge {{ $statusClasses[$sourcePost->status] ?? 'badge-light' }}">{{ $sourcePost->statusLabel() }}</span></td>
                                 <td>{{ $sourcePost->language ? strtoupper($sourcePost->language) : '-' }}</td>
                                 <td class="text-end">
-                                    <a href="{{ route('admin.ai-articles.create', ['source_post_ids' => [$sourcePost->id]]) }}" class="btn btn-icon btn-light-primary btn-sm me-2" aria-label="Crear nota con IA" title="Crear nota con IA">
-                                        <i class="ki-outline ki-sparkles fs-3"></i>
-                                    </a>
+                                    @if ($sourcePost->status === \App\Models\SourcePost::STATUS_FETCHED)
+                                        <a href="{{ route('admin.ai-articles.create', ['source_post_ids' => [$sourcePost->id]]) }}" class="btn btn-icon btn-light-primary btn-sm me-2" aria-label="Crear nota con IA" title="Crear nota con IA">
+                                            <i class="ki-outline ki-sparkles fs-3"></i>
+                                        </a>
+                                    @endif
                                     <a href="{{ route('admin.news.show', $sourcePost) }}" class="btn btn-icon btn-light btn-sm me-2" aria-label="Ver detalle">
                                         <i class="ki-outline ki-eye fs-3"></i>
                                     </a>

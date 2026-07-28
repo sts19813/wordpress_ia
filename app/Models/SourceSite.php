@@ -3,20 +3,28 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-
-//Modelos de stios fuentes para obtener publicaciones generadas por Ia.
+// Modelos de stios fuentes para obtener publicaciones generadas por Ia.
 class SourceSite extends Model
 {
     use SoftDeletes;
+
+    public const TYPE_AUTO = 'auto';
 
     public const TYPE_WORDPRESS_REST = 'wordpress_rest';
 
     public const TYPE_RSS = 'rss';
 
+    public const TYPE_JSON_FEED = 'json_feed';
+
+    public const TYPE_SITEMAP = 'sitemap';
+
     public const TYPE_HTML = 'html';
+
+    public const TYPE_AI_WEB = 'ai_web';
 
     public const STATUS_PENDING = 'pending';
 
@@ -38,11 +46,19 @@ class SourceSite extends Model
 
     protected $fillable = [
         'name',
+        'automation_user_id',
+        'ai_prompt_profile_id',
+        'wordpress_site_id',
+        'auto_generate',
+        'auto_publish',
         'url',
         'type',
         'status',
         'frequency_minutes',
         'category',
+        'filter_topics',
+        'excluded_topics',
+        'filter_instructions',
         'language',
         'country',
         'priority',
@@ -53,7 +69,11 @@ class SourceSite extends Model
         'cookies',
         'auth_method',
         'daily_limit',
+        'max_posts_per_scan',
+        'max_generations_per_scan',
         'last_synced_at',
+        'next_scan_at',
+        'last_queued_at',
         'active',
     ];
 
@@ -67,22 +87,34 @@ class SourceSite extends Model
         return [
             'custom_headers' => 'array',
             'cookies' => 'array',
+            'filter_topics' => 'array',
+            'excluded_topics' => 'array',
             'api_key' => 'encrypted',
             'password' => 'encrypted',
             'last_synced_at' => 'datetime',
+            'next_scan_at' => 'datetime',
+            'last_queued_at' => 'datetime',
             'active' => 'boolean',
+            'auto_generate' => 'boolean',
+            'auto_publish' => 'boolean',
             'frequency_minutes' => 'integer',
             'priority' => 'integer',
             'daily_limit' => 'integer',
+            'max_posts_per_scan' => 'integer',
+            'max_generations_per_scan' => 'integer',
         ];
     }
 
     public static function typeOptions(): array
     {
         return [
-            self::TYPE_WORDPRESS_REST => 'WordPress REST API',
-            self::TYPE_RSS => 'RSS',
-            self::TYPE_HTML => 'Sitio HTML para scraping',
+            self::TYPE_AUTO => 'Detección automática (recomendado)',
+            self::TYPE_WORDPRESS_REST => 'WordPress — API REST nativa',
+            self::TYPE_RSS => 'Feed RSS o Atom',
+            self::TYPE_JSON_FEED => 'JSON Feed',
+            self::TYPE_SITEMAP => 'Sitemap XML de publicaciones',
+            self::TYPE_HTML => 'Página HTML — datos estructurados o scraping',
+            self::TYPE_AI_WEB => 'Navegación y extracción con IA — último recurso',
         ];
     }
 
@@ -125,5 +157,30 @@ class SourceSite extends Model
     public function sourcePosts(): HasMany
     {
         return $this->hasMany(SourcePost::class);
+    }
+
+    public function scanLogs(): HasMany
+    {
+        return $this->hasMany(SourceScanLog::class);
+    }
+
+    public function automationUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'automation_user_id');
+    }
+
+    public function promptProfile(): BelongsTo
+    {
+        return $this->belongsTo(AiPromptProfile::class, 'ai_prompt_profile_id');
+    }
+
+    public function wordpressSite(): BelongsTo
+    {
+        return $this->belongsTo(WordPressSite::class);
+    }
+
+    public function scheduledTasks(): HasMany
+    {
+        return $this->hasMany(Scheduler::class);
     }
 }

@@ -47,28 +47,46 @@ class ScrapingSourceStrategy implements SourceStrategyInterface
 
         $xpath = new DOMXPath($document);
         $nodes = $xpath->query('//article');
+        $documentFallback = false;
+
+        if (! $nodes || $nodes->length === 0) {
+            $nodes = $xpath->query(
+                '//main//a[.//h1 or .//h2 or .//h3]'
+                .' | //a[contains(concat(" ", normalize-space(@class), " "), " post ")]'
+                .' | //a[contains(concat(" ", normalize-space(@class), " "), " article ")]'
+                .' | //a[contains(concat(" ", normalize-space(@class), " "), " story ")]'
+            );
+        }
 
         if (! $nodes || $nodes->length === 0) {
             $nodes = $xpath->query('//main | //body');
+            $documentFallback = true;
         }
 
         return collect($nodes ?: [])
             ->take($sourceSite->daily_limit ?: 20)
             ->filter(fn (mixed $node) => $node instanceof DOMElement)
-            ->map(fn (DOMElement $node) => $this->normalizeItem([
-                'titulo' => $this->nodeText($xpath, './/h1 | .//h2 | .//h3', $node) ?: $this->meta($xpath, 'og:title') ?: $this->documentTitle($xpath),
-                'contenido' => $this->paragraphText($xpath, $node) ?: $node->textContent,
-                'autor' => $this->nodeText($xpath, './/*[@rel="author"] | .//*[contains(@class, "author")]', $node) ?: $this->meta($xpath, 'author', 'name'),
-                'fecha' => $this->nodeAttribute($xpath, './/time[@datetime]', 'datetime', $node) ?: $this->meta($xpath, 'article:published_time'),
-                'imagen' => $this->absoluteUrl($this->nodeAttribute($xpath, './/img[@src]', 'src', $node) ?: $this->meta($xpath, 'og:image'), $sourceSite->url),
-                'url' => $this->absoluteUrl($this->nodeAttribute($xpath, './/a[@href]', 'href', $node) ?: $this->meta($xpath, 'og:url') ?: $sourceSite->url, $sourceSite->url),
-                'categorias' => $this->meta($xpath, 'article:section') ? [$this->meta($xpath, 'article:section')] : [],
-                'tags' => $this->meta($xpath, 'keywords', 'name'),
-                'contenido_html' => $this->innerHtml($node),
-                'resumen' => $this->meta($xpath, 'description', 'name') ?: $this->nodeText($xpath, './/p', $node),
-                'slug' => null,
-                'idioma' => $sourceSite->language,
-            ], $sourceSite))
+            ->map(function (DOMElement $node) use ($xpath, $sourceSite, $documentFallback): array {
+                $normalized = $this->normalizeItem([
+                    'titulo' => $this->nodeText($xpath, './/h1 | .//h2 | .//h3', $node) ?: $this->meta($xpath, 'og:title') ?: $this->documentTitle($xpath),
+                    'contenido' => $this->paragraphText($xpath, $node) ?: $node->textContent,
+                    'autor' => $this->nodeText($xpath, './/*[@rel="author"] | .//*[contains(@class, "author")]', $node) ?: $this->meta($xpath, 'author', 'name'),
+                    'fecha' => $this->nodeAttribute($xpath, './/time[@datetime]', 'datetime', $node) ?: $this->meta($xpath, 'article:published_time'),
+                    'imagen' => $this->absoluteUrl($this->nodeAttribute($xpath, './/img[@src]', 'src', $node) ?: $this->meta($xpath, 'og:image'), $sourceSite->url),
+                    'url' => $this->absoluteUrl($this->nodeAttribute($xpath, './/a[@href]', 'href', $node) ?: $this->meta($xpath, 'og:url') ?: $sourceSite->url, $sourceSite->url),
+                    'categorias' => $this->meta($xpath, 'article:section') ? [$this->meta($xpath, 'article:section')] : [],
+                    'tags' => $this->meta($xpath, 'keywords', 'name'),
+                    'contenido_html' => $this->innerHtml($node),
+                    'resumen' => $this->meta($xpath, 'description', 'name') ?: $this->nodeText($xpath, './/p', $node),
+                    'slug' => null,
+                    'idioma' => $sourceSite->language,
+                ], $sourceSite);
+
+                return [
+                    ...$normalized,
+                    '_html_document_fallback' => $documentFallback,
+                ];
+            })
             ->filter(fn (array $item) => filled($item['titulo']) && filled($item['url']))
             ->values();
     }
