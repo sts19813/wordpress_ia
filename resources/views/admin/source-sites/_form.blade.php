@@ -18,7 +18,8 @@
     };
     $filterErrors = $errors->hasAny(['filter_topics', 'filter_topics.*', 'excluded_topics', 'excluded_topics.*', 'filter_instructions']);
     $advancedErrors = $errors->hasAny(['daily_limit', 'active', 'auth_method', 'api_key', 'username', 'password', 'custom_headers', 'cookies']);
-    $activeTab = $advancedErrors ? 'advanced' : ($filterErrors ? 'filters' : 'basic');
+    $automationErrors = $errors->hasAny(['auto_generate', 'auto_publish', 'ai_prompt_profile_id', 'wordpress_site_id']);
+    $activeTab = $automationErrors ? 'automation' : ($advancedErrors ? 'advanced' : ($filterErrors ? 'filters' : 'basic'));
 @endphp
 
 <form method="POST"
@@ -43,6 +44,11 @@
                 <li class="nav-item">
                     <button class="nav-link {{ $activeTab === 'filters' ? 'active' : '' }}" data-bs-toggle="tab" data-bs-target="#source-filters" type="button">
                         <i class="ki-outline ki-filter-search fs-3 me-2"></i>Filtros inteligentes
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link {{ $activeTab === 'automation' ? 'active' : '' }}" data-bs-toggle="tab" data-bs-target="#source-automation" type="button">
+                        <i class="ki-outline ki-arrows-circle fs-3 me-2"></i>Automatización
                     </button>
                 </li>
                 <li class="nav-item">
@@ -126,6 +132,62 @@
                             <textarea name="filter_instructions" rows="4" class="form-control form-control-solid @error('filter_instructions') is-invalid @enderror" placeholder="Ej. Aceptar notas sobre decisiones del Congreso aunque el título no diga política.">{{ old('filter_instructions', $sourceSite->filter_instructions) }}</textarea>
                             <div class="form-text">Úsalo para reglas editoriales, entidades, regiones o casos especiales.</div>
                             @error('filter_instructions')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade {{ $activeTab === 'automation' ? 'show active' : '' }}" id="source-automation">
+                    <div class="notice d-flex bg-light-success rounded border-success border border-dashed p-6 mb-8">
+                        <i class="ki-outline ki-arrows-circle fs-2tx text-success me-4"></i>
+                        <div>
+                            <div class="fw-bold text-gray-900 mb-1">Flujo completo mediante colas</div>
+                            <div class="text-gray-700">Cada nota aceptada por los filtros inteligentes puede generar un artículo con IA y publicarse en WordPress. El progreso completo aparecerá en el Programador.</div>
+                        </div>
+                    </div>
+
+                    <div class="row g-7">
+                        <div class="col-lg-6">
+                            <label class="form-label required">Perfil editorial para generar artículos</label>
+                            <select name="ai_prompt_profile_id" class="form-select form-select-solid @error('ai_prompt_profile_id') is-invalid @enderror">
+                                <option value="">Selecciona un perfil</option>
+                                @foreach ($promptProfiles as $profile)
+                                    <option value="{{ $profile->id }}" @selected((int) old('ai_prompt_profile_id', $sourceSite->ai_prompt_profile_id) === $profile->id)>
+                                        {{ $profile->name }}{{ $profile->is_default ? ' · Predeterminado' : '' }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('ai_prompt_profile_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                        <div class="col-lg-6">
+                            <label class="form-label">Destino de publicación automática</label>
+                            <select name="wordpress_site_id" class="form-select form-select-solid @error('wordpress_site_id') is-invalid @enderror">
+                                <option value="">Solo guardar como borrador</option>
+                                @foreach ($wordpressSites as $wordpressSite)
+                                    <option value="{{ $wordpressSite->id }}" @selected((int) old('wordpress_site_id', $sourceSite->wordpress_site_id) === $wordpressSite->id)>{{ $wordpressSite->name }}</option>
+                                @endforeach
+                            </select>
+                            <div class="form-text">El destino debe estar activo y pertenecer a tu cuenta.</div>
+                            @error('wordpress_site_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                        <div class="col-lg-6">
+                            <label class="form-check form-switch form-check-custom form-check-solid">
+                                <input type="hidden" name="auto_generate" value="0">
+                                <input class="form-check-input" type="checkbox" name="auto_generate" value="1" @checked((bool) old('auto_generate', $sourceSite->auto_generate ?? true))>
+                                <span class="form-check-label">
+                                    <span class="fw-bold text-gray-800 d-block">Generar artículo con IA</span>
+                                    <span class="text-muted fs-8">Solo para notas nuevas que hayan aprobado los filtros.</span>
+                                </span>
+                            </label>
+                        </div>
+                        <div class="col-lg-6">
+                            <label class="form-check form-switch form-check-custom form-check-solid">
+                                <input type="hidden" name="auto_publish" value="0">
+                                <input class="form-check-input" type="checkbox" name="auto_publish" value="1" @checked((bool) old('auto_publish', $sourceSite->auto_publish ?? false))>
+                                <span class="form-check-label">
+                                    <span class="fw-bold text-gray-800 d-block">Publicar automáticamente</span>
+                                    <span class="text-muted fs-8">Si está desactivado, el artículo queda como borrador para revisión.</span>
+                                </span>
+                            </label>
                         </div>
                     </div>
                 </div>

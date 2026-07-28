@@ -10,9 +10,9 @@ Artisan::command('inspire', function () {
 
 // Compatible con hosting compartido: Hostinger sólo necesita invocar
 // `php artisan schedule:run` cada minuto desde su panel de cron jobs.
-Schedule::command('queue:work database --queue=ai-text,ai-image --stop-when-empty --tries=3 --timeout=300 --max-time=240')
+Schedule::command('queue:work database --queue=source-pipeline,ai-text,ai-image --stop-when-empty --tries=3 --timeout=900 --max-time=1200')
     ->everyMinute()
-    ->withoutOverlapping(10);
+    ->withoutOverlapping(30);
 
 Schedule::command('sources:scan-due')
     ->everyMinute()

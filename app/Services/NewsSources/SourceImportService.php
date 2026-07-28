@@ -28,6 +28,7 @@ class SourceImportService
             'created' => 0,
             'duplicates' => 0,
             'discarded' => 0,
+            'created_post_ids' => [],
             'limits_reached' => [],
             'errors' => [],
         ];
@@ -41,6 +42,10 @@ class SourceImportService
             $result['created'] += $siteResult['created'];
             $result['duplicates'] += $siteResult['duplicates'];
             $result['discarded'] += $siteResult['discarded'];
+            $result['created_post_ids'] = [
+                ...$result['created_post_ids'],
+                ...$siteResult['created_post_ids'],
+            ];
 
             if ($siteResult['daily_limit_reached']) {
                 $result['limits_reached'][] = $sourceSite->name;
@@ -55,7 +60,7 @@ class SourceImportService
     }
 
     /**
-     * @return array{fetched: int, created: int, duplicates: int, discarded: int, error: ?string, daily_limit_reached: bool}
+     * @return array{fetched: int, created: int, duplicates: int, discarded: int, created_post_ids: array<int, int>, error: ?string, daily_limit_reached: bool}
      */
     public function importSource(SourceSite $sourceSite): array
     {
@@ -73,6 +78,7 @@ class SourceImportService
                     'created' => 0,
                     'duplicates' => 0,
                     'discarded' => 0,
+                    'created_post_ids' => [],
                     'error' => null,
                     'daily_limit_reached' => true,
                 ];
@@ -84,6 +90,7 @@ class SourceImportService
             $created = 0;
             $duplicates = 0;
             $discarded = 0;
+            $createdPostIds = [];
 
             foreach ($items as $item) {
                 if (! $this->sourcePostService->isStorable($item)) {
@@ -118,6 +125,7 @@ class SourceImportService
 
                 if ($sourcePost->wasRecentlyCreated) {
                     $created++;
+                    $createdPostIds[] = $sourcePost->id;
                     $outcome = SourceScanLog::OUTCOME_ACCEPTED;
                 } else {
                     $duplicates++;
@@ -137,6 +145,7 @@ class SourceImportService
                 'created' => $created,
                 'duplicates' => $duplicates,
                 'discarded' => $discarded,
+                'created_post_ids' => $createdPostIds,
                 'error' => null,
                 'daily_limit_reached' => $items->count() >= $remainingToday,
             ];
@@ -151,6 +160,7 @@ class SourceImportService
                 'created' => 0,
                 'duplicates' => 0,
                 'discarded' => 0,
+                'created_post_ids' => [],
                 'error' => "{$sourceSite->name}: {$exception->getMessage()}",
                 'daily_limit_reached' => false,
             ];

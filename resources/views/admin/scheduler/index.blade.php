@@ -6,7 +6,7 @@
     <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-4 w-100">
         <div>
             <h1 class="page-heading text-gray-900 fw-bold fs-3 my-0">Programador y colas</h1>
-            <div class="text-muted fw-semibold fs-7 pt-1">Seguimiento de procesos en segundo plano, reintentos y errores.</div>
+            <div class="text-muted fw-semibold fs-7 pt-1">Consulta fuentes, aplica filtros, genera artículos y publica mediante trabajos rastreables.</div>
         </div>
         <a href="{{ route('admin.ai-articles.create') }}" class="btn btn-primary"><i class="ki-outline ki-plus fs-2"></i>Nueva nota</a>
     </div>
@@ -57,6 +57,98 @@
         </div>
     </div>
 
+    <div class="card card-flush mb-7">
+        <div class="card-header align-items-center">
+            <div class="card-title">
+                <div>
+                    <h3 class="fw-bold mb-1">Próximas consultas de sitios fuente</h3>
+                    <div class="text-muted fs-7">La fecha se recalcula al encolar cada sitio según su frecuencia configurada.</div>
+                </div>
+            </div>
+        </div>
+        <div class="card-body pt-0">
+            <div class="table-responsive">
+                <table class="table align-middle table-row-dashed fs-7 gy-5">
+                    <thead>
+                        <tr class="text-start text-gray-500 fw-bold text-uppercase">
+                            <th>Sitio fuente</th>
+                            <th>Frecuencia</th>
+                            <th>Última consulta</th>
+                            <th>Próxima consulta</th>
+                            <th>Automatización</th>
+                            <th>Estado de cola</th>
+                            <th class="text-end">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody class="fw-semibold text-gray-700">
+                        @forelse ($sourceSites as $sourceSite)
+                            @php
+                                $activeTask = $activeSourceTasks->get($sourceSite->id);
+                                $isDue = $sourceSite->active && $sourceSite->next_scan_at?->lte(now());
+                            @endphp
+                            <tr>
+                                <td>
+                                    <a href="{{ route('admin.source-sites.edit', $sourceSite) }}" class="text-gray-900 text-hover-primary fw-bold">{{ $sourceSite->name }}</a>
+                                    <div class="text-muted fs-8">{{ $sourceSite->typeLabel() }}</div>
+                                </td>
+                                <td>{{ max(1, (int) ceil($sourceSite->frequency_minutes / 60)) }} h</td>
+                                <td>{{ $sourceSite->last_synced_at?->format('d/m/Y H:i') ?: 'Sin consultas' }}</td>
+                                <td>
+                                    @if (! $sourceSite->active)
+                                        <span class="badge badge-light-secondary">Inactivo</span>
+                                    @elseif ($isDue)
+                                        <span class="badge badge-light-warning">Vencida · ejecutar ahora</span>
+                                    @else
+                                        <span class="fw-bold text-gray-900">{{ $sourceSite->next_scan_at?->format('d/m/Y H:i') ?: 'Pendiente inmediata' }}</span>
+                                        @if ($sourceSite->next_scan_at)<div class="text-muted fs-8">{{ $sourceSite->next_scan_at->diffForHumans() }}</div>@endif
+                                    @endif
+                                </td>
+                                <td>
+                                    @if ($sourceSite->auto_generate && $sourceSite->promptProfile)
+                                        <span class="badge badge-light-primary">IA: {{ $sourceSite->promptProfile->name }}</span>
+                                    @else
+                                        <span class="badge badge-light-warning">Solo obtener notas</span>
+                                    @endif
+                                    @if ($sourceSite->auto_publish && $sourceSite->wordpressSite)
+                                        <div class="text-muted fs-8 mt-1">Publica en {{ $sourceSite->wordpressSite->name }}</div>
+                                    @else
+                                        <div class="text-muted fs-8 mt-1">Guarda borrador</div>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if ($activeTask)
+                                        <a href="{{ route('admin.scheduler.index', ['task' => $activeTask->id]) }}" class="badge badge-light-{{ $activeTask->status === 'running' ? 'primary' : 'warning' }}">
+                                            {{ $activeTask->statusLabel() }} #{{ $activeTask->id }}
+                                        </a>
+                                    @else
+                                        <span class="badge badge-light-success">Programado</span>
+                                    @endif
+                                </td>
+                                <td class="text-end">
+                                    <form method="POST" action="{{ route('admin.scheduler.sources.run', $sourceSite) }}" class="d-inline">
+                                        @csrf
+                                        <button type="submit" class="btn btn-sm btn-light-primary" @disabled(! $sourceSite->active || $activeTask)>
+                                            <i class="ki-outline ki-play fs-3"></i>Consultar ahora
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="7" class="text-center text-muted py-10">No hay sitios fuente configurados.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex align-items-center justify-content-between mb-5">
+        <div>
+            <h2 class="fw-bold fs-4 mb-1">Ejecuciones y bitácora</h2>
+            <div class="text-muted fs-7">Cada consulta y cada artículo aceptado aparecen como trabajos independientes.</div>
+        </div>
+    </div>
+
     <div class="d-flex flex-column gap-5" id="queue-task-list">
         @forelse ($tasks as $task)
             @php
@@ -79,6 +171,8 @@
                             <div class="d-flex align-items-center flex-wrap gap-3 mb-2">
                                 <span class="fw-bold fs-5 text-gray-900">{{ $task->name }} #{{ $task->id }}</span>
                                 <span class="badge task-status {{ $badge }}">{{ $task->statusLabel() }}</span>
+                                <span class="badge badge-light">{{ $task->typeLabel() }}</span>
+                                @if ($task->sourceSite)<span class="badge badge-light-info">{{ $task->sourceSite->name }}</span>@endif
                                 @if ($mainImage?->status === 'failed')<span class="badge badge-light-warning">Texto listo · imagen fallida</span>@endif
                             </div>
                             <div class="task-step text-muted fw-semibold mb-4">{{ $task->step }}</div>
@@ -109,6 +203,14 @@
                                 <a href="{{ route('admin.ai-articles.show', $task->article) }}" class="btn btn-sm btn-light-primary task-article-link"><i class="ki-outline ki-eye fs-3"></i>Ver borrador</a>
                             @else
                                 <a href="#" class="btn btn-sm btn-light-primary task-article-link d-none"><i class="ki-outline ki-eye fs-3"></i>Ver borrador</a>
+                            @endif
+                            @if ($task->sourcePost)
+                                <a href="{{ route('admin.news.show', $task->sourcePost) }}" class="btn btn-sm btn-light-info"><i class="ki-outline ki-document fs-3"></i>Ver fuente</a>
+                            @endif
+                            @if ($task->publication?->remote_url)
+                                <a href="{{ $task->publication->remote_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-light-success task-publication-link"><i class="ki-outline ki-send fs-3"></i>Ver publicación</a>
+                            @else
+                                <a href="#" target="_blank" rel="noopener" class="btn btn-sm btn-light-success task-publication-link d-none"><i class="ki-outline ki-send fs-3"></i>Ver publicación</a>
                             @endif
                             @if ($task->status === 'failed')
                                 <form method="POST" action="{{ route('admin.scheduler.retry', $task) }}" class="task-retry-form">
@@ -203,6 +305,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (task.article_url) {
                     const link = card.querySelector('.task-article-link');
                     link.href = task.article_url;
+                    link.classList.remove('d-none');
+                }
+                if (task.publication_url) {
+                    const link = card.querySelector('.task-publication-link');
+                    link.href = task.publication_url;
                     link.classList.remove('d-none');
                 }
                 if (task.last_error) {

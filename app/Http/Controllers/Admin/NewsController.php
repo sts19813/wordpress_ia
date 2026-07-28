@@ -4,8 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\SourcePost;
+use App\Models\SourceSite;
 use App\Repositories\SourcePostRepository;
-use App\Services\NewsSources\SourceImportService;
+use App\Services\SourcePipelineService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,7 +15,7 @@ class NewsController extends Controller
 {
     public function __construct(
         private readonly SourcePostRepository $sourcePosts,
-        private readonly SourceImportService $sourceImportService,
+        private readonly SourcePipelineService $sourcePipeline,
     ) {}
 
     public function index(Request $request): View
@@ -32,20 +33,22 @@ class NewsController extends Controller
             'source_site_id' => ['nullable', 'integer', 'exists:source_sites,id'],
         ]);
 
-        $result = $this->sourceImportService->import($validated['source_site_id'] ?? null);
+        $sites = SourceSite::query()
+            ->where('active', true)
+            ->where('status', '!=', SourceSite::STATUS_PAUSED)
+            ->when($validated['source_site_id'] ?? null, fn ($query, $id) => $query->whereKey($id))
+            ->get();
+        $tasks = $sites
+            ->map(fn (SourceSite $site) => $this->sourcePipeline->enqueueScan($site, 'manual', $request->user()))
+            ->filter();
 
-        $message = "Escaneo terminado: {$result['fetched']} revisadas, {$result['created']} nuevas, {$result['discarded']} descartadas por filtros y {$result['duplicates']} ya conocidas.";
-
-        if ($result['sites'] === 0) {
-            $message = 'No hay sitios fuente activos para importar.';
-        } elseif ($result['limits_reached'] !== []) {
-            $message .= ' Límite diario alcanzado: '.implode(', ', $result['limits_reached']).'.';
+        if ($tasks->isEmpty()) {
+            return back()->with('warning', 'No hay sitios fuente activos para consultar.');
         }
 
         return redirect()
-            ->route('admin.news.index', $request->only('source_site_id'))
-            ->with('status', $message)
-            ->with('import_errors', $result['errors']);
+            ->route('admin.scheduler.index', ['task' => $tasks->last()->id])
+            ->with('status', "{$tasks->count()} consulta(s) añadidas a la cola. El progreso ya está disponible en el Programador.");
     }
 
     public function show(SourcePost $sourcePost): View

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -45,6 +46,11 @@ class SourceSite extends Model
 
     protected $fillable = [
         'name',
+        'automation_user_id',
+        'ai_prompt_profile_id',
+        'wordpress_site_id',
+        'auto_generate',
+        'auto_publish',
         'url',
         'type',
         'status',
@@ -64,6 +70,8 @@ class SourceSite extends Model
         'auth_method',
         'daily_limit',
         'last_synced_at',
+        'next_scan_at',
+        'last_queued_at',
         'active',
     ];
 
@@ -82,7 +90,11 @@ class SourceSite extends Model
             'api_key' => 'encrypted',
             'password' => 'encrypted',
             'last_synced_at' => 'datetime',
+            'next_scan_at' => 'datetime',
+            'last_queued_at' => 'datetime',
             'active' => 'boolean',
+            'auto_generate' => 'boolean',
+            'auto_publish' => 'boolean',
             'frequency_minutes' => 'integer',
             'priority' => 'integer',
             'daily_limit' => 'integer',
@@ -146,5 +158,25 @@ class SourceSite extends Model
     public function scanLogs(): HasMany
     {
         return $this->hasMany(SourceScanLog::class);
+    }
+
+    public function automationUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'automation_user_id');
+    }
+
+    public function promptProfile(): BelongsTo
+    {
+        return $this->belongsTo(AiPromptProfile::class, 'ai_prompt_profile_id');
+    }
+
+    public function wordpressSite(): BelongsTo
+    {
+        return $this->belongsTo(WordPressSite::class);
+    }
+
+    public function scheduledTasks(): HasMany
+    {
+        return $this->hasMany(Scheduler::class);
     }
 }

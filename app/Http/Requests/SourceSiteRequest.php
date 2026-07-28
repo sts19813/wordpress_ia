@@ -28,6 +28,8 @@ class SourceSiteRequest extends FormRequest
             'priority' => $this->input('priority', $sourceSite?->priority ?: 5),
             'auth_method' => $this->input('auth_method', $sourceSite?->auth_method ?: SourceSite::AUTH_NONE),
             'active' => $this->has('active') ? $this->boolean('active') : ($sourceSite?->active ?? true),
+            'auto_generate' => $this->has('auto_generate') ? $this->boolean('auto_generate') : ($sourceSite?->auto_generate ?? true),
+            'auto_publish' => $this->has('auto_publish') ? $this->boolean('auto_publish') : ($sourceSite?->auto_publish ?? false),
         ], fn (mixed $value) => $value !== null));
     }
 
@@ -61,6 +63,23 @@ class SourceSiteRequest extends FormRequest
             'daily_limit' => ['required', 'integer', 'min:1', 'max:10000'],
             'last_synced_at' => ['nullable', 'date'],
             'active' => ['boolean'],
+            'auto_generate' => ['boolean'],
+            'auto_publish' => ['boolean'],
+            'ai_prompt_profile_id' => [
+                'nullable',
+                'required_if:auto_generate,1',
+                'integer',
+                Rule::exists('ai_prompt_profiles', 'id')->where('user_id', $this->user()->id),
+            ],
+            'wordpress_site_id' => [
+                'nullable',
+                'required_if:auto_publish,1',
+                'integer',
+                Rule::exists('wordpress_sites', 'id')->where(fn ($query) => $query
+                    ->where('user_id', $this->user()->id)
+                    ->where('active', true)
+                    ->where('status', 'active')),
+            ],
         ];
     }
 
@@ -88,6 +107,10 @@ class SourceSiteRequest extends FormRequest
             'daily_limit' => 'límite de posts escaneados al día',
             'last_synced_at' => 'última sincronización',
             'active' => 'activo',
+            'auto_generate' => 'generación automática',
+            'auto_publish' => 'publicación automática',
+            'ai_prompt_profile_id' => 'perfil editorial IA',
+            'wordpress_site_id' => 'destino WordPress',
         ];
     }
 

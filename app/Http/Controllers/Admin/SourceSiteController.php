@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\SourceSiteRequest;
 use App\Models\SourceSite;
 use App\Repositories\SourceSiteRepository;
+use App\Services\AiPromptProfileService;
 use App\Services\NewsSources\SourceSiteTester;
 use App\Services\SourceSiteService;
 use Illuminate\Contracts\View\View;
@@ -20,6 +21,7 @@ class SourceSiteController extends Controller
     public function __construct(
         private readonly SourceSiteRepository $sourceSites,
         private readonly SourceSiteService $sourceSiteService,
+        private readonly AiPromptProfileService $promptProfiles,
     ) {}
 
     public function index(Request $request): View
@@ -32,10 +34,22 @@ class SourceSiteController extends Controller
         ]);
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
+        $defaultProfile = $this->promptProfiles->ensureDefaultFor($request->user());
+        $wordpressSites = $request->user()->wordpressSites()
+            ->where('active', true)
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->get();
+
         return view('admin.source-sites.create', [
             'sourceSite' => new SourceSite([
+                'automation_user_id' => $request->user()->id,
+                'ai_prompt_profile_id' => $defaultProfile->id,
+                'wordpress_site_id' => $wordpressSites->count() === 1 ? $wordpressSites->first()->id : null,
+                'auto_generate' => true,
+                'auto_publish' => $wordpressSites->count() === 1,
                 'type' => SourceSite::TYPE_AUTO,
                 'status' => SourceSite::STATUS_PENDING,
                 'frequency_minutes' => 60,
@@ -47,12 +61,17 @@ class SourceSiteController extends Controller
             ]),
             'typeOptions' => SourceSite::typeOptions(),
             'authMethodOptions' => SourceSite::authMethodOptions(),
+            'promptProfiles' => $request->user()->aiPromptProfiles()->orderByDesc('is_default')->orderBy('name')->get(),
+            'wordpressSites' => $wordpressSites,
         ]);
     }
 
     public function store(SourceSiteRequest $request): RedirectResponse
     {
-        $this->sourceSiteService->create($request->validated());
+        $this->sourceSiteService->create([
+            ...$request->validated(),
+            'automation_user_id' => $request->user()->id,
+        ]);
 
         return redirect()
             ->route('admin.source-sites.index')
@@ -105,18 +124,27 @@ class SourceSiteController extends Controller
         }
     }
 
-    public function edit(SourceSite $sourceSite): View
+    public function edit(Request $request, SourceSite $sourceSite): View
     {
         return view('admin.source-sites.edit', [
             'sourceSite' => $sourceSite,
             'typeOptions' => SourceSite::typeOptions(),
             'authMethodOptions' => SourceSite::authMethodOptions(),
+            'promptProfiles' => $request->user()->aiPromptProfiles()->orderByDesc('is_default')->orderBy('name')->get(),
+            'wordpressSites' => $request->user()->wordpressSites()
+                ->where('active', true)
+                ->where('status', 'active')
+                ->orderBy('name')
+                ->get(),
         ]);
     }
 
     public function update(SourceSiteRequest $request, SourceSite $sourceSite): RedirectResponse
     {
-        $this->sourceSiteService->update($sourceSite, $request->validated());
+        $this->sourceSiteService->update($sourceSite, [
+            ...$request->validated(),
+            'automation_user_id' => $request->user()->id,
+        ]);
 
         return redirect()
             ->route('admin.source-sites.index')

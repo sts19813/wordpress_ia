@@ -80,6 +80,7 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     Route::get('programador/{scheduler}/estado', [SchedulerController::class, 'status'])->name('scheduler.status');
     Route::post('programador/{scheduler}/ejecutar', [SchedulerController::class, 'execute'])->name('scheduler.execute');
     Route::post('programador/{scheduler}/reintentar', [SchedulerController::class, 'retry'])->name('scheduler.retry');
+    Route::post('programador/fuentes/{sourceSite}/ejecutar', [SchedulerController::class, 'runSource'])->name('scheduler.sources.run');
     Route::get('logs', SystemLogController::class)->name('system-logs.index');
     Route::get('configuracion', [SettingController::class, 'index'])->name('settings.index');
     Route::get('configuracion/prompts/nuevo', [SettingController::class, 'create'])->name('settings.prompts.create');

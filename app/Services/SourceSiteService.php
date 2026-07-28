@@ -11,7 +11,12 @@ class SourceSiteService
      */
     public function create(array $data): SourceSite
     {
-        return SourceSite::query()->create($this->normalizePayload($data));
+        $sourceSite = SourceSite::query()->create($this->normalizePayload($data));
+        $sourceSite->forceFill([
+            'next_scan_at' => $sourceSite->active ? now() : null,
+        ])->save();
+
+        return $sourceSite->fresh();
     }
 
     /**
@@ -19,9 +24,21 @@ class SourceSiteService
      */
     public function update(SourceSite $sourceSite, array $data): SourceSite
     {
+        $frequencyChanged = isset($data['frequency_minutes'])
+            && (int) $data['frequency_minutes'] !== (int) $sourceSite->frequency_minutes;
+        $wasInactive = ! $sourceSite->active;
         $sourceSite->update($this->normalizePayload($data, true));
 
-        return $sourceSite;
+        if (! $sourceSite->active) {
+            $sourceSite->forceFill(['next_scan_at' => null])->save();
+        } elseif ($frequencyChanged || $wasInactive || ! $sourceSite->next_scan_at) {
+            $nextScanAt = $sourceSite->last_synced_at
+                ? $sourceSite->last_synced_at->copy()->addMinutes($sourceSite->frequency_minutes)
+                : now();
+            $sourceSite->forceFill(['next_scan_at' => $nextScanAt])->save();
+        }
+
+        return $sourceSite->fresh();
     }
 
     public function delete(SourceSite $sourceSite): void
@@ -65,6 +82,8 @@ class SourceSiteService
             'auth_method' => SourceSite::AUTH_NONE,
             'daily_limit' => 20,
             'active' => true,
+            'auto_generate' => true,
+            'auto_publish' => false,
         ], $data);
     }
 }
