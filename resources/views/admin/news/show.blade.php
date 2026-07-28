@@ -22,7 +22,9 @@
         </div>
 
         <div class="d-flex gap-3">
-            <a href="{{ route('admin.ai-articles.create', ['source_post_ids' => [$sourcePost->id]]) }}" class="btn btn-primary"><i class="ki-outline ki-sparkles fs-2"></i>Crear nota con IA</a>
+            @if ($sourcePost->status === \App\Models\SourcePost::STATUS_FETCHED)
+                <a href="{{ route('admin.ai-articles.create', ['source_post_ids' => [$sourcePost->id]]) }}" class="btn btn-primary"><i class="ki-outline ki-sparkles fs-2"></i>Crear nota con IA</a>
+            @endif
             <form method="POST" action="{{ route('admin.news.destroy', $sourcePost) }}" data-confirm-delete data-confirm-title="Eliminar noticia" data-confirm-text="Se eliminará {{ $sourcePost->title }}. Esta acción no se puede deshacer.">
                 @csrf @method('DELETE')
                 <button type="submit" class="btn btn-light-danger"><i class="ki-outline ki-trash fs-2"></i>Eliminar</button>
@@ -95,6 +97,15 @@
                         <div>
                             <div class="text-muted fw-semibold fs-7">Estado</div>
                             <span class="badge {{ $statusClasses[$sourcePost->status] ?? 'badge-light' }}">{{ $sourcePost->statusLabel() }}</span>
+                        </div>
+                        <div>
+                            <div class="text-muted fw-semibold fs-7">Decisión del filtro</div>
+                            <div class="fw-bold {{ $sourcePost->filter_applies ? 'text-success' : 'text-danger' }}">
+                                {{ $sourcePost->filter_applies ? 'Sí aplicó' : 'No aplicó' }}
+                            </div>
+                            @if ($sourcePost->filter_reason)
+                                <div class="text-muted fs-7 mt-1">{{ $sourcePost->filter_reason }}</div>
+                            @endif
                         </div>
                         <div>
                             <div class="text-muted fw-semibold fs-7">Fuente</div>

@@ -16,9 +16,19 @@ class SourceSiteRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $this->merge([
-            'active' => $this->boolean('active'),
-        ]);
+        $frequencyHours = $this->input('frequency_hours');
+        $sourceSite = $this->route('sourceSite');
+
+        $this->merge(array_filter([
+            'frequency_minutes' => filled($frequencyHours) ? ((int) $frequencyHours * 60) : null,
+            'filter_topics' => $this->topicList($this->input('filter_topics')),
+            'excluded_topics' => $this->topicList($this->input('excluded_topics')),
+            'status' => $this->input('status', $sourceSite?->status ?: SourceSite::STATUS_PENDING),
+            'language' => $this->input('language', $sourceSite?->language ?: 'es'),
+            'priority' => $this->input('priority', $sourceSite?->priority ?: 5),
+            'auth_method' => $this->input('auth_method', $sourceSite?->auth_method ?: SourceSite::AUTH_NONE),
+            'active' => $this->has('active') ? $this->boolean('active') : ($sourceSite?->active ?? true),
+        ], fn (mixed $value) => $value !== null));
     }
 
     /**
@@ -31,8 +41,14 @@ class SourceSiteRequest extends FormRequest
             'url' => ['required', 'url', 'max:2048'],
             'type' => ['required', Rule::in(array_keys(SourceSite::typeOptions()))],
             'status' => ['required', Rule::in(array_keys(SourceSite::statusOptions()))],
-            'frequency_minutes' => ['required', 'integer', 'min:5', 'max:10080'],
+            'frequency_hours' => ['required', 'integer', 'min:1', 'max:168'],
+            'frequency_minutes' => ['required', 'integer', 'min:60', 'max:10080'],
             'category' => ['nullable', 'string', 'max:120'],
+            'filter_topics' => ['nullable', 'array', 'max:30'],
+            'filter_topics.*' => ['string', 'max:120'],
+            'excluded_topics' => ['nullable', 'array', 'max:30'],
+            'excluded_topics.*' => ['string', 'max:120'],
+            'filter_instructions' => ['nullable', 'string', 'max:3000'],
             'language' => ['required', 'string', 'max:10'],
             'country' => ['nullable', 'string', 'max:100'],
             'priority' => ['required', 'integer', 'min:1', 'max:10'],
@@ -42,7 +58,7 @@ class SourceSiteRequest extends FormRequest
             'custom_headers' => ['nullable', 'json'],
             'cookies' => ['nullable', 'json'],
             'auth_method' => ['required', Rule::in(array_keys(SourceSite::authMethodOptions()))],
-            'daily_limit' => ['nullable', 'integer', 'min:0', 'max:100000'],
+            'daily_limit' => ['required', 'integer', 'min:1', 'max:10000'],
             'last_synced_at' => ['nullable', 'date'],
             'active' => ['boolean'],
         ];
@@ -56,7 +72,10 @@ class SourceSiteRequest extends FormRequest
             'type' => 'tipo',
             'status' => 'estado',
             'frequency_minutes' => 'frecuencia de consulta',
-            'category' => 'categoría',
+            'frequency_hours' => 'frecuencia de consulta',
+            'filter_topics' => 'temas aceptados',
+            'excluded_topics' => 'temas excluidos',
+            'filter_instructions' => 'instrucciones del filtro',
             'language' => 'idioma',
             'country' => 'país',
             'priority' => 'prioridad',
@@ -66,9 +85,26 @@ class SourceSiteRequest extends FormRequest
             'custom_headers' => 'headers personalizados',
             'cookies' => 'cookies',
             'auth_method' => 'método de autenticación',
-            'daily_limit' => 'límite diario',
+            'daily_limit' => 'límite de posts escaneados al día',
             'last_synced_at' => 'última sincronización',
             'active' => 'activo',
         ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function topicList(mixed $value): array
+    {
+        if (is_string($value)) {
+            $value = preg_split('/[\r\n,]+/', $value) ?: [];
+        }
+
+        return collect(is_iterable($value) ? $value : [])
+            ->map(fn (mixed $topic) => trim((string) $topic))
+            ->filter()
+            ->unique(fn (string $topic) => mb_strtolower($topic))
+            ->values()
+            ->all();
     }
 }

@@ -32,6 +32,7 @@ class SourcePostRepository
             })
             ->when($filters['source_site_id'] ?? null, fn (Builder $query, string $sourceSiteId) => $query->where('source_site_id', $sourceSiteId))
             ->when($filters['status'] ?? null, fn (Builder $query, string $status) => $query->where('status', $status))
+            ->when(! filled($filters['status'] ?? null), fn (Builder $query) => $query->where('status', SourcePost::STATUS_FETCHED))
             ->when($filters['language'] ?? null, fn (Builder $query, string $language) => $query->where('language', $language))
             ->when($filters['author'] ?? null, fn (Builder $query, string $author) => $query->where('author', $author))
             ->when($filters['category'] ?? null, fn (Builder $query, string $category) => $query->whereJsonContains('categories', $category))

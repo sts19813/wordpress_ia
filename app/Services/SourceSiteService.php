@@ -35,6 +35,8 @@ class SourceSiteService
      */
     private function normalizePayload(array $data, bool $updating = false): array
     {
+        unset($data['frequency_hours']);
+
         foreach (['custom_headers', 'cookies'] as $jsonField) {
             if (isset($data[$jsonField]) && is_string($data[$jsonField])) {
                 $data[$jsonField] = json_decode($data[$jsonField], true);
@@ -55,6 +57,14 @@ class SourceSiteService
             $data['last_synced_at'] = null;
         }
 
-        return $data;
+        return array_merge([
+            'status' => SourceSite::STATUS_PENDING,
+            'frequency_minutes' => 60,
+            'language' => 'es',
+            'priority' => 5,
+            'auth_method' => SourceSite::AUTH_NONE,
+            'daily_limit' => 20,
+            'active' => true,
+        ], $data);
     }
 }

@@ -6,15 +6,20 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-
-//Modelos de stios fuentes para obtener publicaciones generadas por Ia.
+// Modelos de stios fuentes para obtener publicaciones generadas por Ia.
 class SourceSite extends Model
 {
     use SoftDeletes;
 
+    public const TYPE_AUTO = 'auto';
+
     public const TYPE_WORDPRESS_REST = 'wordpress_rest';
 
     public const TYPE_RSS = 'rss';
+
+    public const TYPE_JSON_FEED = 'json_feed';
+
+    public const TYPE_SITEMAP = 'sitemap';
 
     public const TYPE_HTML = 'html';
 
@@ -43,6 +48,9 @@ class SourceSite extends Model
         'status',
         'frequency_minutes',
         'category',
+        'filter_topics',
+        'excluded_topics',
+        'filter_instructions',
         'language',
         'country',
         'priority',
@@ -67,6 +75,8 @@ class SourceSite extends Model
         return [
             'custom_headers' => 'array',
             'cookies' => 'array',
+            'filter_topics' => 'array',
+            'excluded_topics' => 'array',
             'api_key' => 'encrypted',
             'password' => 'encrypted',
             'last_synced_at' => 'datetime',
@@ -80,9 +90,12 @@ class SourceSite extends Model
     public static function typeOptions(): array
     {
         return [
-            self::TYPE_WORDPRESS_REST => 'WordPress REST API',
-            self::TYPE_RSS => 'RSS',
-            self::TYPE_HTML => 'Sitio HTML para scraping',
+            self::TYPE_AUTO => 'Detección automática (recomendado)',
+            self::TYPE_WORDPRESS_REST => 'WordPress — API REST nativa',
+            self::TYPE_RSS => 'Feed RSS o Atom',
+            self::TYPE_JSON_FEED => 'JSON Feed',
+            self::TYPE_SITEMAP => 'Sitemap XML de publicaciones',
+            self::TYPE_HTML => 'Página HTML — datos estructurados o scraping',
         ];
     }
 
@@ -125,5 +138,10 @@ class SourceSite extends Model
     public function sourcePosts(): HasMany
     {
         return $this->hasMany(SourcePost::class);
+    }
+
+    public function scanLogs(): HasMany
+    {
+        return $this->hasMany(SourceScanLog::class);
     }
 }

@@ -34,10 +34,12 @@ class NewsController extends Controller
 
         $result = $this->sourceImportService->import($validated['source_site_id'] ?? null);
 
-        $message = "Importación terminada: {$result['fetched']} obtenidas, {$result['created']} nuevas, {$result['duplicates']} duplicadas.";
+        $message = "Escaneo terminado: {$result['fetched']} revisadas, {$result['created']} nuevas, {$result['discarded']} descartadas por filtros y {$result['duplicates']} ya conocidas.";
 
         if ($result['sites'] === 0) {
             $message = 'No hay sitios fuente activos para importar.';
+        } elseif ($result['limits_reached'] !== []) {
+            $message .= ' Límite diario alcanzado: '.implode(', ', $result['limits_reached']).'.';
         }
 
         return redirect()

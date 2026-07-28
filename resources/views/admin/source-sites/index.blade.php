@@ -14,7 +14,7 @@
 @section('toolbar')
     <div>
         <h1 class="page-heading text-gray-900 fw-bold fs-3 my-0">Sitios Fuente</h1>
-        <div class="text-muted fw-semibold fs-7 pt-1">Administra fuentes WordPress REST, RSS y HTML.</div>
+        <div class="text-muted fw-semibold fs-7 pt-1">Conecta WordPress, RSS/Atom, JSON Feed, sitemaps y sitios HTML con filtros inteligentes.</div>
     </div>
     <a href="{{ route('admin.source-sites.create') }}" class="btn btn-primary">
         <i class="ki-outline ki-plus fs-2"></i>
@@ -29,7 +29,7 @@
                 <form method="GET" action="{{ route('admin.source-sites.index') }}" class="d-flex flex-column flex-xl-row align-items-xl-center gap-3">
                     <div class="position-relative">
                         <i class="ki-outline ki-magnifier fs-3 position-absolute ms-4 top-50 translate-middle-y text-gray-500"></i>
-                        <input type="text" name="search" value="{{ request('search') }}" class="form-control form-control-solid ps-12 w-250px" placeholder="Buscar sitio, URL, categoría...">
+                        <input type="text" name="search" value="{{ request('search') }}" class="form-control form-control-solid ps-12 w-250px" placeholder="Buscar sitio, URL o tema...">
                     </div>
 
                     <select name="type" class="form-select form-select-solid w-200px">
@@ -52,10 +52,10 @@
                         <option value="0" @selected(request('active') === '0')>Inactivo</option>
                     </select>
 
-                    <select name="category" class="form-select form-select-solid w-175px">
-                        <option value="">Categoría</option>
-                        @foreach ($filterOptions['categories'] as $category)
-                            <option value="{{ $category }}" @selected(request('category') === $category)>{{ $category }}</option>
+                    <select name="topic" class="form-select form-select-solid w-175px">
+                        <option value="">Tema aceptado</option>
+                        @foreach ($filterOptions['topics'] as $topic)
+                            <option value="{{ $topic }}" @selected(request('topic') === $topic)>{{ $topic }}</option>
                         @endforeach
                     </select>
 
@@ -92,7 +92,7 @@
                             <th class="min-w-160px">Tipo</th>
                             <th class="min-w-125px">Estado</th>
                             <th class="min-w-125px">Frecuencia</th>
-                            <th class="min-w-125px">Categoría</th>
+                            <th class="min-w-180px">Filtros de notas</th>
                             <th class="min-w-100px">Prioridad</th>
                             <th class="min-w-150px">Última sync</th>
                             <th class="min-w-100px">Activo</th>
@@ -109,8 +109,16 @@
                                 </td>
                                 <td>{{ $sourceSite->typeLabel() }}</td>
                                 <td><span class="badge {{ $statusClasses[$sourceSite->status] ?? 'badge-light' }}">{{ $sourceSite->statusLabel() }}</span></td>
-                                <td data-order="{{ $sourceSite->frequency_minutes }}">{{ $sourceSite->frequency_minutes }} min</td>
-                                <td>{{ $sourceSite->category ?: '-' }}</td>
+                                <td data-order="{{ $sourceSite->frequency_minutes }}">{{ max(1, (int) ceil($sourceSite->frequency_minutes / 60)) }} h</td>
+                                <td>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        @forelse (array_slice($sourceSite->filter_topics ?: [], 0, 3) as $topic)
+                                            <span class="badge badge-light-primary">{{ $topic }}</span>
+                                        @empty
+                                            <span class="text-muted">Todas las notas</span>
+                                        @endforelse
+                                    </div>
+                                </td>
                                 <td data-order="{{ $sourceSite->priority }}"><span class="badge badge-light-primary">{{ $sourceSite->priority }}</span></td>
                                 <td data-order="{{ $sourceSite->last_synced_at?->timestamp ?: 0 }}">{{ $sourceSite->last_synced_at?->format('d/m/Y H:i') ?: '-' }}</td>
                                 <td data-order="{{ $sourceSite->active ? 1 : 0 }}">
@@ -121,6 +129,9 @@
                                     @endif
                                 </td>
                                 <td class="text-end">
+                                    <a href="{{ route('admin.source-scan-logs.index', ['source_site_id' => $sourceSite->id]) }}" class="btn btn-icon btn-light-info btn-sm me-2" aria-label="Ver bitácora" title="Ver bitácora">
+                                        <i class="ki-outline ki-note-2 fs-3"></i>
+                                    </a>
                                     <a href="{{ route('admin.source-sites.edit', $sourceSite) }}" class="btn btn-icon btn-light btn-sm me-2" aria-label="Editar">
                                         <i class="ki-outline ki-pencil fs-3"></i>
                                     </a>

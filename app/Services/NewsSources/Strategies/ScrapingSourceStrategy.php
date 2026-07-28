@@ -49,6 +49,15 @@ class ScrapingSourceStrategy implements SourceStrategyInterface
         $nodes = $xpath->query('//article');
 
         if (! $nodes || $nodes->length === 0) {
+            $nodes = $xpath->query(
+                '//main//a[.//h1 or .//h2 or .//h3]'
+                .' | //a[contains(concat(" ", normalize-space(@class), " "), " post ")]'
+                .' | //a[contains(concat(" ", normalize-space(@class), " "), " article ")]'
+                .' | //a[contains(concat(" ", normalize-space(@class), " "), " story ")]'
+            );
+        }
+
+        if (! $nodes || $nodes->length === 0) {
             $nodes = $xpath->query('//main | //body');
         }
 

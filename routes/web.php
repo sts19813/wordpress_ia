@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\NewsController;
 use App\Http\Controllers\Admin\PublicationController;
 use App\Http\Controllers\Admin\SchedulerController;
 use App\Http\Controllers\Admin\SettingController;
+use App\Http\Controllers\Admin\SourceScanLogController;
 use App\Http\Controllers\Admin\SourceSiteController;
 use App\Http\Controllers\Admin\SystemLogController;
 use App\Http\Controllers\Admin\WordPressSiteController;
@@ -53,9 +54,11 @@ Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
 Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::get('noticias', [NewsController::class, 'index'])->name('news.index');
+    Route::get('bitacora-fuentes', SourceScanLogController::class)->name('source-scan-logs.index');
     Route::post('noticias/obtener', [NewsController::class, 'fetch'])->name('news.fetch');
     Route::delete('noticias/{sourcePost}', [NewsController::class, 'destroy'])->name('news.destroy');
     Route::get('noticias/{sourcePost}', [NewsController::class, 'show'])->name('news.show');
+    Route::post('sitios-fuente/probar', [SourceSiteController::class, 'test'])->name('source-sites.test');
     Route::resource('sitios-fuente', SourceSiteController::class)
         ->names('source-sites')
         ->parameters(['sitios-fuente' => 'sourceSite'])

@@ -13,3 +13,7 @@ Artisan::command('inspire', function () {
 Schedule::command('queue:work database --queue=ai-text,ai-image --stop-when-empty --tries=3 --timeout=300 --max-time=240')
     ->everyMinute()
     ->withoutOverlapping(10);
+
+Schedule::command('sources:scan-due')
+    ->everyMinute()
+    ->withoutOverlapping(10);
