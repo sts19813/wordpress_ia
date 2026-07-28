@@ -18,16 +18,27 @@ class SourceSiteTester
      */
     public function test(SourceSite $sourceSite): array
     {
-        $detection = $this->discovery->detect($sourceSite);
-        $testedType = $sourceSite->type === SourceSite::TYPE_AUTO
-            ? $detection['type']
-            : $sourceSite->type;
+        $resolved = $this->manager->resolveAndFetch($sourceSite);
+        $testedType = $resolved['type'];
+        $items = $resolved['items']
+            ->sortByDesc(fn (array $item) => $item['fecha'] ?? '')
+            ->values();
+
+        try {
+            $detection = $this->discovery->detect($sourceSite);
+        } catch (\Throwable) {
+            $detection = $this->recommendationFor($testedType, []);
+        }
+
+        if ($resolved['fallback_used'] || $testedType === SourceSite::TYPE_AI_WEB) {
+            $detection = $this->recommendationFor(
+                SourceSite::TYPE_AI_WEB,
+                $detection['capabilities'] ?? [],
+            );
+        }
 
         $testSite = $sourceSite->replicate();
         $testSite->type = $testedType;
-        $items = $this->manager->fetch($testSite)
-            ->sortByDesc(fn (array $item) => $item['fecha'] ?? '')
-            ->values();
         $latest = $items->first();
 
         if (! is_array($latest)) {
@@ -58,6 +69,30 @@ class SourceSiteTester
                 'extraction_error' => $latest['extraction_error'] ?? null,
                 'has_full_content' => mb_strlen($content) >= 300,
             ],
+        ];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $capabilities
+     * @return array<string, mixed>
+     */
+    private function recommendationFor(string $type, array $capabilities): array
+    {
+        $capability = [
+            'type' => $type,
+            'label' => SourceSite::typeOptions()[$type] ?? $type,
+            'confidence' => $type === SourceSite::TYPE_AI_WEB ? 70 : 50,
+            'reason' => $type === SourceSite::TYPE_AI_WEB
+                ? 'Los conectores convencionales no localizaron publicaciones; la IA sí pudo interpretar la estructura.'
+                : 'La conexión pudo obtener publicaciones.',
+        ];
+
+        return [
+            ...$capability,
+            'capabilities' => collect([$capability, ...$capabilities])
+                ->unique('type')
+                ->values()
+                ->all(),
         ];
     }
 }

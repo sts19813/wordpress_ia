@@ -9,6 +9,7 @@ use App\Services\NewsSources\Strategies\JsonFeedSourceStrategy;
 use App\Services\NewsSources\Strategies\RSSSourceStrategy;
 use App\Services\NewsSources\Strategies\ScrapingSourceStrategy;
 use App\Services\NewsSources\Strategies\SitemapSourceStrategy;
+use App\Services\NewsSources\Strategies\WordPressSourceStrategy;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -78,6 +79,33 @@ class SourceManagerTest extends TestCase
         Http::assertSent(fn ($request) => $request->method() === 'GET'
             && str_starts_with($request->url(), 'https://example.com/wp-json/wp/v2/posts')
             && str_contains($request->url(), 'categories=220'));
+    }
+
+    public function test_wordpress_strategy_uses_the_readable_yoast_author_instead_of_a_numeric_id(): void
+    {
+        $post = $this->wordpressPost([
+            'author' => 653,
+            '_embedded' => [
+                'author' => [[
+                    'code' => 'rest_no_route',
+                    'message' => 'No se encontró la ruta.',
+                    'name' => null,
+                ]],
+            ],
+            'yoast_head_json' => [
+                'author' => 'Mary Whitfill Roeloffs',
+            ],
+        ]);
+
+        $items = app(WordPressSourceStrategy::class)
+            ->parse([$post], new SourceSite([
+                'name' => 'Forbes',
+                'url' => 'https://forbes.test',
+                'type' => SourceSite::TYPE_WORDPRESS_REST,
+                'language' => 'es',
+            ]));
+
+        $this->assertSame('Mary Whitfill Roeloffs', $items->first()['autor']);
     }
 
     public function test_rss_strategy_discovers_feed_from_category_html(): void

@@ -76,6 +76,14 @@
                                 @endforeach
                             </select>
                             <div class="form-text" id="source-type-help">La detección automática analizará el sitio y recomendará el conector más confiable.</div>
+                            <div class="notice d-none bg-light-warning border-warning border border-dashed rounded p-4 mt-4" id="ai-connection-notice">
+                                <div class="d-flex align-items-start">
+                                    <i class="ki-outline ki-sparkles fs-2 text-warning me-3"></i>
+                                    <div class="text-gray-700">
+                                        La IA descargará y analizará el HTML para localizar publicaciones. Después extraerá el contenido completo de cada nota aceptada. Requiere una API Key de OpenAI configurada.
+                                    </div>
+                                </div>
+                            </div>
                             @error('type')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-lg-4">
@@ -261,8 +269,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveButton = document.getElementById('save-source-button');
     const resultCard = document.getElementById('source-test-result');
     const typeSelect = document.getElementById('source-type');
+    const typeHelp = document.getElementById('source-type-help');
+    const aiNotice = document.getElementById('ai-connection-notice');
     const requiresTest = @json(! $isEdit);
     let lastRecommendation = null;
+
+    const typeDescriptions = {
+        auto: 'Probará primero los conectores convencionales y usará IA automáticamente si ninguno localiza publicaciones.',
+        wordpress_rest: 'Usa la API REST nativa de WordPress para obtener publicaciones estructuradas.',
+        rss: 'Lee publicaciones desde un feed RSS o Atom.',
+        json_feed: 'Lee publicaciones desde un documento JSON Feed.',
+        sitemap: 'Localiza publicaciones mediante un sitemap XML.',
+        html: 'Busca artículos, metadatos y datos estructurados directamente en el HTML.',
+        ai_web: 'Descarga las páginas y usa IA para reconocer la estructura, localizar notas y extraer su contenido.',
+    };
+
+    const updateTypeHelp = () => {
+        typeHelp.textContent = typeDescriptions[typeSelect.value] || '';
+        aiNotice.classList.toggle('d-none', typeSelect.value !== 'ai_web' && typeSelect.value !== 'auto');
+    };
+    updateTypeHelp();
+    typeSelect.addEventListener('change', updateTypeHelp);
 
     const invalidateTest = () => {
         if (requiresTest) saveButton.disabled = true;

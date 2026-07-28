@@ -14,6 +14,11 @@ class ArticleContentExtractor
 {
     use BuildsSourceRequests;
 
+    public function __construct(
+        private readonly AiWebPageAnalyzer $aiAnalyzer,
+        private readonly ArticleBodyCleaner $bodyCleaner,
+    ) {}
+
     /**
      * Completa un elemento normalizado desde la página de la nota y conserva
      * el HTML crudo como respaldo para diagnóstico y configuración.
@@ -24,9 +29,22 @@ class ArticleContentExtractor
     public function extract(SourceSite $sourceSite, array $item): array
     {
         $url = trim((string) ($item['url'] ?? ''));
+        $existingBody = $this->bodyCleaner->clean(
+            $item['contenido_html'] ?? null,
+            $item['contenido'] ?? null,
+        );
+
+        if ($this->isCompleteBody($sourceSite, $existingBody) && ($item['_ai_discovered'] ?? false) !== true) {
+            return [
+                ...$item,
+                'contenido' => $existingBody['text'],
+                'contenido_html' => $existingBody['html'],
+                'raw_html' => $item['contenido_html'] ?? null,
+            ];
+        }
 
         if ($url === '') {
-            return $item;
+            return $this->withExistingBody($item, $existingBody);
         }
 
         try {
@@ -34,13 +52,40 @@ class ArticleContentExtractor
             $rawHtml = $response->body();
 
             if (! preg_match('/<html|<!doctype|<article|<main/i', $rawHtml)) {
-                return [...$item, 'raw_html' => $rawHtml];
+                return [
+                    ...$this->withExistingBody($item, $existingBody),
+                    'raw_html' => $rawHtml,
+                ];
             }
 
-            return $this->fromHtml($item, $rawHtml, $url);
+            if (($item['_ai_discovered'] ?? false) === true || $sourceSite->type === SourceSite::TYPE_AI_WEB) {
+                try {
+                    $aiExtracted = [
+                        ...$item,
+                        ...$this->aiAnalyzer->extractArticle($sourceSite, $rawHtml, $url, $item),
+                    ];
+                    $aiBody = $this->bodyCleaner->clean(
+                        $aiExtracted['contenido_html'] ?? null,
+                        $aiExtracted['contenido'] ?? null,
+                    );
+
+                    return [
+                        ...$aiExtracted,
+                        'contenido' => $aiBody['text'],
+                        'contenido_html' => $aiBody['html'],
+                    ];
+                } catch (Throwable $exception) {
+                    return [
+                        ...$this->fromHtml($item, $rawHtml, $url, $existingBody),
+                        'extraction_error' => 'La extracción con IA falló; se usó el extractor HTML: '.$exception->getMessage(),
+                    ];
+                }
+            }
+
+            return $this->fromHtml($item, $rawHtml, $url, $existingBody);
         } catch (Throwable $exception) {
             return [
-                ...$item,
+                ...$this->withExistingBody($item, $existingBody),
                 'extraction_error' => $exception->getMessage(),
             ];
         }
@@ -48,9 +93,10 @@ class ArticleContentExtractor
 
     /**
      * @param  array<string, mixed>  $item
+     * @param  array{html: string, text: string, score: int, paragraphs: int}  $existingBody
      * @return array<string, mixed>
      */
-    private function fromHtml(array $item, string $rawHtml, string $url): array
+    private function fromHtml(array $item, string $rawHtml, string $url, array $existingBody): array
     {
         $document = new DOMDocument;
         libxml_use_internal_errors(true);
@@ -63,9 +109,15 @@ class ArticleContentExtractor
             $node->parentNode?->removeChild($node);
         }
 
-        $article = $xpath->query('//article | //*[@itemprop="articleBody"] | //main')?->item(0);
+        $article = $this->bestArticleNode($xpath);
         $html = $article ? $this->innerHtml($article) : '';
-        $text = $article ? $this->paragraphText($xpath, $article) : '';
+        $extractedBody = $this->bodyCleaner->clean(
+            $html,
+            $article ? $this->paragraphText($xpath, $article) : null,
+        );
+        $body = $existingBody['score'] >= $extractedBody['score']
+            ? $existingBody
+            : $extractedBody;
 
         return [
             ...$item,
@@ -76,8 +128,8 @@ class ArticleContentExtractor
                 $this->text($xpath, '//h1'),
                 $item['titulo'] ?? null,
             ]),
-            'contenido' => $text !== '' ? $text : ($item['contenido'] ?? null),
-            'contenido_html' => $html !== '' ? $html : ($item['contenido_html'] ?? null),
+            'contenido' => $body['text'] !== '' ? $body['text'] : ($item['contenido'] ?? null),
+            'contenido_html' => $body['html'] !== '' ? $body['html'] : ($item['contenido_html'] ?? null),
             'resumen' => $this->firstFilled([
                 data_get($jsonLd, 'description'),
                 $this->meta($xpath, 'description', 'name'),
@@ -110,6 +162,97 @@ class ArticleContentExtractor
             ]),
             'raw_html' => $rawHtml,
         ];
+    }
+
+    /**
+     * @param  array{html: string, text: string, score: int, paragraphs: int}  $body
+     */
+    private function isCompleteBody(SourceSite $sourceSite, array $body): bool
+    {
+        if ($sourceSite->type === SourceSite::TYPE_WORDPRESS_REST) {
+            return $body['paragraphs'] >= 2
+                && mb_strlen($body['text']) >= 300;
+        }
+
+        return $body['paragraphs'] >= 3
+            && mb_strlen($body['text']) >= 700;
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     * @param  array{html: string, text: string, score: int, paragraphs: int}  $existingBody
+     * @return array<string, mixed>
+     */
+    private function withExistingBody(array $item, array $existingBody): array
+    {
+        return [
+            ...$item,
+            'contenido' => $existingBody['text'] !== '' ? $existingBody['text'] : ($item['contenido'] ?? null),
+            'contenido_html' => $existingBody['html'] !== '' ? $existingBody['html'] : ($item['contenido_html'] ?? null),
+        ];
+    }
+
+    private function bestArticleNode(DOMXPath $xpath): ?DOMNode
+    {
+        $explicitQuery = '//*[@itemprop="articleBody"]'
+            .' | //*[contains(translate(@class, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz"), "entry-content")]'
+            .' | //*[contains(translate(@class, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz"), "article-body")]'
+            .' | //*[contains(translate(@class, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz"), "article-content")]'
+            .' | //*[contains(translate(@class, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz"), "post-content")]';
+
+        $explicit = collect($xpath->query($explicitQuery) ?: [])
+            ->filter(fn (mixed $node) => $node instanceof DOMElement)
+            ->unique(fn (DOMElement $node) => spl_object_id($node))
+            ->sortByDesc(fn (DOMElement $node) => $this->articleNodeScore($xpath, $node))
+            ->first();
+
+        if ($explicit instanceof DOMElement
+            && mb_strlen(str($explicit->textContent)->squish()->toString()) >= 250
+            && ($xpath->query('.//p', $explicit)?->length ?? 0) >= 2) {
+            return $explicit;
+        }
+
+        return collect($xpath->query('//article | //main') ?: [])
+            ->filter(fn (mixed $node) => $node instanceof DOMElement)
+            ->unique(fn (DOMElement $node) => spl_object_id($node))
+            ->sortByDesc(fn (DOMElement $node) => $this->articleNodeScore($xpath, $node))
+            ->first();
+    }
+
+    private function articleNodeScore(DOMXPath $xpath, DOMElement $node): int
+    {
+        $textLength = mb_strlen(str($node->textContent)->squish()->toString());
+        $paragraphs = $xpath->query('.//p', $node)?->length ?? 0;
+        $headings = $xpath->query('.//h1 | .//h2 | .//h3', $node)?->length ?? 0;
+        $identity = strtolower($node->getAttribute('class').' '.$node->getAttribute('id'));
+        $score = $textLength + ($paragraphs * 180) + ($headings * 80);
+
+        if ($node->getAttribute('itemprop') === 'articleBody') {
+            $score += 4000;
+        }
+
+        if (str_contains($identity, 'entry-content')
+            || str_contains($identity, 'article-body')
+            || str_contains($identity, 'article-content')
+            || str_contains($identity, 'post-content')) {
+            $score += 3000;
+        }
+
+        if (strtolower($node->tagName) === 'article') {
+            $score += 500;
+        }
+
+        foreach (['search', 'quick', 'aside', 'related', 'recommend', 'footer', 'header', 'sidebar', 'share', 'promo', 'card', 'list'] as $penalty) {
+            if (str_contains($identity, $penalty)) {
+                $score -= 5000;
+            }
+        }
+
+        if ($textLength < 250 || $paragraphs === 0) {
+            $score -= 2500;
+        }
+
+        return $score;
     }
 
     private function paragraphText(DOMXPath $xpath, DOMNode $context): string

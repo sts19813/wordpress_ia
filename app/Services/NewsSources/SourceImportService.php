@@ -201,6 +201,10 @@ class SourceImportService
                 'categories' => $item['categorias'] ?? [],
                 'tags' => $item['tags'] ?? [],
                 'published_at' => $item['fecha'] ?? null,
+                'connection_type' => ($item['_ai_discovered'] ?? false)
+                    ? SourceSite::TYPE_AI_WEB
+                    : $sourceSite->type,
+                'structure_summary' => $item['_ai_structure_summary'] ?? null,
             ],
             'scanned_at' => now(),
         ]);

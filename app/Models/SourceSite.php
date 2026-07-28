@@ -23,6 +23,8 @@ class SourceSite extends Model
 
     public const TYPE_HTML = 'html';
 
+    public const TYPE_AI_WEB = 'ai_web';
+
     public const STATUS_PENDING = 'pending';
 
     public const STATUS_ACTIVE = 'active';
@@ -96,6 +98,7 @@ class SourceSite extends Model
             self::TYPE_JSON_FEED => 'JSON Feed',
             self::TYPE_SITEMAP => 'Sitemap XML de publicaciones',
             self::TYPE_HTML => 'Página HTML — datos estructurados o scraping',
+            self::TYPE_AI_WEB => 'Navegación y extracción con IA — último recurso',
         ];
     }
 

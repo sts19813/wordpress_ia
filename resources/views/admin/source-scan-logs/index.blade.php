@@ -68,6 +68,11 @@
                                     <div class="fw-bold text-gray-900">{{ $log->title ?: 'Elemento sin título' }}</div>
                                     @if ($log->url)<div class="text-muted text-truncate mw-400px">{{ $log->url }}</div>@endif
                                     <div class="d-flex flex-wrap gap-1 mt-2">
+                                        @if (data_get($log->metadata, 'connection_type') === \App\Models\SourceSite::TYPE_AI_WEB)
+                                            <span class="badge badge-light-warning" title="{{ data_get($log->metadata, 'structure_summary') }}">
+                                                <i class="ki-outline ki-sparkles fs-7 me-1"></i>Conexión IA
+                                            </span>
+                                        @endif
                                         @foreach ($log->matched_topics ?: [] as $topic)
                                             <span class="badge badge-light-primary">{{ $topic }}</span>
                                         @endforeach

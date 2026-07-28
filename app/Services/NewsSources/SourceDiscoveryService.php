@@ -42,6 +42,14 @@ class SourceDiscoveryService
         if (str_contains($contentType, 'text/html') || preg_match('/<html|<!doctype/i', $body)) {
             $capabilities = array_merge($capabilities, $this->htmlCapabilities($body));
             $capabilities[] = $this->capability(SourceSite::TYPE_HTML, 55, 'La página puede procesarse mediante HTML y datos estructurados.');
+
+            if (filled(config('services.openai.api_key'))) {
+                $capabilities[] = $this->capability(
+                    SourceSite::TYPE_AI_WEB,
+                    25,
+                    'Disponible como último recurso para analizar la estructura y localizar publicaciones con IA.',
+                );
+            }
         }
 
         if ($capabilities === []) {

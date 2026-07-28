@@ -48,7 +48,7 @@ class WordPressSourceStrategy implements SourceStrategyInterface
             ->map(fn (array $post) => $this->normalizeItem([
                 'titulo' => data_get($post, 'title.rendered'),
                 'contenido' => strip_tags((string) data_get($post, 'content.rendered', '')),
-                'autor' => data_get($post, '_embedded.author.0.name') ?: data_get($post, 'author'),
+                'autor' => $this->authorFor($post),
                 'fecha' => data_get($post, 'date_gmt') ?: data_get($post, 'date'),
                 'imagen' => data_get($post, '_embedded.wp:featuredmedia.0.source_url'),
                 'url' => data_get($post, 'link'),
@@ -149,5 +149,30 @@ class WordPressSourceStrategy implements SourceStrategyInterface
             ->filter()
             ->values()
             ->all();
+    }
+
+    private function authorFor(array $post): ?string
+    {
+        $author = data_get($post, '_embedded.author.0.name')
+            ?: data_get($post, 'yoast_head_json.author');
+
+        if (filled($author)) {
+            return (string) $author;
+        }
+
+        $person = collect(data_get($post, 'yoast_head_json.schema.@graph', []))
+            ->first(fn (mixed $node) => is_array($node)
+                && in_array('Person', (array) data_get($node, '@type'), true)
+                && filled(data_get($node, 'name')));
+
+        if (filled(data_get($person, 'name'))) {
+            return (string) data_get($person, 'name');
+        }
+
+        $fallback = data_get($post, 'author');
+
+        return is_string($fallback) && ! is_numeric($fallback)
+            ? $fallback
+            : null;
     }
 }

@@ -14,7 +14,7 @@
 @section('toolbar')
     <div>
         <h1 class="page-heading text-gray-900 fw-bold fs-3 my-0">Sitios Fuente</h1>
-        <div class="text-muted fw-semibold fs-7 pt-1">Conecta WordPress, RSS/Atom, JSON Feed, sitemaps y sitios HTML con filtros inteligentes.</div>
+        <div class="text-muted fw-semibold fs-7 pt-1">Conecta WordPress, feeds, sitemaps, HTML o usa IA para interpretar sitios sin una estructura compatible.</div>
     </div>
     <a href="{{ route('admin.source-sites.create') }}" class="btn btn-primary">
         <i class="ki-outline ki-plus fs-2"></i>

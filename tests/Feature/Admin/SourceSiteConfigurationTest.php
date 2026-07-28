@@ -5,6 +5,7 @@ namespace Tests\Feature\Admin;
 use App\Models\SourceSite;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -24,6 +25,7 @@ class SourceSiteConfigurationTest extends TestCase
             ->assertSee('Probar y traer la nota más reciente')
             ->assertSee('Frecuencia de consulta')
             ->assertSee('horas')
+            ->assertSee('Navegación y extracción con IA')
             ->assertSee('Límite de posts escaneados al día')
             ->assertDontSee('name="status"', false)
             ->assertDontSee('name="language"', false)
@@ -100,6 +102,72 @@ class SourceSiteConfigurationTest extends TestCase
         );
     }
 
+    public function test_automatic_connection_uses_ai_when_conventional_extractors_find_no_posts(): void
+    {
+        config(['services.openai.api_key' => 'test-key']);
+        Http::fake(function (Request $request) {
+            if (str_contains($request->url(), '/responses')) {
+                $schema = data_get($request->data(), 'text.format.name');
+
+                if ($schema === 'ai_source_post_discovery') {
+                    return $this->openAiResponse([
+                        'site_kind' => 'Medio construido como aplicación web',
+                        'structure_summary' => 'Las publicaciones están declaradas dentro del estado JSON de la portada.',
+                        'posts' => [[
+                            'title' => 'Reforma económica entra en vigor',
+                            'url' => '/politica/reforma-economica',
+                            'published_at' => '2026-07-28T11:00:00-06:00',
+                            'image_url' => '/media/reforma.jpg',
+                            'summary' => 'La reforma fue publicada este lunes.',
+                        ]],
+                    ]);
+                }
+
+                return $this->openAiResponse([
+                    'title' => 'Reforma económica entra en vigor',
+                    'content' => str_repeat('Contenido completo de la reforma económica. ', 12),
+                    'content_html' => '<p>Contenido completo de la reforma económica.</p>',
+                    'summary' => 'La reforma fue publicada este lunes.',
+                    'author' => 'Redacción',
+                    'published_at' => '2026-07-28T11:00:00-06:00',
+                    'image_url' => 'https://example.com/media/reforma.jpg',
+                    'categories' => ['Política', 'Economía'],
+                    'tags' => ['Congreso'],
+                ]);
+            }
+
+            if (str_contains($request->url(), '/politica/reforma-economica')) {
+                return Http::response('<html><body><div id="app">Contenido cargado por una estructura no convencional.</div></body></html>');
+            }
+
+            return Http::response(<<<'HTML'
+                <html>
+                    <head><title>Portada dinámica</title></head>
+                    <body>
+                        <main><div id="app">Cargando publicaciones…</div></main>
+                        <script type="application/json">{"posts":[{"title":"Reforma económica entra en vigor","url":"/politica/reforma-economica"}]}</script>
+                    </body>
+                </html>
+                HTML, 200, ['Content-Type' => 'text/html']);
+        });
+
+        $response = $this->actingAs(User::factory()->create())
+            ->postJson(route('admin.source-sites.test'), [
+                'name' => 'Medio dinámico',
+                'url' => 'https://example.com',
+                'type' => SourceSite::TYPE_AUTO,
+                'auth_method' => SourceSite::AUTH_NONE,
+            ]);
+
+        $response->assertOk()
+            ->assertJsonPath('tested_type', SourceSite::TYPE_AI_WEB)
+            ->assertJsonPath('recommendation.type', SourceSite::TYPE_AI_WEB)
+            ->assertJsonPath('post.title', 'Reforma económica entra en vigor')
+            ->assertJsonPath('post.author', 'Redacción');
+
+        $this->assertStringContainsString('Contenido completo', (string) $response->json('post.content'));
+    }
+
     private function rss(): string
     {
         return <<<'XML'
@@ -117,5 +185,17 @@ class SourceSiteConfigurationTest extends TestCase
             </channel>
         </rss>
         XML;
+    }
+
+    private function openAiResponse(array $payload): mixed
+    {
+        return Http::response([
+            'output' => [[
+                'content' => [[
+                    'type' => 'output_text',
+                    'text' => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                ]],
+            ]],
+        ]);
     }
 }
