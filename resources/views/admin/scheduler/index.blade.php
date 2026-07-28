@@ -91,7 +91,10 @@
                                     <a href="{{ route('admin.source-sites.edit', $sourceSite) }}" class="text-gray-900 text-hover-primary fw-bold">{{ $sourceSite->name }}</a>
                                     <div class="text-muted fs-8">{{ $sourceSite->typeLabel() }}</div>
                                 </td>
-                                <td>{{ max(1, (int) ceil($sourceSite->frequency_minutes / 60)) }} h</td>
+                                <td>
+                                    {{ max(1, (int) ceil($sourceSite->frequency_minutes / 60)) }} h
+                                    <div class="text-muted fs-8">{{ $sourceSite->max_posts_per_scan }} por consulta</div>
+                                </td>
                                 <td>{{ $sourceSite->last_synced_at?->format('d/m/Y H:i') ?: 'Sin consultas' }}</td>
                                 <td>
                                     @if (! $sourceSite->active)
@@ -106,6 +109,7 @@
                                 <td>
                                     @if ($sourceSite->auto_generate && $sourceSite->promptProfile)
                                         <span class="badge badge-light-primary">IA: {{ $sourceSite->promptProfile->name }}</span>
+                                        <div class="text-muted fs-8 mt-1">Máximo {{ $sourceSite->max_generations_per_scan }} generaciones</div>
                                     @else
                                         <span class="badge badge-light-warning">Solo obtener notas</span>
                                     @endif

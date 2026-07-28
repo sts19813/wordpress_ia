@@ -178,6 +178,41 @@ class SourcePipelineQueueTest extends TestCase
             ->assertSee('Artículo publicado correctamente');
     }
 
+    public function test_scan_creates_only_the_configured_number_of_generation_jobs(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        $profile = app(AiPromptProfileService::class)->ensureDefaultFor($user);
+        $sourceSite = $this->sourceSite($user, $profile->id, [
+            'max_posts_per_scan' => 3,
+            'max_generations_per_scan' => 1,
+        ]);
+        $posts = collect(range(1, 3))->map(fn (int $number) => [
+            'title' => ['rendered' => "Nota económica {$number}"],
+            'content' => ['rendered' => $this->completeSourceHtml()],
+            'excerpt' => ['rendered' => '<p>Resumen económico.</p>'],
+            'date' => "2026-07-28T1{$number}:00:00",
+            'link' => "https://source.test/nota-{$number}",
+            'slug' => "nota-{$number}",
+            '_embedded' => ['author' => [['name' => 'Redacción']], 'wp:term' => []],
+        ])->all();
+
+        Http::fake([
+            'source.test/wp-json/wp/v2/posts*' => Http::response($posts),
+        ]);
+
+        $this->actingAs($user)->post(route('admin.scheduler.sources.run', $sourceSite))->assertRedirect();
+        $scanTask = Scheduler::query()->sole();
+        app()->call([new ScanSourceSite($scanTask->id, $sourceSite->id), 'handle']);
+
+        $this->assertSame(3, SourcePost::query()->count());
+        $this->assertSame(1, Scheduler::query()->where('type', Scheduler::TYPE_SOURCE_ARTICLE)->count());
+        $this->assertSame(2, $scanTask->fresh()->payload['generation_skipped']);
+        $this->assertTrue(collect($scanTask->fresh()->events)->contains(
+            fn (array $event) => str_contains($event['message'], 'excedieron el máximo de 1'),
+        ));
+    }
+
     private function sourceSite(User $user, int $profileId, array $overrides = []): SourceSite
     {
         return SourceSite::query()->create(array_merge([
@@ -192,6 +227,8 @@ class SourcePipelineQueueTest extends TestCase
             'priority' => 5,
             'auth_method' => SourceSite::AUTH_NONE,
             'daily_limit' => 20,
+            'max_posts_per_scan' => 20,
+            'max_generations_per_scan' => 5,
             'auto_generate' => true,
             'auto_publish' => false,
             'active' => true,

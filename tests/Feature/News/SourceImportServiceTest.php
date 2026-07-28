@@ -193,6 +193,44 @@ class SourceImportServiceTest extends TestCase
         $this->assertSame(1, SourceScanLog::query()->count());
     }
 
+    public function test_it_limits_each_consultation_without_consuming_the_remaining_daily_quota(): void
+    {
+        Http::fake([
+            'example.com/wp-json/wp/v2/posts*' => Http::response([
+                $this->wordpressPost(1),
+                $this->wordpressPost(2),
+                $this->wordpressPost(3),
+                $this->wordpressPost(4),
+            ]),
+        ]);
+
+        $sourceSite = SourceSite::query()->create([
+            'name' => 'WordPress por consulta',
+            'url' => 'https://example.com',
+            'type' => SourceSite::TYPE_WORDPRESS_REST,
+            'status' => SourceSite::STATUS_ACTIVE,
+            'frequency_minutes' => 60,
+            'daily_limit' => 20,
+            'max_posts_per_scan' => 2,
+            'max_generations_per_scan' => 1,
+            'language' => 'es',
+            'priority' => 5,
+            'auth_method' => SourceSite::AUTH_NONE,
+            'active' => true,
+        ]);
+
+        $result = app(SourceImportService::class)->import($sourceSite->id);
+
+        $this->assertSame(2, $result['fetched']);
+        $this->assertSame(2, $result['created']);
+        $this->assertCount(2, $result['created_post_ids']);
+        $this->assertSame(2, SourcePost::query()->count());
+        $this->assertSame(2, SourceScanLog::query()->count());
+        $this->assertSame([], $result['limits_reached']);
+
+        Http::assertSent(fn (Request $request) => str_contains($request->url(), 'per_page=2'));
+    }
+
     public function test_auto_import_uses_ai_to_discover_and_extract_posts_from_an_unknown_structure(): void
     {
         config(['services.openai.api_key' => 'test-key']);

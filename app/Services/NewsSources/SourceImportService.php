@@ -60,12 +60,16 @@ class SourceImportService
     }
 
     /**
-     * @return array{fetched: int, created: int, duplicates: int, discarded: int, created_post_ids: array<int, int>, error: ?string, daily_limit_reached: bool}
+     * @return array{fetched: int, created: int, duplicates: int, discarded: int, created_post_ids: array<int, int>, consultation_limit: int, error: ?string, daily_limit_reached: bool}
      */
     public function importSource(SourceSite $sourceSite): array
     {
         try {
             $dailyLimit = (int) ($sourceSite->daily_limit ?: 20);
+            $maxPerScan = min(
+                $dailyLimit,
+                max(1, (int) ($sourceSite->max_posts_per_scan ?: 20)),
+            );
             $scannedToday = SourceScanLog::query()
                 ->where('source_site_id', $sourceSite->id)
                 ->whereDate('scanned_at', today())
@@ -79,14 +83,19 @@ class SourceImportService
                     'duplicates' => 0,
                     'discarded' => 0,
                     'created_post_ids' => [],
+                    'consultation_limit' => 0,
                     'error' => null,
                     'daily_limit_reached' => true,
                 ];
             }
 
             $fetchSite = $sourceSite->replicate();
-            $fetchSite->daily_limit = $remainingToday;
-            $items = $this->sourceManager->fetch($fetchSite);
+            $consultationLimit = min($remainingToday, $maxPerScan);
+            $fetchSite->daily_limit = $consultationLimit;
+            $items = $this->sourceManager
+                ->fetch($fetchSite)
+                ->take($consultationLimit)
+                ->values();
             $created = 0;
             $duplicates = 0;
             $discarded = 0;
@@ -146,6 +155,7 @@ class SourceImportService
                 'duplicates' => $duplicates,
                 'discarded' => $discarded,
                 'created_post_ids' => $createdPostIds,
+                'consultation_limit' => $consultationLimit,
                 'error' => null,
                 'daily_limit_reached' => $items->count() >= $remainingToday,
             ];
@@ -161,6 +171,7 @@ class SourceImportService
                 'duplicates' => 0,
                 'discarded' => 0,
                 'created_post_ids' => [],
+                'consultation_limit' => 0,
                 'error' => "{$sourceSite->name}: {$exception->getMessage()}",
                 'daily_limit_reached' => false,
             ];

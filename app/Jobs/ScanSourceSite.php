@@ -76,15 +76,34 @@ class ScanSourceSite implements ShouldBeUnique, ShouldQueue
                 $task,
                 'Consulta terminada; preparando notas aceptadas',
                 35,
-                "{$result['fetched']} revisadas, {$result['created']} nuevas, {$result['discarded']} descartadas y {$result['duplicates']} duplicadas.",
+                "{$result['fetched']} de {$result['consultation_limit']} posibles revisadas, {$result['created']} nuevas, {$result['discarded']} descartadas y {$result['duplicates']} duplicadas.",
             );
 
-            $articleTasks = $pipeline->enqueueArticles($task->fresh(), $result['created_post_ids']);
+            $generationLimit = max(1, (int) ($task->sourceSite->max_generations_per_scan ?: 5));
+            $autoGenerate = (bool) data_get($task->payload, 'auto_generate', true);
+            $generationPostIds = $autoGenerate
+                ? collect($result['created_post_ids'])->take($generationLimit)->values()->all()
+                : [];
+            $generationSkipped = $autoGenerate
+                ? max(0, count($result['created_post_ids']) - count($generationPostIds))
+                : 0;
+            $articleTasks = $pipeline->enqueueArticles($task->fresh(), $generationPostIds);
+
+            if ($generationSkipped > 0) {
+                $scheduler->addEvent(
+                    $task,
+                    'warning',
+                    "{$generationSkipped} nota(s) aceptadas excedieron el máximo de {$generationLimit} generaciones por consulta. Quedaron guardadas en Noticias para generación manual.",
+                );
+            }
+
             $task->update([
                 'payload' => [
                     ...($task->payload ?: []),
                     'scan_result' => $result,
                     'article_task_ids' => $articleTasks->pluck('id')->all(),
+                    'generation_limit' => $generationLimit,
+                    'generation_skipped' => $generationSkipped,
                 ],
             ]);
 

@@ -57,6 +57,8 @@ class SourceSiteController extends Controller
                 'priority' => 5,
                 'auth_method' => SourceSite::AUTH_NONE,
                 'daily_limit' => 20,
+                'max_posts_per_scan' => 20,
+                'max_generations_per_scan' => 5,
                 'active' => true,
             ]),
             'typeOptions' => SourceSite::typeOptions(),

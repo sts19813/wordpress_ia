@@ -30,6 +30,8 @@ class SourceSiteRequest extends FormRequest
             'active' => $this->has('active') ? $this->boolean('active') : ($sourceSite?->active ?? true),
             'auto_generate' => $this->has('auto_generate') ? $this->boolean('auto_generate') : ($sourceSite?->auto_generate ?? true),
             'auto_publish' => $this->has('auto_publish') ? $this->boolean('auto_publish') : ($sourceSite?->auto_publish ?? false),
+            'max_posts_per_scan' => $this->input('max_posts_per_scan', $sourceSite?->max_posts_per_scan ?: 20),
+            'max_generations_per_scan' => $this->input('max_generations_per_scan', $sourceSite?->max_generations_per_scan ?: 5),
         ], fn (mixed $value) => $value !== null));
     }
 
@@ -61,6 +63,8 @@ class SourceSiteRequest extends FormRequest
             'cookies' => ['nullable', 'json'],
             'auth_method' => ['required', Rule::in(array_keys(SourceSite::authMethodOptions()))],
             'daily_limit' => ['required', 'integer', 'min:1', 'max:10000'],
+            'max_posts_per_scan' => ['required', 'integer', 'min:1', 'max:1000', 'lte:daily_limit'],
+            'max_generations_per_scan' => ['required', 'integer', 'min:1', 'max:1000', 'lte:max_posts_per_scan'],
             'last_synced_at' => ['nullable', 'date'],
             'active' => ['boolean'],
             'auto_generate' => ['boolean'],
@@ -105,6 +109,8 @@ class SourceSiteRequest extends FormRequest
             'cookies' => 'cookies',
             'auth_method' => 'método de autenticación',
             'daily_limit' => 'límite de posts escaneados al día',
+            'max_posts_per_scan' => 'máximo de posts por consulta',
+            'max_generations_per_scan' => 'máximo de artículos generados por consulta',
             'last_synced_at' => 'última sincronización',
             'active' => 'activo',
             'auto_generate' => 'generación automática',

@@ -17,8 +17,8 @@
         return is_array($value) ? implode("\n", $value) : $value;
     };
     $filterErrors = $errors->hasAny(['filter_topics', 'filter_topics.*', 'excluded_topics', 'excluded_topics.*', 'filter_instructions']);
-    $advancedErrors = $errors->hasAny(['daily_limit', 'active', 'auth_method', 'api_key', 'username', 'password', 'custom_headers', 'cookies']);
-    $automationErrors = $errors->hasAny(['auto_generate', 'auto_publish', 'ai_prompt_profile_id', 'wordpress_site_id']);
+    $advancedErrors = $errors->hasAny(['daily_limit', 'max_posts_per_scan', 'active', 'auth_method', 'api_key', 'username', 'password', 'custom_headers', 'cookies']);
+    $automationErrors = $errors->hasAny(['auto_generate', 'auto_publish', 'ai_prompt_profile_id', 'wordpress_site_id', 'max_generations_per_scan']);
     $activeTab = $automationErrors ? 'automation' : ($advancedErrors ? 'advanced' : ($filterErrors ? 'filters' : 'basic'));
 @endphp
 
@@ -170,6 +170,12 @@
                             @error('wordpress_site_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-lg-6">
+                            <label class="form-label required">Máximo de artículos generados por consulta</label>
+                            <input type="number" name="max_generations_per_scan" value="{{ old('max_generations_per_scan', $sourceSite->max_generations_per_scan ?: 5) }}" class="form-control form-control-solid @error('max_generations_per_scan') is-invalid @enderror" min="1" max="1000" required>
+                            <div class="form-text">Solo esta cantidad de notas nuevas aceptadas generará y publicará automáticamente. Las demás permanecerán disponibles en Noticias.</div>
+                            @error('max_generations_per_scan')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                        <div class="col-lg-6">
                             <label class="form-check form-switch form-check-custom form-check-solid">
                                 <input type="hidden" name="auto_generate" value="0">
                                 <input class="form-check-input" type="checkbox" name="auto_generate" value="1" @checked((bool) old('auto_generate', $sourceSite->auto_generate ?? true))>
@@ -246,13 +252,19 @@
 
                     <div class="separator separator-dashed mb-9"></div>
                     <div class="row g-7">
-                        <div class="col-lg-6">
+                        <div class="col-lg-4">
                             <label class="form-label required">Límite de posts escaneados al día</label>
                             <input type="number" name="daily_limit" value="{{ old('daily_limit', $sourceSite->daily_limit ?: 20) }}" class="form-control form-control-solid @error('daily_limit') is-invalid @enderror" min="1" max="10000" required>
                             <div class="form-text">Incluye notas aceptadas, descartadas, duplicadas y elementos no interpretables. El conteo se reinicia cada día.</div>
                             @error('daily_limit')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
-                        <div class="col-lg-6 d-flex align-items-center">
+                        <div class="col-lg-4">
+                            <label class="form-label required">Máximo de posts por consulta</label>
+                            <input type="number" name="max_posts_per_scan" value="{{ old('max_posts_per_scan', $sourceSite->max_posts_per_scan ?: 20) }}" class="form-control form-control-solid @error('max_posts_per_scan') is-invalid @enderror" min="1" max="1000" required>
+                            <div class="form-text">Limita cuántos elementos se descargan y evalúan cada vez que se ejecuta la fuente. Nunca supera el saldo diario.</div>
+                            @error('max_posts_per_scan')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                        <div class="col-lg-4 d-flex align-items-center">
                             <label class="form-check form-switch form-check-custom form-check-solid mt-lg-8">
                                 <input type="hidden" name="active" value="0">
                                 <input class="form-check-input" type="checkbox" name="active" value="1" @checked((bool) old('active', $sourceSite->active))>

@@ -69,6 +69,8 @@ class SourceSite extends Model
         'cookies',
         'auth_method',
         'daily_limit',
+        'max_posts_per_scan',
+        'max_generations_per_scan',
         'last_synced_at',
         'next_scan_at',
         'last_queued_at',
@@ -98,6 +100,8 @@ class SourceSite extends Model
             'frequency_minutes' => 'integer',
             'priority' => 'integer',
             'daily_limit' => 'integer',
+            'max_posts_per_scan' => 'integer',
+            'max_generations_per_scan' => 'integer',
         ];
     }
 

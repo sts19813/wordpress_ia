@@ -27,6 +27,8 @@ class SourceSiteConfigurationTest extends TestCase
             ->assertSee('horas')
             ->assertSee('Navegación y extracción con IA')
             ->assertSee('Límite de posts escaneados al día')
+            ->assertSee('Máximo de posts por consulta')
+            ->assertSee('Máximo de artículos generados por consulta')
             ->assertDontSee('name="status"', false)
             ->assertDontSee('name="language"', false)
             ->assertDontSee('name="priority"', false);
@@ -50,6 +52,8 @@ class SourceSiteConfigurationTest extends TestCase
                 'language' => 'es',
                 'priority' => 5,
                 'daily_limit' => 20,
+                'max_posts_per_scan' => 12,
+                'max_generations_per_scan' => 4,
                 'active' => '1',
             ]);
 
@@ -59,6 +63,8 @@ class SourceSiteConfigurationTest extends TestCase
         $this->assertSame(180, $sourceSite->frequency_minutes);
         $this->assertSame(['Política', 'Economía'], $sourceSite->filter_topics);
         $this->assertSame(['Tecnología', 'Deportes'], $sourceSite->excluded_topics);
+        $this->assertSame(12, $sourceSite->max_posts_per_scan);
+        $this->assertSame(4, $sourceSite->max_generations_per_scan);
     }
 
     public function test_it_tests_a_source_before_saving_and_returns_the_latest_full_post(): void
