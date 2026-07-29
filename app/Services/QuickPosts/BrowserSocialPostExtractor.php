@@ -2,6 +2,7 @@
 
 namespace App\Services\QuickPosts;
 
+use App\Support\SocialPostUrl;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
@@ -11,6 +12,26 @@ class BrowserSocialPostExtractor
      * @return array<string, mixed>
      */
     public function extract(string $url): array
+    {
+        $result = $this->runBrowser($url);
+
+        if ($this->isFacebookLogin($result)) {
+            $result = $this->extractFromFacebookEmbed($result);
+        }
+
+        $text = trim((string) ($result['text'] ?? ''));
+
+        if (mb_strlen($text) < 40) {
+            throw new RuntimeException('La publicación no expuso contenido visible. Confirma que sea pública.');
+        }
+
+        return $result;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function runBrowser(string $url): array
     {
         $node = (string) config('services.social_capture.node_binary', 'node');
         $timeout = max(15, (int) config('services.social_capture.browser_timeout', 60));
@@ -47,11 +68,50 @@ class BrowserSocialPostExtractor
             throw new RuntimeException('El navegador devolvió una respuesta que no se pudo interpretar.');
         }
 
+        return $result;
+    }
+
+    /**
+     * @param  array<string, mixed>  $result
+     */
+    private function isFacebookLogin(array $result): bool
+    {
+        $finalUrl = (string) ($result['final_url'] ?? '');
+
+        return SocialPostUrl::platform($finalUrl) === 'facebook'
+            && str_starts_with((string) parse_url($finalUrl, PHP_URL_PATH), '/login/');
+    }
+
+    /**
+     * @param  array<string, mixed>  $loginResult
+     * @return array<string, mixed>
+     */
+    private function extractFromFacebookEmbed(array $loginResult): array
+    {
+        $loginUrl = (string) ($loginResult['final_url'] ?? '');
+        parse_str((string) parse_url($loginUrl, PHP_URL_QUERY), $query);
+        $nextUrl = (string) ($query['next'] ?? '');
+
+        if ($nextUrl === '' || SocialPostUrl::platform($nextUrl) !== 'facebook') {
+            throw new RuntimeException('Facebook redirigió al inicio de sesión y no expuso la URL pública del post.');
+        }
+
+        $canonicalUrl = SocialPostUrl::canonicalize($nextUrl);
+        $embedUrl = 'https://www.facebook.com/plugins/post.php?'.http_build_query([
+            'href' => $canonicalUrl,
+            'show_text' => 'true',
+            'width' => 500,
+        ], '', '&', PHP_QUERY_RFC3986);
+        $result = $this->runBrowser($embedUrl);
         $text = trim((string) ($result['text'] ?? ''));
 
-        if (mb_strlen($text) < 40) {
-            throw new RuntimeException('La publicación no expuso contenido visible. Confirma que sea pública.');
+        if (str_contains(mb_strtolower($text), 'ya no está disponible')) {
+            throw new RuntimeException('Facebook no permitió abrir la versión pública de esta publicación.');
         }
+
+        $result['capture_url'] = $embedUrl;
+        $result['final_url'] = $canonicalUrl;
+        $result['canonical_url'] = $canonicalUrl;
 
         return $result;
     }
