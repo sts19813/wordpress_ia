@@ -22,6 +22,8 @@ class Scheduler extends Model
 
     public const TYPE_SOURCE_ARTICLE = 'source_article';
 
+    public const TYPE_QUICK_POST = 'quick_post';
+
     protected $fillable = [
         'parent_id',
         'user_id',
@@ -113,6 +115,7 @@ class Scheduler extends Model
         return match ($this->type) {
             self::TYPE_SOURCE_SCAN => 'Consulta de fuente',
             self::TYPE_SOURCE_ARTICLE => 'Generación y publicación',
+            self::TYPE_QUICK_POST => 'Post rápido',
             default => 'Generación manual',
         };
     }

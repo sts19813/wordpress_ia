@@ -123,7 +123,7 @@
                     @foreach ($sourcePosts as $sourcePost)
                         <div class="pb-4 mb-4 border-bottom">
                             <a href="{{ route('admin.news.show', $sourcePost) }}" class="fw-bold text-gray-900 text-hover-primary">{{ $sourcePost->title }}</a>
-                            <div class="text-muted fs-8 mt-1">{{ $sourcePost->sourceSite?->name }}</div>
+                            <div class="text-muted fs-8 mt-1">{{ $sourcePost->originLabel() }}</div>
                         </div>
                     @endforeach
                 </div>

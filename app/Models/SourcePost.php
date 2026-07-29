@@ -4,10 +4,15 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 // Modelos de publicaciones generadas por IA.
 class SourcePost extends Model
 {
+    public const ORIGIN_SOURCE_SITE = 'source_site';
+
+    public const ORIGIN_QUICK_POST = 'quick_post';
+
     public const STATUS_FETCHED = 'fetched';
 
     public const STATUS_DUPLICATE = 'duplicate';
@@ -16,6 +21,8 @@ class SourcePost extends Model
 
     protected $fillable = [
         'source_site_id',
+        'origin_type',
+        'social_platform',
         'title',
         'content',
         'content_html',
@@ -26,6 +33,7 @@ class SourcePost extends Model
         'categories',
         'tags',
         'url',
+        'canonical_url',
         'hash',
         'status',
         'original_json',
@@ -35,6 +43,7 @@ class SourcePost extends Model
         'matched_topics',
         'filter_method',
         'scanned_at',
+        'captured_at',
     ];
 
     protected function casts(): array
@@ -47,7 +56,15 @@ class SourcePost extends Model
             'filter_applies' => 'boolean',
             'matched_topics' => 'array',
             'scanned_at' => 'datetime',
+            'captured_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::deleting(function (SourcePost $sourcePost): void {
+            $sourcePost->media()->get()->each->delete();
+        });
     }
 
     public static function statusOptions(): array
@@ -62,6 +79,30 @@ class SourcePost extends Model
     public function sourceSite(): BelongsTo
     {
         return $this->belongsTo(SourceSite::class);
+    }
+
+    public function media(): HasMany
+    {
+        return $this->hasMany(SourcePostMedia::class)->orderBy('position');
+    }
+
+    public function isQuickPost(): bool
+    {
+        return $this->origin_type === self::ORIGIN_QUICK_POST;
+    }
+
+    public function originLabel(): string
+    {
+        if (! $this->isQuickPost()) {
+            return $this->sourceSite?->name ?: 'Sitio fuente';
+        }
+
+        return match ($this->social_platform) {
+            'facebook' => 'Facebook',
+            'x' => 'X',
+            'instagram' => 'Instagram',
+            default => 'Post rápido',
+        };
     }
 
     public function statusLabel(): string

@@ -128,7 +128,10 @@
                                         @endforeach
                                     </div>
                                 </td>
-                                <td>{{ $sourcePost->sourceSite?->name ?: '-' }}</td>
+                                <td>
+                                    {{ $sourcePost->originLabel() }}
+                                    @if ($sourcePost->isQuickPost())<div class="badge badge-light-primary mt-1">Post rápido</div>@endif
+                                </td>
                                 <td>{{ $sourcePost->author ?: '-' }}</td>
                                 <td data-order="{{ $sourcePost->published_at?->timestamp ?: 0 }}">{{ $sourcePost->published_at?->format('d/m/Y H:i') ?: '-' }}</td>
                                 <td><span class="badge {{ $statusClasses[$sourcePost->status] ?? 'badge-light' }}">{{ $sourcePost->statusLabel() }}</span></td>

@@ -29,11 +29,11 @@
                         </div>
                         <div class="border rounded overflow-auto" style="max-height: 580px;">
                             @forelse ($sourcePosts as $sourcePost)
-                                <label class="d-flex align-items-start gap-4 p-5 border-bottom source-option" data-search="{{ Str::lower($sourcePost->title.' '.$sourcePost->sourceSite?->name) }}">
+                                <label class="d-flex align-items-start gap-4 p-5 border-bottom source-option" data-search="{{ Str::lower($sourcePost->title.' '.$sourcePost->originLabel()) }}">
                                     <input class="form-check-input mt-1 source-checkbox" type="checkbox" name="source_post_ids[]" value="{{ $sourcePost->id }}" @checked(in_array($sourcePost->id, old('source_post_ids', $selectedIds)))>
                                     <span class="flex-grow-1">
                                         <span class="d-block fw-bold text-gray-900">{{ $sourcePost->title }}</span>
-                                        <span class="d-block text-muted fs-7 mt-1">{{ $sourcePost->sourceSite?->name ?: 'Sin fuente' }} · {{ $sourcePost->published_at?->format('d/m/Y H:i') ?: 'Sin fecha' }}</span>
+                                        <span class="d-block text-muted fs-7 mt-1">{{ $sourcePost->originLabel() }} · {{ $sourcePost->published_at?->format('d/m/Y H:i') ?: 'Sin fecha' }}</span>
                                         <span class="d-block text-gray-600 fs-7 mt-2">{{ Str::limit($sourcePost->summary ?: $sourcePost->content, 180) }}</span>
                                     </span>
                                 </label>

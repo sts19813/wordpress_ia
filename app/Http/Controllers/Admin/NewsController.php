@@ -53,7 +53,7 @@ class NewsController extends Controller
 
     public function show(SourcePost $sourcePost): View
     {
-        $sourcePost->load('sourceSite:id,name,url');
+        $sourcePost->load(['sourceSite:id,name,url', 'media']);
 
         return view('admin.news.show', [
             'sourcePost' => $sourcePost,

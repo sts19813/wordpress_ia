@@ -6,8 +6,10 @@ use App\Http\Controllers\Admin\AiImageController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\NewsController;
 use App\Http\Controllers\Admin\PublicationController;
+use App\Http\Controllers\Admin\QuickPostController;
 use App\Http\Controllers\Admin\SchedulerController;
 use App\Http\Controllers\Admin\SettingController;
+use App\Http\Controllers\Admin\SourcePostMediaController;
 use App\Http\Controllers\Admin\SourceScanLogController;
 use App\Http\Controllers\Admin\SourceSiteController;
 use App\Http\Controllers\Admin\SystemLogController;
@@ -54,6 +56,11 @@ Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
 Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::get('noticias', [NewsController::class, 'index'])->name('news.index');
+    Route::get('post-rapido', [QuickPostController::class, 'index'])->name('quick-posts.index');
+    Route::get('post-rapido/nuevo', [QuickPostController::class, 'create'])->name('quick-posts.create');
+    Route::post('post-rapido', [QuickPostController::class, 'store'])->name('quick-posts.store');
+    Route::delete('post-rapido/{sourcePost}', [QuickPostController::class, 'destroy'])->name('quick-posts.destroy');
+    Route::get('medios-originales/{sourcePostMedia}', SourcePostMediaController::class)->name('source-post-media.file');
     Route::get('bitacora-fuentes', SourceScanLogController::class)->name('source-scan-logs.index');
     Route::post('noticias/obtener', [NewsController::class, 'fetch'])->name('news.fetch');
     Route::delete('noticias/{sourcePost}', [NewsController::class, 'destroy'])->name('news.destroy');

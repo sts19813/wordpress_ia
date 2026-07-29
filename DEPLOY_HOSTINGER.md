@@ -23,6 +23,8 @@ Desde la raíz del proyecto en el servidor:
 
 ```bash
 composer install --no-dev --optimize-autoloader
+npm ci
+npm run build
 php artisan migrate --force
 php artisan optimize:clear
 php artisan optimize
@@ -51,9 +53,40 @@ Si hPanel no acepta una frecuencia menor a 5 minutos, el sistema seguirá funcio
 ## 4. Diagnóstico
 
 ```bash
-php artisan queue:work database --queue=ai-text,ai-image --stop-when-empty --tries=3 --timeout=300
+php artisan queue:work database --queue=social-capture,ai-text,ai-image --stop-when-empty --tries=3 --timeout=300
 php artisan queue:failed
 php artisan queue:retry all
 ```
 
 El primer comando permite procesar manualmente la cola para comprobar la configuración. El módulo **Programador** muestra el avance, los intentos, la etapa actual y la bitácora de cada solicitud.
+
+## 5. Navegador para Post rápido
+
+El módulo **Post rápido** abre publicaciones públicas de Facebook, X e Instagram con un navegador sin sesión. El servidor necesita Node.js y un ejecutable de Chromium, Google Chrome o Microsoft Edge.
+
+Instala las dependencias de Node con `npm ci` y configura la ruta real en `.env`:
+
+```dotenv
+SOCIAL_BROWSER_EXECUTABLE=/usr/bin/chromium
+SOCIAL_BROWSER_WS_ENDPOINT=
+SOCIAL_NODE_BINARY=node
+SOCIAL_BROWSER_TIMEOUT=60
+SOCIAL_CAPTURE_MODEL=gpt-4.1-mini
+```
+
+Busca la ruta disponible con:
+
+```bash
+which chromium
+which chromium-browser
+which google-chrome
+```
+
+En un plan compartido que no permita ejecutar Chromium, configura un proveedor de navegador remoto compatible con CDP:
+
+```dotenv
+SOCIAL_BROWSER_EXECUTABLE=
+SOCIAL_BROWSER_WS_ENDPOINT=wss://PROVEEDOR_CDP?token=TOKEN_PRIVADO
+```
+
+No publiques ese endpoint ni su token. La descarga HTTP y la búsqueda web por sí solas no acceden de forma fiable a los posts de Facebook.
