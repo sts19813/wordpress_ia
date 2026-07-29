@@ -38,6 +38,12 @@ class QuickPostRequest extends FormRequest
                     }
                 },
             ],
+            'ai_prompt_profile_id' => [
+                'required',
+                'integer',
+                Rule::exists('ai_prompt_profiles', 'id')
+                    ->where('user_id', $this->user()->id),
+            ],
             'image_mode' => ['required', Rule::in(['generate', 'original'])],
         ];
     }

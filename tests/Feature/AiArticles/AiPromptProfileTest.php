@@ -56,6 +56,41 @@ class AiPromptProfileTest extends TestCase
         $this->assertSame('gpt-4.1-mini', AiPromptProfile::normalizeTextModel('modelo-inventado'));
     }
 
+    public function test_profile_can_use_the_very_short_content_length(): void
+    {
+        $user = User::factory()->create();
+        $profile = app(AiPromptProfileService::class)->ensureDefaultFor($user)->fresh();
+
+        $this->actingAs($user)
+            ->get(route('admin.settings.prompts.edit', $profile))
+            ->assertOk()
+            ->assertSee('Muy corto (150–200 palabras)');
+
+        $this->actingAs($user)
+            ->put(route('admin.settings.prompts.update', $profile), [
+                'name' => $profile->name,
+                'system_prompt' => $profile->system_prompt,
+                'model' => $profile->model,
+                'temperature' => $profile->temperature,
+                'writing_style' => $profile->writing_style,
+                'tone' => $profile->tone,
+                'content_length' => 'very_short',
+                'language' => $profile->language,
+                'audience' => $profile->audience,
+                'max_output_tokens' => $profile->max_output_tokens,
+                'generate_image' => '1',
+                'image_model' => $profile->image_model,
+                'image_size' => $profile->image_size,
+                'image_quality' => $profile->image_quality,
+                'image_style' => $profile->image_style,
+                'is_default' => '1',
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('admin.settings.index'));
+
+        $this->assertSame('very_short', $profile->fresh()->content_length);
+    }
+
     public function test_article_generation_form_explains_background_queue_processing(): void
     {
         $user = User::factory()->create();

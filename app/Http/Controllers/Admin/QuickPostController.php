@@ -31,14 +31,22 @@ class QuickPostController extends Controller
 
     public function create(Request $request): View
     {
+        $this->profiles->ensureDefaultFor($request->user());
+
         return view('admin.quick-posts.create', [
-            'profile' => $this->profiles->ensureDefaultFor($request->user()),
+            'profiles' => $request->user()
+                ->aiPromptProfiles()
+                ->orderByDesc('is_default')
+                ->orderBy('name')
+                ->get(),
         ]);
     }
 
     public function store(QuickPostRequest $request): RedirectResponse
     {
-        $profile = $this->profiles->ensureDefaultFor($request->user());
+        $profile = $request->user()
+            ->aiPromptProfiles()
+            ->findOrFail($request->validated('ai_prompt_profile_id'));
         $task = $this->scheduler->createQuickPostTask(
             $request->user(),
             $profile,

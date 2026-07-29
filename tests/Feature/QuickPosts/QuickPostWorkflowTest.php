@@ -7,6 +7,7 @@ use App\Jobs\GenerateAiArticle;
 use App\Jobs\GenerateAiImage;
 use App\Models\AiArticle;
 use App\Models\AiImage;
+use App\Models\AiPromptProfile;
 use App\Models\Scheduler;
 use App\Models\SourcePost;
 use App\Models\SourcePostMedia;
@@ -32,9 +33,16 @@ class QuickPostWorkflowTest extends TestCase
         Queue::fake();
         $user = User::factory()->create();
         $url = 'https://www.facebook.com/share/p/1Zvt11XRZJ/';
+        app(AiPromptProfileService::class)->ensureDefaultFor($user);
+        $selectedProfile = $user->aiPromptProfiles()->create([
+            'name' => 'Social muy breve',
+            'system_prompt' => AiPromptProfile::DEFAULT_SYSTEM_PROMPT,
+            'content_length' => 'very_short',
+        ]);
 
         $response = $this->actingAs($user)->post(route('admin.quick-posts.store'), [
             'url' => $url,
+            'ai_prompt_profile_id' => $selectedProfile->id,
             'image_mode' => 'original',
         ]);
 
@@ -43,18 +51,48 @@ class QuickPostWorkflowTest extends TestCase
         $this->assertSame($url, $task->payload['url']);
         $this->assertSame([], $task->payload['source_post_ids']);
         $this->assertSame('original', $task->payload['image_mode']);
+        $this->assertSame($selectedProfile->id, $task->payload['profile_id']);
         $this->assertFalse($task->payload['generate_image']);
         Queue::assertPushedOn('social-capture', CaptureQuickPost::class);
     }
 
     public function test_quick_post_form_asks_how_images_should_be_handled(): void
     {
-        $this->actingAs(User::factory()->create())
+        $user = User::factory()->create();
+        app(AiPromptProfileService::class)->ensureDefaultFor($user);
+        $user->aiPromptProfiles()->create([
+            'name' => 'Perfil para redes',
+            'system_prompt' => AiPromptProfile::DEFAULT_SYSTEM_PROMPT,
+            'content_length' => 'very_short',
+        ]);
+
+        $this->actingAs($user)
             ->get(route('admin.quick-posts.create'))
             ->assertOk()
             ->assertSee('Generar imágenes nuevas con IA')
             ->assertSee('Conservar las imágenes originales')
-            ->assertSee('name="image_mode"', false);
+            ->assertSee('name="image_mode"', false)
+            ->assertSee('name="ai_prompt_profile_id"', false)
+            ->assertSee('Perfil para redes')
+            ->assertSee('Muy corto (150–200 palabras)');
+    }
+
+    public function test_quick_post_cannot_use_another_users_profile(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $otherProfile = app(AiPromptProfileService::class)->ensureDefaultFor($otherUser);
+
+        $this->actingAs($user)
+            ->post(route('admin.quick-posts.store'), [
+                'url' => 'https://x.com/openai/status/123456',
+                'ai_prompt_profile_id' => $otherProfile->id,
+                'image_mode' => 'original',
+            ])
+            ->assertSessionHasErrors('ai_prompt_profile_id');
+
+        $this->assertDatabaseCount('schedulers', 0);
     }
 
     public function test_capture_job_archives_the_original_then_hands_off_to_the_ai_queue(): void

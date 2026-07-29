@@ -31,7 +31,7 @@ class AiDraftWorkflowTest extends TestCase
             'temperature' => 0.55,
             'writing_style' => 'periodístico',
             'tone' => 'objetivo',
-            'content_length' => 'short',
+            'content_length' => 'very_short',
             'language' => 'es',
             'audience' => 'lectores generales',
             'max_output_tokens' => 2500,
@@ -102,7 +102,7 @@ class AiDraftWorkflowTest extends TestCase
         Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/responses')
             && $request['temperature'] === 0.55
             && data_get($request->data(), 'text.format.type') === 'json_schema'
-            && str_contains($request['input'], 'Entre 400 y 600 palabras.'));
+            && str_contains($request['input'], 'Entre 150 y 200 palabras.'));
         Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/images/generations')
             && $request['model'] === 'gpt-image-1.5'
             && $request['size'] === '1536x1024');

@@ -219,6 +219,7 @@ class ArticleGenerationEngine
     private function contentLengthInstruction(string $length): string
     {
         return match ($length) {
+            'very_short' => 'Entre 150 y 200 palabras.',
             'short' => 'Entre 400 y 600 palabras.',
             'long' => 'Entre 1,200 y 1,600 palabras.',
             default => 'Entre 700 y 1,000 palabras.',

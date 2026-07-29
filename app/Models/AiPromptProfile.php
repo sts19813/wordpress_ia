@@ -58,6 +58,7 @@ PROMPT;
     public static function lengthOptions(): array
     {
         return [
+            'very_short' => 'Muy corto (150–200 palabras)',
             'short' => 'Corta (400–600 palabras)',
             'medium' => 'Media (700–1,000 palabras)',
             'long' => 'Larga (1,200–1,600 palabras)',

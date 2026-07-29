@@ -50,6 +50,36 @@
 
                         <div class="separator my-8"></div>
 
+                        <div class="row align-items-end g-4">
+                            <div class="col-md-8">
+                                <label for="quick-post-profile" class="form-label required fw-bold">Perfil de generación</label>
+                                <select
+                                    id="quick-post-profile"
+                                    name="ai_prompt_profile_id"
+                                    class="form-select form-select-solid @error('ai_prompt_profile_id') is-invalid @enderror"
+                                    required
+                                >
+                                    @foreach ($profiles as $profile)
+                                        <option
+                                            value="{{ $profile->id }}"
+                                            @selected((string) old('ai_prompt_profile_id', $profiles->firstWhere('is_default', true)?->id) === (string) $profile->id)
+                                        >
+                                            {{ $profile->name }}
+                                            · {{ App\Models\AiPromptProfile::lengthOptions()[$profile->content_length] ?? $profile->content_length }}
+                                            {{ $profile->is_default ? ' · predeterminado' : '' }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @error('ai_prompt_profile_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                <div class="form-text">Se aplicarán su prompt, tono, extensión, modelo de texto y estilo visual.</div>
+                            </div>
+                            <div class="col-md-4 text-md-end">
+                                <a href="{{ route('admin.settings.index') }}" class="btn btn-light">Administrar perfiles</a>
+                            </div>
+                        </div>
+
+                        <div class="separator my-8"></div>
+
                         <label class="form-label required fw-bold mb-4">Imágenes del post generado</label>
                         <div class="row g-5">
                             <div class="col-md-6">
@@ -100,20 +130,6 @@
                                 </div>
                             @endforeach
                         </div>
-
-                        <div class="separator my-8"></div>
-
-                        <div class="d-flex flex-column flex-md-row justify-content-between gap-5">
-                            <div>
-                                <div class="text-muted fs-7">Perfil editorial automático</div>
-                                <div class="fw-bold text-gray-900">{{ $profile->name }}</div>
-                                <div class="text-muted fs-8">
-                                    La generación de texto siempre utilizará este perfil editorial.
-                                </div>
-                            </div>
-                            <a href="{{ route('admin.settings.index') }}" class="btn btn-light align-self-md-center">Ajustar perfil</a>
-                        </div>
-
                         <div class="notice d-flex bg-light-info rounded border-info border border-dashed p-5 mt-8">
                             <i class="ki-outline ki-shield-tick fs-2x text-info me-3"></i>
                             <div class="fs-7 text-gray-700">
