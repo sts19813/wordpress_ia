@@ -14,6 +14,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use RuntimeException;
 use Throwable;
 
@@ -52,6 +53,24 @@ class GenerateAiArticle implements ShouldBeUnique, ShouldQueue
     }
 
     public function handle(
+        AiArticleService $articles,
+        SchedulerService $scheduler,
+        OriginalPostImageService $originalImages,
+    ): void {
+        $lock = Cache::lock("scheduler:generate-ai-article:{$this->taskId}", $this->timeout + 60);
+
+        if (! $lock->get()) {
+            return;
+        }
+
+        try {
+            $this->handleLocked($articles, $scheduler, $originalImages);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function handleLocked(
         AiArticleService $articles,
         SchedulerService $scheduler,
         OriginalPostImageService $originalImages,

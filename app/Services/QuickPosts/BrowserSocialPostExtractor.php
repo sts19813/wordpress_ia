@@ -8,11 +8,19 @@ use Symfony\Component\Process\Process;
 
 class BrowserSocialPostExtractor
 {
+    public function __construct(
+        private readonly XPublicPostExtractor $x,
+    ) {}
+
     /**
      * @return array<string, mixed>
      */
     public function extract(string $url): array
     {
+        if (SocialPostUrl::platform($url) === 'x') {
+            return $this->x->extract($url);
+        }
+
         $result = $this->runBrowser($url);
 
         if ($this->isFacebookLogin($result)) {

@@ -88,7 +88,7 @@ class AiArticleService
             ]);
         }
 
-        return $article->fresh();
+        return $article;
     }
 
     /**

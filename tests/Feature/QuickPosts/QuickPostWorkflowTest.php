@@ -17,6 +17,7 @@ use App\Services\QuickPosts\OriginalPostImageService;
 use App\Services\QuickPosts\SocialPostCaptureService;
 use App\Services\SchedulerService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Mockery;
@@ -251,5 +252,35 @@ class QuickPostWorkflowTest extends TestCase
             'status' => AiImage::STATUS_GENERATED,
         ]);
         Queue::assertNotPushed(GenerateAiImage::class);
+    }
+
+    public function test_the_same_task_cannot_generate_two_drafts_concurrently(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        $profile = app(AiPromptProfileService::class)->ensureDefaultFor($user);
+        $task = app(SchedulerService::class)->createQuickPostTask(
+            $user,
+            $profile,
+            'https://x.com/example/status/123456',
+            'original',
+        );
+        $lock = Cache::lock("scheduler:generate-ai-article:{$task->id}", 300);
+        $this->assertTrue($lock->get());
+        $articles = Mockery::mock(AiArticleService::class);
+        $articles->shouldNotReceive('generateTextDraft');
+
+        try {
+            (new GenerateAiArticle($task->id))->handle(
+                $articles,
+                app(SchedulerService::class),
+                app(OriginalPostImageService::class),
+            );
+        } finally {
+            $lock->release();
+        }
+
+        $this->assertDatabaseCount('ai_articles', 0);
+        $this->assertSame(Scheduler::STATUS_QUEUED, $task->fresh()->status);
     }
 }
