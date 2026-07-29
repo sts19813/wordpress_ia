@@ -4,6 +4,10 @@
 
 @php
     $mainImage = $article->mainImage();
+    $originalVariants = $article->images
+        ->where('model', 'original')
+        ->where('type', App\Models\AiImage::TYPE_VARIANT)
+        ->where('status', App\Models\AiImage::STATUS_GENERATED);
     $publishedDestinations = $article->publications->where('status', App\Models\Publication::STATUS_PUBLISHED)->count();
 @endphp
 
@@ -54,8 +58,24 @@
                 <div class="card-body p-lg-10">
                     @if ($mainImage?->status === 'generated' && $mainImage->file_path)
                         <img src="{{ route('admin.ai-images.file', $mainImage) }}" alt="{{ $article->title }}" class="rounded w-100 mb-8" style="max-height: 480px; object-fit: cover;">
+                        @if ($mainImage->model === 'original')
+                            <div class="badge badge-light-info mb-8">Imagen original conservada</div>
+                        @endif
                     @elseif ($mainImage?->status === 'failed')
                         <div class="alert alert-warning">El texto quedó listo, pero la imagen no pudo generarse: {{ $mainImage->generation_error }}</div>
+                    @endif
+
+                    @if ($originalVariants->isNotEmpty())
+                        <div class="mb-8">
+                            <div class="fw-bold text-gray-900 mb-3">{{ $originalVariants->count() }} imagen(es) originales adicionales conservadas</div>
+                            <div class="row g-3">
+                                @foreach ($originalVariants as $image)
+                                    <div class="col-6 col-md-4">
+                                        <img src="{{ route('admin.ai-images.file', $image) }}" alt="{{ $image->title }}" class="rounded w-100" style="height: 150px; object-fit: cover;">
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
                     @endif
 
                     @if ($article->status !== 'failed')

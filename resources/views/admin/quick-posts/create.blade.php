@@ -8,7 +8,7 @@
             <i class="ki-outline ki-left fs-4 me-1"></i>Post rápido
         </a>
         <h1 class="page-heading text-gray-900 fw-bold fs-3 my-0">Crear desde una publicación social</h1>
-        <div class="text-muted fw-semibold fs-7 pt-1">Pega un enlace público; el original se archivará antes de crear el borrador y la imagen con IA.</div>
+        <div class="text-muted fw-semibold fs-7 pt-1">Pega un enlace público, recrea el texto con IA y decide qué imágenes conservar para publicar.</div>
     </div>
 @endsection
 
@@ -48,6 +48,43 @@
                         </div>
                         @error('url')<div class="text-danger fs-7 mt-3">{{ $message }}</div>@enderror
 
+                        <div class="separator my-8"></div>
+
+                        <label class="form-label required fw-bold mb-4">Imágenes del post generado</label>
+                        <div class="row g-5">
+                            <div class="col-md-6">
+                                <label class="border rounded p-5 h-100 d-flex gap-4 cursor-pointer">
+                                    <input
+                                        class="form-check-input mt-1"
+                                        type="radio"
+                                        name="image_mode"
+                                        value="generate"
+                                        @checked(old('image_mode', 'generate') === 'generate')
+                                    >
+                                    <span>
+                                        <span class="fw-bold text-gray-900 d-block mb-1">Generar imágenes nuevas con IA</span>
+                                        <span class="text-muted fs-8">Crea una imagen principal nueva usando el estilo del perfil editorial.</span>
+                                    </span>
+                                </label>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="border rounded p-5 h-100 d-flex gap-4 cursor-pointer">
+                                    <input
+                                        class="form-check-input mt-1"
+                                        type="radio"
+                                        name="image_mode"
+                                        value="original"
+                                        @checked(old('image_mode') === 'original')
+                                    >
+                                    <span>
+                                        <span class="fw-bold text-gray-900 d-block mb-1">Conservar las imágenes originales</span>
+                                        <span class="text-muted fs-8">Usa las imágenes del post sin modificarlas y las prepara para publicar después.</span>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+                        @error('image_mode')<div class="text-danger fs-7 mt-3">{{ $message }}</div>@enderror
+
                         <div class="row g-5 mt-5">
                             @foreach ([
                                 ['facebook', 'Facebook', 'ki-facebook'],
@@ -71,7 +108,7 @@
                                 <div class="text-muted fs-7">Perfil editorial automático</div>
                                 <div class="fw-bold text-gray-900">{{ $profile->name }}</div>
                                 <div class="text-muted fs-8">
-                                    {{ $profile->generate_image ? 'Incluye generación de imagen IA' : 'Solo genera el texto' }}
+                                    La generación de texto siempre utilizará este perfil editorial.
                                 </div>
                             </div>
                             <a href="{{ route('admin.settings.index') }}" class="btn btn-light align-self-md-center">Ajustar perfil</a>

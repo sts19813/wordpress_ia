@@ -44,8 +44,15 @@ class SchedulerService
         return $task->fresh();
     }
 
-    public function createQuickPostTask(User $user, AiPromptProfile $profile, string $url): Scheduler
-    {
+    public function createQuickPostTask(
+        User $user,
+        AiPromptProfile $profile,
+        string $url,
+        ?string $imageMode = null,
+    ): Scheduler {
+        $imageMode ??= $profile->generate_image ? 'generate' : 'original';
+        $imageMode = in_array($imageMode, ['generate', 'original'], true) ? $imageMode : 'generate';
+
         $task = Scheduler::query()->create([
             'user_id' => $user->id,
             'type' => Scheduler::TYPE_QUICK_POST,
@@ -58,7 +65,8 @@ class SchedulerService
                 'url' => $url,
                 'profile_id' => $profile->id,
                 'source_post_ids' => [],
-                'generate_image' => (bool) $profile->generate_image,
+                'image_mode' => $imageMode,
+                'generate_image' => $imageMode === 'generate',
             ],
             'events' => [],
         ]);
@@ -203,7 +211,7 @@ class SchedulerService
                 $job->handle(app(AiArticleService::class), $this);
             } else {
                 $job = (new GenerateAiArticle($task->id))->withoutImageDispatch();
-                $job->handle(app(AiArticleService::class), $this);
+                app()->call([$job, 'handle']);
 
                 $task->refresh()->load('article.images');
 
@@ -289,7 +297,7 @@ class SchedulerService
         }
 
         $article = (new GenerateAiArticle($task->id))->withoutImageDispatch();
-        $article->handle(app(AiArticleService::class), $this);
+        app()->call([$article, 'handle']);
         $task->refresh()->load('article.images');
 
         if ($task->status === Scheduler::STATUS_QUEUED && $this->shouldGenerateImage($task)) {

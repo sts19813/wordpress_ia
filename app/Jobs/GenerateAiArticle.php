@@ -6,6 +6,7 @@ use App\Models\AiArticle;
 use App\Models\Scheduler;
 use App\Models\SourcePost;
 use App\Services\AiArticleService;
+use App\Services\QuickPosts\OriginalPostImageService;
 use App\Services\SchedulerService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -50,8 +51,11 @@ class GenerateAiArticle implements ShouldBeUnique, ShouldQueue
         return (string) $this->taskId;
     }
 
-    public function handle(AiArticleService $articles, SchedulerService $scheduler): void
-    {
+    public function handle(
+        AiArticleService $articles,
+        SchedulerService $scheduler,
+        OriginalPostImageService $originalImages,
+    ): void {
         $task = Scheduler::query()->with('article')->findOrFail($this->taskId);
 
         if ($task->status === Scheduler::STATUS_COMPLETED) {
@@ -62,11 +66,7 @@ class GenerateAiArticle implements ShouldBeUnique, ShouldQueue
         $profile = $task->user?->aiPromptProfiles()->findOrFail($payload['profile_id'] ?? null);
 
         if ($task->article?->status === AiArticle::STATUS_DRAFT) {
-            if ($profile->generate_image) {
-                $scheduler->awaitingImage($task, $task->article, $this->dispatchImage);
-            } else {
-                $scheduler->completed($task, 'El borrador de texto quedó listo.');
-            }
+            $this->completeImageChoice($task, $task->article, $scheduler, $originalImages, $profile->generate_image);
 
             return;
         }
@@ -103,11 +103,7 @@ class GenerateAiArticle implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        if ($profile->generate_image) {
-            $scheduler->awaitingImage($task, $article, $this->dispatchImage);
-        } else {
-            $scheduler->completed($task, 'El borrador de texto quedó listo.');
-        }
+        $this->completeImageChoice($task, $article, $scheduler, $originalImages, $profile->generate_image);
     }
 
     public function failed(?Throwable $exception): void
@@ -135,5 +131,43 @@ class GenerateAiArticle implements ShouldBeUnique, ShouldQueue
         }
 
         throw new RuntimeException($message);
+    }
+
+    private function completeImageChoice(
+        Scheduler $task,
+        AiArticle $article,
+        SchedulerService $scheduler,
+        OriginalPostImageService $originalImages,
+        bool $profileGeneratesImage,
+    ): void {
+        $payload = $task->payload ?: [];
+
+        if (($payload['image_mode'] ?? null) === 'original') {
+            $sourcePost = SourcePost::query()
+                ->whereIn('id', array_map('intval', $payload['source_post_ids'] ?? []))
+                ->where('origin_type', SourcePost::ORIGIN_QUICK_POST)
+                ->with('media')
+                ->first();
+
+            if (! $sourcePost) {
+                throw new RuntimeException('La publicación original no está disponible para conservar sus imágenes.');
+            }
+
+            $count = $originalImages->attach($article, $sourcePost);
+            $scheduler->completed(
+                $task,
+                "El borrador quedó listo con {$count} imagen(es) originales conservadas para su publicación.",
+            );
+
+            return;
+        }
+
+        if ((bool) ($payload['generate_image'] ?? $profileGeneratesImage)) {
+            $scheduler->awaitingImage($task, $article, $this->dispatchImage);
+
+            return;
+        }
+
+        $scheduler->completed($task, 'El borrador de texto quedó listo.');
     }
 }

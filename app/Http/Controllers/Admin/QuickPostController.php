@@ -43,11 +43,16 @@ class QuickPostController extends Controller
             $request->user(),
             $profile,
             $request->validated('url'),
+            $request->validated('image_mode'),
         );
+
+        $imageMessage = $request->validated('image_mode') === 'original'
+            ? 'conservando sus imágenes originales'
+            : 'generando imágenes nuevas con IA';
 
         return redirect()
             ->route('admin.scheduler.index', ['task' => $task->id])
-            ->with('status', 'La captura, la recreación con IA y su imagen se añadieron a la cola.');
+            ->with('status', "La captura y recreación con IA se añadieron a la cola, {$imageMessage}.");
     }
 
     public function destroy(SourcePost $sourcePost): RedirectResponse

@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Support\SocialPostUrl;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use InvalidArgumentException;
 
 class QuickPostRequest extends FormRequest
@@ -16,7 +17,10 @@ class QuickPostRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $this->merge(['url' => trim((string) $this->input('url'))]);
+        $this->merge([
+            'url' => trim((string) $this->input('url')),
+            'image_mode' => trim((string) $this->input('image_mode', 'generate')),
+        ]);
     }
 
     public function rules(): array
@@ -34,6 +38,7 @@ class QuickPostRequest extends FormRequest
                     }
                 },
             ],
+            'image_mode' => ['required', Rule::in(['generate', 'original'])],
         ];
     }
 }

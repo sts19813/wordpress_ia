@@ -4,11 +4,16 @@ namespace Tests\Feature\QuickPosts;
 
 use App\Jobs\CaptureQuickPost;
 use App\Jobs\GenerateAiArticle;
+use App\Jobs\GenerateAiImage;
+use App\Models\AiArticle;
+use App\Models\AiImage;
 use App\Models\Scheduler;
 use App\Models\SourcePost;
 use App\Models\SourcePostMedia;
 use App\Models\User;
+use App\Services\AiArticleService;
 use App\Services\AiPromptProfileService;
+use App\Services\QuickPosts\OriginalPostImageService;
 use App\Services\QuickPosts\SocialPostCaptureService;
 use App\Services\SchedulerService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -29,13 +34,26 @@ class QuickPostWorkflowTest extends TestCase
 
         $response = $this->actingAs($user)->post(route('admin.quick-posts.store'), [
             'url' => $url,
+            'image_mode' => 'original',
         ]);
 
         $task = Scheduler::query()->sole();
         $response->assertRedirect(route('admin.scheduler.index', ['task' => $task->id]));
         $this->assertSame($url, $task->payload['url']);
         $this->assertSame([], $task->payload['source_post_ids']);
+        $this->assertSame('original', $task->payload['image_mode']);
+        $this->assertFalse($task->payload['generate_image']);
         Queue::assertPushedOn('social-capture', CaptureQuickPost::class);
+    }
+
+    public function test_quick_post_form_asks_how_images_should_be_handled(): void
+    {
+        $this->actingAs(User::factory()->create())
+            ->get(route('admin.quick-posts.create'))
+            ->assertOk()
+            ->assertSee('Generar imágenes nuevas con IA')
+            ->assertSee('Conservar las imágenes originales')
+            ->assertSee('name="image_mode"', false);
     }
 
     public function test_capture_job_archives_the_original_then_hands_off_to_the_ai_queue(): void
@@ -119,5 +137,119 @@ class QuickPostWorkflowTest extends TestCase
             ->assertSessionHasErrors('url');
 
         $this->assertDatabaseCount('schedulers', 0);
+    }
+
+    public function test_original_media_is_copied_to_the_generated_draft_for_later_publication(): void
+    {
+        Storage::fake('local');
+        $user = User::factory()->create();
+        $post = SourcePost::query()->create([
+            'origin_type' => SourcePost::ORIGIN_QUICK_POST,
+            'social_platform' => 'facebook',
+            'title' => 'Post original',
+            'content' => 'Contenido original.',
+            'url' => 'https://www.facebook.com/story.php?story_fbid=1&id=2',
+            'canonical_url' => 'https://www.facebook.com/story.php?story_fbid=1&id=2',
+            'hash' => hash('sha256', 'quick-post-original-images'),
+            'status' => SourcePost::STATUS_FETCHED,
+            'captured_at' => now(),
+        ]);
+        $article = $user->aiArticles()->create([
+            'source_post_ids' => [$post->id],
+            'title' => 'Post recreado',
+            'content' => '<p>Contenido recreado.</p>',
+            'status' => AiArticle::STATUS_DRAFT,
+        ]);
+
+        foreach ([0, 1] as $position) {
+            $sourcePath = "source-posts/test/original-{$position}.jpg";
+            Storage::disk('local')->put($sourcePath, "image-{$position}");
+            SourcePostMedia::query()->create([
+                'source_post_id' => $post->id,
+                'position' => $position,
+                'original_url' => "https://facebook.test/original-{$position}.jpg",
+                'url_hash' => hash('sha256', "original-image-{$position}"),
+                'file_path' => $sourcePath,
+                'mime_type' => 'image/jpeg',
+                'width' => 1200,
+                'height' => 630,
+            ]);
+        }
+
+        $count = app(OriginalPostImageService::class)->attach($article, $post->fresh('media'));
+        $images = $article->fresh('images')->images;
+
+        $this->assertSame(2, $count);
+        $this->assertSame(AiImage::TYPE_MAIN, $images->first()->type);
+        $this->assertSame(AiImage::TYPE_VARIANT, $images->last()->type);
+        $this->assertTrue($images->every(fn (AiImage $image) => $image->model === 'original'));
+        $this->assertTrue($images->every(fn (AiImage $image) => Storage::disk('local')->exists($image->file_path)));
+    }
+
+    public function test_original_mode_finishes_the_ai_draft_without_generating_a_new_image(): void
+    {
+        Queue::fake();
+        Storage::fake('local');
+        $user = User::factory()->create();
+        $profile = app(AiPromptProfileService::class)->ensureDefaultFor($user);
+        $url = 'https://www.instagram.com/p/ORIGINAL123/';
+        $task = app(SchedulerService::class)->createQuickPostTask($user, $profile, $url, 'original');
+        $post = SourcePost::query()->create([
+            'origin_type' => SourcePost::ORIGIN_QUICK_POST,
+            'social_platform' => 'instagram',
+            'title' => 'Post original',
+            'content' => 'Contenido original.',
+            'url' => $url,
+            'canonical_url' => $url,
+            'hash' => hash('sha256', 'quick-post-original-mode'),
+            'status' => SourcePost::STATUS_FETCHED,
+            'captured_at' => now(),
+        ]);
+        Storage::disk('local')->put('source-posts/test/original-mode.jpg', 'original');
+        SourcePostMedia::query()->create([
+            'source_post_id' => $post->id,
+            'position' => 0,
+            'original_url' => 'https://instagram.test/original-mode.jpg',
+            'url_hash' => hash('sha256', 'original-mode-image'),
+            'file_path' => 'source-posts/test/original-mode.jpg',
+            'mime_type' => 'image/jpeg',
+        ]);
+        $task->update([
+            'source_post_id' => $post->id,
+            'payload' => [
+                ...$task->payload,
+                'source_post_ids' => [$post->id],
+            ],
+        ]);
+        $article = $user->aiArticles()->create([
+            'source_post_ids' => [$post->id],
+            'ai_prompt_profile_id' => $profile->id,
+            'title' => 'Post recreado con IA',
+            'content' => '<p>Contenido recreado.</p>',
+            'status' => AiArticle::STATUS_DRAFT,
+        ]);
+        $articles = Mockery::mock(AiArticleService::class);
+        $articles->shouldReceive('generateTextDraft')
+            ->once()
+            ->andReturnUsing(function ($taskUser, $taskProfile, $sourcePosts, $onPrepared) use ($article) {
+                $onPrepared($article);
+
+                return $article;
+            });
+
+        (new GenerateAiArticle($task->id))->handle(
+            $articles,
+            app(SchedulerService::class),
+            app(OriginalPostImageService::class),
+        );
+
+        $this->assertSame(Scheduler::STATUS_COMPLETED, $task->fresh()->status);
+        $this->assertDatabaseHas('ai_images', [
+            'ai_article_id' => $article->id,
+            'type' => AiImage::TYPE_MAIN,
+            'model' => 'original',
+            'status' => AiImage::STATUS_GENERATED,
+        ]);
+        Queue::assertNotPushed(GenerateAiImage::class);
     }
 }
