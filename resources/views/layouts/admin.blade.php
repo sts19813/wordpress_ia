@@ -970,13 +970,15 @@
             if (window.jQuery && jQuery.fn.DataTable) {
                 jQuery('.admin-datatable').each(function () {
                     var table = jQuery(this);
+                    var configuredPageLength = parseInt(table.attr('data-page-length'), 10);
+                    var pageLength = Number.isFinite(configuredPageLength) ? configuredPageLength : 25;
 
                     if (jQuery.fn.DataTable.isDataTable(this)) {
                         return;
                     }
 
                     table.DataTable({
-                        pageLength: 25,
+                        pageLength: pageLength,
                         lengthMenu: [[25, 50, 100, -1], [25, 50, 100, 'Todos']],
                         order: [],
                         autoWidth: false,

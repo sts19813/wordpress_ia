@@ -20,10 +20,14 @@ class NewsController extends Controller
 
     public function index(Request $request): View
     {
+        $sourceSiteId = $request->integer('source_site_id') ?: null;
+
         return view('admin.news.index', [
-            'sourcePosts' => $this->sourcePosts->getForAdmin($request->query()),
-            'filterOptions' => $this->sourcePosts->filterOptions(),
-            'statusOptions' => SourcePost::statusOptions(),
+            'sourcePosts' => $this->sourcePosts->getForAdmin([
+                'source_site_id' => $sourceSiteId,
+            ]),
+            'sourceSites' => SourceSite::query()->orderBy('name')->pluck('name', 'id'),
+            'selectedSourceSiteId' => $sourceSiteId,
         ]);
     }
 

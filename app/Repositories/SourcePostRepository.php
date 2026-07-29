@@ -3,7 +3,6 @@
 namespace App\Repositories;
 
 use App\Models\SourcePost;
-use App\Models\SourceSite;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -42,34 +41,6 @@ class SourcePostRepository
             ->orderBy($sort, $direction)
             ->orderBy('id', 'desc')
             ->get();
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function filterOptions(): array
-    {
-        return [
-            'sourceSites' => SourceSite::query()->orderBy('name')->pluck('name', 'id'),
-            'languages' => SourcePost::query()->whereNotNull('language')->distinct()->orderBy('language')->pluck('language'),
-            'authors' => SourcePost::query()->whereNotNull('author')->distinct()->orderBy('author')->pluck('author'),
-            'categories' => SourcePost::query()
-                ->whereNotNull('categories')
-                ->get(['categories'])
-                ->flatMap(fn (SourcePost $sourcePost) => $sourcePost->categories ?: [])
-                ->filter()
-                ->unique()
-                ->sort()
-                ->values(),
-            'tags' => SourcePost::query()
-                ->whereNotNull('tags')
-                ->get(['tags'])
-                ->flatMap(fn (SourcePost $sourcePost) => $sourcePost->tags ?: [])
-                ->filter()
-                ->unique()
-                ->sort()
-                ->values(),
-        ];
     }
 
     /**
