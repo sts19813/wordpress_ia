@@ -33,8 +33,8 @@ class PublicationRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'site_ids.min' => 'Selecciona al menos un sitio WordPress.',
-            'site_ids.*.exists' => 'Uno de los sitios seleccionados no está disponible.',
+            'site_ids.min' => 'Selecciona al menos un perfil de publicación.',
+            'site_ids.*.exists' => 'Uno de los perfiles seleccionados no está disponible.',
         ];
     }
 }

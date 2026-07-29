@@ -6,6 +6,8 @@ use App\Models\AiArticle;
 use App\Models\AiImage;
 use App\Models\Publication;
 use App\Models\WordPressSite;
+use App\Services\Publications\FacebookPageClient;
+use App\Services\Publications\FacebookPublicationEngine;
 use App\Services\Publications\PublicationEngine;
 use App\Services\Publications\WordPressRestClient;
 use Illuminate\Http\Client\RequestException;
@@ -17,6 +19,8 @@ class PublicationService
     public function __construct(
         private readonly PublicationEngine $engine,
         private readonly WordPressRestClient $client,
+        private readonly FacebookPublicationEngine $facebook,
+        private readonly FacebookPageClient $facebookClient,
     ) {}
 
     public function createPublication(WordPressSite $site, AiArticle $article, ?AiImage $image = null): Publication
@@ -61,6 +65,17 @@ class PublicationService
 
     public function testConnection(WordPressSite $site): array
     {
+        if ($site->isFacebookPage()) {
+            $response = $this->facebookClient->testConnection($site);
+
+            return [
+                'id' => $response->json('id'),
+                'name' => $response->json('name'),
+                'link' => $response->json('link'),
+                'roles' => [],
+            ];
+        }
+
         $response = $this->client->testConnection($site);
 
         return [
@@ -72,6 +87,10 @@ class PublicationService
 
     public function publishNow(WordPressSite $site, AiArticle $article, ?AiImage $image = null): Publication
     {
+        if ($site->isFacebookPage()) {
+            return $this->facebook->publishNow($site, $article, $image);
+        }
+
         $publication = Publication::query()
             ->where('wordpress_site_id', $site->id)
             ->where('ai_article_id', $article->id)

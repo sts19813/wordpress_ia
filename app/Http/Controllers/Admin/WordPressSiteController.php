@@ -37,6 +37,8 @@ class WordPressSiteController extends Controller
 
         return view('admin.wordpress-sites.create', [
             'site' => new WordPressSite([
+                'type' => WordPressSite::TYPE_WORDPRESS,
+                'facebook_api_version' => 'v24.0',
                 'status' => WordPressSite::STATUS_ACTIVE,
                 'active' => true,
             ]),
@@ -46,11 +48,11 @@ class WordPressSiteController extends Controller
     public function store(WordPressSiteRequest $request): RedirectResponse
     {
         $site = $request->user()->wordpressSites()->create([
-            ...$request->validated(),
+            ...$this->normalizedData($request->validated()),
             'status' => WordPressSite::STATUS_ACTIVE,
         ]);
 
-        return $this->testAndRedirect($site, 'Sitio WordPress guardado y conectado correctamente.');
+        return $this->testAndRedirect($site, 'Perfil de publicación guardado y conectado correctamente.');
     }
 
     public function edit(WordPressSite $wordpressSite): View
@@ -63,22 +65,28 @@ class WordPressSiteController extends Controller
     public function update(WordPressSiteRequest $request, WordPressSite $wordpressSite): RedirectResponse
     {
         Gate::authorize('update', $wordpressSite);
-        $data = $request->validated();
+        $data = $this->normalizedData($request->validated());
 
-        if (blank($data['application_password'] ?? null)) {
+        if (($data['type'] ?? null) === WordPressSite::TYPE_WORDPRESS
+            && blank($data['application_password'] ?? null)) {
             unset($data['application_password']);
+        }
+
+        if (($data['type'] ?? null) === WordPressSite::TYPE_FACEBOOK_PAGE
+            && blank($data['facebook_access_token'] ?? null)) {
+            unset($data['facebook_access_token']);
         }
 
         $wordpressSite->update($data);
 
-        return $this->testAndRedirect($wordpressSite, 'Sitio WordPress actualizado y conectado correctamente.');
+        return $this->testAndRedirect($wordpressSite, 'Perfil de publicación actualizado y conectado correctamente.');
     }
 
     public function test(WordPressSite $wordpressSite): RedirectResponse
     {
         Gate::authorize('update', $wordpressSite);
 
-        return $this->testAndRedirect($wordpressSite, 'Conexión verificada correctamente. El sitio está listo para publicar.');
+        return $this->testAndRedirect($wordpressSite, 'Conexión verificada correctamente. El perfil está listo para publicar.');
     }
 
     public function destroy(WordPressSite $wordpressSite): RedirectResponse
@@ -86,7 +94,7 @@ class WordPressSiteController extends Controller
         Gate::authorize('delete', $wordpressSite);
         $wordpressSite->delete();
 
-        return redirect()->route('admin.wordpress-sites.index')->with('status', 'Sitio WordPress eliminado. El historial de publicaciones se conservó.');
+        return redirect()->route('admin.wordpress-sites.index')->with('status', 'Perfil de publicación eliminado. El historial de publicaciones se conservó.');
     }
 
     private function testAndRedirect(WordPressSite $site, string $successMessage): RedirectResponse
@@ -101,10 +109,14 @@ class WordPressSiteController extends Controller
 
             return redirect()->route('admin.wordpress-sites.index')->with('status', $successMessage);
         } catch (Throwable $exception) {
-            $remoteMessage = $exception instanceof RequestException ? $exception->response?->json('message') : null;
+            $remoteMessage = $exception instanceof RequestException
+                ? ($exception->response?->json('error.message') ?: $exception->response?->json('message'))
+                : null;
             $message = is_string($remoteMessage) && $remoteMessage !== ''
                 ? $remoteMessage
-                : 'No pudimos autenticar el sitio. Verifica el dominio, el usuario y la contraseña de aplicación.';
+                : ($site->isFacebookPage()
+                    ? 'No pudimos autenticar la página. Verifica el ID, el Page Access Token y sus permisos.'
+                    : 'No pudimos autenticar el sitio. Verifica el dominio, el usuario y la contraseña de aplicación.');
 
             $site->update([
                 'status' => WordPressSite::STATUS_ERROR,
@@ -113,7 +125,30 @@ class WordPressSiteController extends Controller
             ]);
 
             return redirect()->route('admin.wordpress-sites.edit', $site)
-                ->with('warning', 'El sitio quedó guardado, pero la prueba de conexión falló. '.$message);
+                ->with('warning', 'El perfil quedó guardado, pero la prueba de conexión falló. '.$message);
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function normalizedData(array $data): array
+    {
+        if (($data['type'] ?? null) === WordPressSite::TYPE_FACEBOOK_PAGE) {
+            return [
+                ...$data,
+                'rest_api_url' => null,
+                'username' => null,
+                'application_password' => null,
+            ];
+        }
+
+        return [
+            ...$data,
+            'facebook_page_id' => null,
+            'facebook_access_token' => null,
+            'facebook_api_version' => 'v24.0',
+        ];
     }
 }

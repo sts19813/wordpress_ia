@@ -6,10 +6,10 @@
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-4 w-100">
         <div>
             <h1 class="page-heading text-gray-900 fw-bold fs-3 my-0">Publicaciones</h1>
-            <div class="text-muted fw-semibold fs-7 pt-1">Todas las entradas enviadas a los sitios WordPress.</div>
+            <div class="text-muted fw-semibold fs-7 pt-1">Todos los posts enviados a tus perfiles de publicación.</div>
         </div>
         <div class="d-flex gap-3">
-            <a href="{{ route('admin.wordpress-sites.index') }}" class="btn btn-light-primary"><i class="ki-outline ki-setting-2 fs-2"></i>Configurar sitios</a>
+            <a href="{{ route('admin.wordpress-sites.index') }}" class="btn btn-light-primary"><i class="ki-outline ki-setting-2 fs-2"></i>Configurar perfiles</a>
             <a href="{{ route('admin.ai-articles.index') }}" class="btn btn-primary"><i class="ki-outline ki-plus fs-2"></i>Elegir artículo</a>
         </div>
     </div>
@@ -20,14 +20,14 @@
         <div class="col-sm-6 col-xl-3"><div class="card card-flush h-100"><div class="card-body"><div class="text-muted fw-semibold fs-7">Entradas enviadas</div><div class="fs-2x fw-bold text-gray-900">{{ $publications->count() }}</div></div></div></div>
         <div class="col-sm-6 col-xl-3"><div class="card card-flush h-100"><div class="card-body"><div class="text-muted fw-semibold fs-7">Publicadas</div><div class="fs-2x fw-bold text-success">{{ $publishedCount }}</div></div></div></div>
         <div class="col-sm-6 col-xl-3"><div class="card card-flush h-100"><div class="card-body"><div class="text-muted fw-semibold fs-7">Con error</div><div class="fs-2x fw-bold text-danger">{{ $failedCount }}</div></div></div></div>
-        <div class="col-sm-6 col-xl-3"><div class="card card-flush h-100"><div class="card-body"><div class="text-muted fw-semibold fs-7">Sitios configurados</div><div class="fs-2x fw-bold text-primary">{{ $sites->count() }}</div></div></div></div>
+        <div class="col-sm-6 col-xl-3"><div class="card card-flush h-100"><div class="card-body"><div class="text-muted fw-semibold fs-7">Perfiles configurados</div><div class="fs-2x fw-bold text-primary">{{ $sites->count() }}</div></div></div></div>
     </div>
 
     @if ($sites->isEmpty())
         <div class="alert alert-primary d-flex align-items-center mb-8">
             <i class="ki-outline ki-information-5 fs-2hx text-primary me-4"></i>
-            <div class="flex-grow-1"><div class="fw-bold">Todavía no hay un sitio conectado</div><div>Agrega tu WordPress para habilitar el botón Publicar en los artículos.</div></div>
-            <a href="{{ route('admin.wordpress-sites.create') }}" class="btn btn-sm btn-primary">Conectar WordPress</a>
+            <div class="flex-grow-1"><div class="fw-bold">Todavía no hay un perfil conectado</div><div>Agrega WordPress o una página de Facebook para habilitar el botón Publicar.</div></div>
+            <a href="{{ route('admin.wordpress-sites.create') }}" class="btn btn-sm btn-primary">Agregar perfil</a>
         </div>
     @endif
 
@@ -37,7 +37,7 @@
             <div class="table-responsive">
                 <table class="table align-middle table-row-dashed fs-6 gy-5 admin-datatable">
                     <thead><tr class="text-start text-muted fw-bold fs-7 text-uppercase gs-0">
-                        <th>Artículo</th><th>Sitio</th><th>Estado</th><th>Fecha</th><th>Detalle</th><th class="text-end no-sort no-search">Acciones</th>
+                        <th>Artículo</th><th>Perfil</th><th>Estado</th><th>Fecha</th><th>Detalle</th><th class="text-end no-sort no-search">Acciones</th>
                     </tr></thead>
                     <tbody class="text-gray-700 fw-semibold">
                         @foreach ($publications as $publication)
@@ -57,11 +57,13 @@
                                     @else
                                         <span class="text-muted">Artículo eliminado</span>
                                     @endif
-                                    @if ($publication->remote_post_id)<div class="text-muted fs-8">ID WordPress: {{ $publication->remote_post_id }}</div>@endif
+                                    @if ($publication->remote_post_key || $publication->remote_post_id)<div class="text-muted fs-8">ID remoto: {{ $publication->remote_post_key ?: $publication->remote_post_id }}</div>@endif
                                 </td>
                                 <td>
-                                    <div class="fw-bold text-gray-900">{{ $publication->wordpressSite?->name ?: 'Sitio eliminado' }}</div>
-                                    <div class="text-muted fs-8">{{ $publication->wordpressSite?->rest_api_url }}</div>
+                                    <div class="fw-bold text-gray-900">{{ $publication->wordpressSite?->name ?: 'Perfil eliminado' }}</div>
+                                    @if ($publication->wordpressSite)
+                                        <div class="text-muted fs-8">{{ $publication->wordpressSite->typeLabel() }} · {{ $publication->wordpressSite->destinationLabel() }}</div>
+                                    @endif
                                 </td>
                                 <td><span class="badge {{ $statusClass }}">{{ $publication->statusLabel() }}</span></td>
                                 <td data-order="{{ ($publication->published_at ?: $publication->updated_at)->timestamp }}">{{ ($publication->published_at ?: $publication->updated_at)->format('d/m/Y H:i') }}</td>

@@ -109,28 +109,28 @@ class GenerateSourceArticle implements ShouldBeUnique, ShouldQueue
                 return;
             }
 
-            $wordpressSite = WordPressSite::query()
+            $publicationProfile = WordPressSite::query()
                 ->whereKey($payload['wordpress_site_id'] ?? null)
                 ->where('user_id', $user->id)
                 ->where('active', true)
                 ->where('status', WordPressSite::STATUS_ACTIVE)
                 ->first();
 
-            if (! $wordpressSite) {
-                throw new RuntimeException('El destino WordPress automático no está disponible.');
+            if (! $publicationProfile) {
+                throw new RuntimeException('El perfil de publicación automático no está disponible.');
             }
 
             $scheduler->progress(
                 $task,
-                'Publicando en '.$wordpressSite->name,
+                'Publicando en '.$publicationProfile->name,
                 90,
-                'Se inició el envío del artículo a WordPress.',
+                'Se inició el envío del artículo a '.$publicationProfile->typeLabel().'.',
             );
-            $publication = $publications->publishNow($wordpressSite, $article->fresh('images'), $article->fresh('images')->mainImage());
+            $publication = $publications->publishNow($publicationProfile, $article->fresh('images'), $article->fresh('images')->mainImage());
             $task->update(['publication_id' => $publication->id]);
 
             if (! $publication->isSuccessful()) {
-                throw new RuntimeException($publication->error_message ?: 'WordPress no confirmó la publicación.');
+                throw new RuntimeException($publication->error_message ?: 'El destino no confirmó la publicación.');
             }
 
             $scheduler->completed(

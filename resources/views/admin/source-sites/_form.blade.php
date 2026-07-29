@@ -141,7 +141,7 @@
                         <i class="ki-outline ki-arrows-circle fs-2tx text-success me-4"></i>
                         <div>
                             <div class="fw-bold text-gray-900 mb-1">Flujo completo mediante colas</div>
-                            <div class="text-gray-700">Cada nota aceptada por los filtros inteligentes puede generar un artículo con IA y publicarse en WordPress. El progreso completo aparecerá en el Programador.</div>
+                            <div class="text-gray-700">Cada nota aceptada por los filtros inteligentes puede generar un artículo con IA y publicarse en WordPress o Facebook. El progreso completo aparecerá en el Programador.</div>
                         </div>
                     </div>
 
@@ -163,7 +163,7 @@
                             <select name="wordpress_site_id" class="form-select form-select-solid @error('wordpress_site_id') is-invalid @enderror">
                                 <option value="">Solo guardar como borrador</option>
                                 @foreach ($wordpressSites as $wordpressSite)
-                                    <option value="{{ $wordpressSite->id }}" @selected((int) old('wordpress_site_id', $sourceSite->wordpress_site_id) === $wordpressSite->id)>{{ $wordpressSite->name }}</option>
+                                    <option value="{{ $wordpressSite->id }}" @selected((int) old('wordpress_site_id', $sourceSite->wordpress_site_id) === $wordpressSite->id)>{{ $wordpressSite->typeLabel() }} · {{ $wordpressSite->name }}</option>
                                 @endforeach
                             </select>
                             <div class="form-text">El destino debe estar activo y pertenecer a tu cuenta.</div>

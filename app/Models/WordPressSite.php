@@ -11,6 +11,10 @@ class WordPressSite extends Model
 {
     protected $table = 'wordpress_sites';
 
+    public const TYPE_WORDPRESS = 'wordpress';
+
+    public const TYPE_FACEBOOK_PAGE = 'facebook_page';
+
     public const STATUS_ACTIVE = 'active';
 
     public const STATUS_PAUSED = 'paused';
@@ -19,10 +23,14 @@ class WordPressSite extends Model
 
     protected $fillable = [
         'user_id',
+        'type',
         'name',
         'rest_api_url',
         'username',
         'application_password',
+        'facebook_page_id',
+        'facebook_access_token',
+        'facebook_api_version',
         'categories',
         'tags',
         'status',
@@ -33,12 +41,14 @@ class WordPressSite extends Model
 
     protected $hidden = [
         'application_password',
+        'facebook_access_token',
     ];
 
     protected function casts(): array
     {
         return [
             'application_password' => 'encrypted',
+            'facebook_access_token' => 'encrypted',
             'categories' => 'array',
             'tags' => 'array',
             'active' => 'boolean',
@@ -53,6 +63,39 @@ class WordPressSite extends Model
             self::STATUS_PAUSED => 'Pausado',
             self::STATUS_ERROR => 'Con error',
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function typeOptions(): array
+    {
+        return [
+            self::TYPE_WORDPRESS => 'Sitio WordPress',
+            self::TYPE_FACEBOOK_PAGE => 'Página de Facebook',
+        ];
+    }
+
+    public function typeLabel(): string
+    {
+        return self::typeOptions()[$this->type] ?? $this->type;
+    }
+
+    public function isWordPress(): bool
+    {
+        return $this->type === self::TYPE_WORDPRESS;
+    }
+
+    public function isFacebookPage(): bool
+    {
+        return $this->type === self::TYPE_FACEBOOK_PAGE;
+    }
+
+    public function destinationLabel(): ?string
+    {
+        return $this->isFacebookPage()
+            ? ($this->facebook_page_id ? 'facebook.com/'.$this->facebook_page_id : null)
+            : $this->rest_api_url;
     }
 
     public function publications(): HasMany

@@ -36,7 +36,7 @@ class SchedulerController extends Controller
         $sourceSites = SourceSite::query()
             ->with([
                 'promptProfile:id,name',
-                'wordpressSite:id,name',
+                'wordpressSite:id,type,name,rest_api_url,facebook_page_id',
             ])
             ->orderBy('next_scan_at')
             ->orderBy('name')

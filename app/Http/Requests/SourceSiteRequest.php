@@ -116,7 +116,7 @@ class SourceSiteRequest extends FormRequest
             'auto_generate' => 'generación automática',
             'auto_publish' => 'publicación automática',
             'ai_prompt_profile_id' => 'perfil editorial IA',
-            'wordpress_site_id' => 'destino WordPress',
+            'wordpress_site_id' => 'perfil de publicación',
         ];
     }
 
