@@ -22,7 +22,7 @@ class AuthenticationTest extends TestCase
 
         $response->assertRedirect(route('admin.dashboard'));
         $this->assertAuthenticated();
-        $this->get(route('admin.dashboard'))->assertOk()->assertSee('Panel administrativo');
+        $this->get(route('admin.dashboard'))->assertOk()->assertSee('Centro de operaciones');
     }
 
     public function test_a_user_can_login_and_logout(): void
