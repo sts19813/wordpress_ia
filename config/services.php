@@ -50,4 +50,12 @@ return [
         'timeout' => (int) env('OPENAI_TIMEOUT', 180),
     ],
 
+    'social_capture' => [
+        'model' => env('SOCIAL_CAPTURE_MODEL', env('OPENAI_TEXT_MODEL', 'gpt-4.1-mini')),
+        'node_binary' => env('SOCIAL_NODE_BINARY', 'node'),
+        'browser_executable' => env('SOCIAL_BROWSER_EXECUTABLE'),
+        'browser_ws_endpoint' => env('SOCIAL_BROWSER_WS_ENDPOINT'),
+        'browser_timeout' => (int) env('SOCIAL_BROWSER_TIMEOUT', 60),
+    ],
+
 ];

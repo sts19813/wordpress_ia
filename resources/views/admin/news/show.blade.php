@@ -13,9 +13,9 @@
 @section('toolbar')
     <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-4 w-100">
         <div>
-            <a href="{{ route('admin.news.index') }}" class="text-muted text-hover-primary fw-semibold d-inline-flex align-items-center mb-3">
+            <a href="{{ $sourcePost->isQuickPost() ? route('admin.quick-posts.index') : route('admin.news.index') }}" class="text-muted text-hover-primary fw-semibold d-inline-flex align-items-center mb-3">
                 <i class="ki-outline ki-left fs-4 me-1"></i>
-                Noticias Obtenidas
+                {{ $sourcePost->isQuickPost() ? 'Post rápido' : 'Noticias Obtenidas' }}
             </a>
             <h1 class="page-heading text-gray-900 fw-bold fs-3 my-0">{{ $sourcePost->title }}</h1>
             <div class="text-muted fw-semibold fs-7 pt-1">{{ $sourcePost->url }}</div>
@@ -25,7 +25,7 @@
             @if ($sourcePost->status === \App\Models\SourcePost::STATUS_FETCHED)
                 <a href="{{ route('admin.ai-articles.create', ['source_post_ids' => [$sourcePost->id]]) }}" class="btn btn-primary"><i class="ki-outline ki-sparkles fs-2"></i>Crear nota con IA</a>
             @endif
-            <form method="POST" action="{{ route('admin.news.destroy', $sourcePost) }}" data-confirm-delete data-confirm-title="Eliminar noticia" data-confirm-text="Se eliminará {{ $sourcePost->title }}. Esta acción no se puede deshacer.">
+            <form method="POST" action="{{ $sourcePost->isQuickPost() ? route('admin.quick-posts.destroy', $sourcePost) : route('admin.news.destroy', $sourcePost) }}" data-confirm-delete data-confirm-title="Eliminar original" data-confirm-text="Se eliminará {{ $sourcePost->title }}{{ $sourcePost->isQuickPost() ? ' junto con sus imágenes archivadas' : '' }}. Esta acción no se puede deshacer.">
                 @csrf @method('DELETE')
                 <button type="submit" class="btn btn-light-danger"><i class="ki-outline ki-trash fs-2"></i>Eliminar</button>
             </form>
@@ -43,7 +43,22 @@
                     </div>
                 </div>
                 <div class="card-body">
-                    @if ($sourcePost->image_url)
+                    @if ($sourcePost->media->isNotEmpty())
+                        <div class="row g-4 mb-7">
+                            @foreach ($sourcePost->media as $media)
+                                <div class="{{ $sourcePost->media->count() === 1 ? 'col-12' : 'col-md-6' }}">
+                                    <a href="{{ $media->file_path ? route('admin.source-post-media.file', $media) : $media->original_url }}" target="_blank" rel="noopener noreferrer">
+                                        <img
+                                            src="{{ $media->file_path ? route('admin.source-post-media.file', $media) : $media->original_url }}"
+                                            alt="{{ data_get($media->metadata, 'alt', $sourcePost->title) }}"
+                                            class="rounded w-100"
+                                            style="height: {{ $sourcePost->media->count() === 1 ? '420px' : '260px' }}; object-fit: cover;"
+                                        >
+                                    </a>
+                                </div>
+                            @endforeach
+                        </div>
+                    @elseif ($sourcePost->image_url)
                         <div class="mb-7">
                             <img src="{{ $sourcePost->image_url }}" alt="{{ $sourcePost->title }}" class="rounded w-100" style="max-height: 360px; object-fit: cover;">
                         </div>
@@ -109,7 +124,10 @@
                         </div>
                         <div>
                             <div class="text-muted fw-semibold fs-7">Fuente</div>
-                            <div class="fw-bold text-gray-900">{{ $sourcePost->sourceSite?->name ?: '-' }}</div>
+                            <div class="fw-bold text-gray-900">{{ $sourcePost->originLabel() }}</div>
+                            @if ($sourcePost->isQuickPost())
+                                <span class="badge badge-light-primary mt-2">Post rápido</span>
+                            @endif
                         </div>
                         <div>
                             <div class="text-muted fw-semibold fs-7">Autor</div>
@@ -119,6 +137,13 @@
                             <div class="text-muted fw-semibold fs-7">Fecha</div>
                             <div class="fw-bold text-gray-900">{{ $sourcePost->published_at?->format('d/m/Y H:i') ?: '-' }}</div>
                         </div>
+                        @if ($sourcePost->captured_at)
+                            <div>
+                                <div class="text-muted fw-semibold fs-7">Archivado</div>
+                                <div class="fw-bold text-gray-900">{{ $sourcePost->captured_at->format('d/m/Y H:i') }}</div>
+                                <div class="text-muted fs-8">{{ $sourcePost->media->count() }} imagen(es) originales</div>
+                            </div>
+                        @endif
                         <div>
                             <div class="text-muted fw-semibold fs-7">Idioma</div>
                             <div class="fw-bold text-gray-900">{{ $sourcePost->language ? strtoupper($sourcePost->language) : '-' }}</div>

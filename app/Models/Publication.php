@@ -26,6 +26,7 @@ class Publication extends Model
         'ai_article_id',
         'ai_image_id',
         'remote_post_id',
+        'remote_post_key',
         'remote_featured_media_id',
         'remote_url',
         'status',

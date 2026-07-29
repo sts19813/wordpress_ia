@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\CaptureQuickPost;
 use App\Jobs\GenerateAiArticle;
 use App\Jobs\GenerateAiImage;
 use App\Jobs\GenerateSourceArticle;
@@ -10,6 +11,7 @@ use App\Models\AiArticle;
 use App\Models\AiPromptProfile;
 use App\Models\Scheduler;
 use App\Models\User;
+use App\Services\QuickPosts\SocialPostCaptureService;
 use Throwable;
 
 class SchedulerService
@@ -38,6 +40,31 @@ class SchedulerService
         $this->addEvent($task, 'info', 'Solicitud recibida y añadida a la cola.');
 
         GenerateAiArticle::dispatch($task->id)->onQueue('ai-text');
+
+        return $task->fresh();
+    }
+
+    public function createQuickPostTask(User $user, AiPromptProfile $profile, string $url): Scheduler
+    {
+        $task = Scheduler::query()->create([
+            'user_id' => $user->id,
+            'type' => Scheduler::TYPE_QUICK_POST,
+            'name' => 'Capturar y recrear post social',
+            'status' => Scheduler::STATUS_QUEUED,
+            'step' => 'Esperando captura de la publicación',
+            'progress' => 0,
+            'max_attempts' => 3,
+            'payload' => [
+                'url' => $url,
+                'profile_id' => $profile->id,
+                'source_post_ids' => [],
+                'generate_image' => (bool) $profile->generate_image,
+            ],
+            'events' => [],
+        ]);
+
+        $this->addEvent($task, 'info', 'URL recibida y añadida a la cola de captura social.');
+        CaptureQuickPost::dispatch($task->id)->onQueue('social-capture');
 
         return $task->fresh();
     }
@@ -144,7 +171,9 @@ class SchedulerService
         $task->update([
             'status' => Scheduler::STATUS_QUEUED,
             'step' => 'Reintento manual en cola',
-            'progress' => $task->article?->status === AiArticle::STATUS_DRAFT ? 70 : 0,
+            'progress' => $task->article?->status === AiArticle::STATUS_DRAFT
+                ? 70
+                : ($task->type === Scheduler::TYPE_QUICK_POST && $task->source_post_id ? 35 : 0),
             'attempts' => 0,
             'last_error' => null,
             'started_at' => null,
@@ -167,6 +196,8 @@ class SchedulerService
                 app()->call([new ScanSourceSite($task->id, (int) $task->source_site_id), 'handle']);
             } elseif ($task->type === Scheduler::TYPE_SOURCE_ARTICLE) {
                 app()->call([new GenerateSourceArticle($task->id, (int) $task->source_site_id), 'handle']);
+            } elseif ($task->type === Scheduler::TYPE_QUICK_POST) {
+                $this->executeQuickPostNow($task);
             } elseif ($this->shouldGenerateImage($task)) {
                 $job = new GenerateAiImage($task->id);
                 $job->handle(app(AiArticleService::class), $this);
@@ -226,10 +257,43 @@ class SchedulerService
             return;
         }
 
+        if ($task->type === Scheduler::TYPE_QUICK_POST && ! $task->source_post_id) {
+            CaptureQuickPost::dispatch($task->id)->onQueue('social-capture');
+
+            return;
+        }
+
         if ($task->article?->status === AiArticle::STATUS_DRAFT && ($task->payload['generate_image'] ?? false)) {
             GenerateAiImage::dispatch($task->id)->onQueue('ai-image');
         } else {
             GenerateAiArticle::dispatch($task->id)->onQueue('ai-text');
+        }
+    }
+
+    private function executeQuickPostNow(Scheduler $task): void
+    {
+        if (! $task->source_post_id) {
+            $capture = (new CaptureQuickPost($task->id))->withoutArticleDispatch();
+            $capture->handle(app(SocialPostCaptureService::class), $this);
+            $task->refresh()->load('article.images');
+        }
+
+        if ($task->status === Scheduler::STATUS_FAILED || ! $task->source_post_id) {
+            return;
+        }
+
+        if ($this->shouldGenerateImage($task)) {
+            (new GenerateAiImage($task->id))->handle(app(AiArticleService::class), $this);
+
+            return;
+        }
+
+        $article = (new GenerateAiArticle($task->id))->withoutImageDispatch();
+        $article->handle(app(AiArticleService::class), $this);
+        $task->refresh()->load('article.images');
+
+        if ($task->status === Scheduler::STATUS_QUEUED && $this->shouldGenerateImage($task)) {
+            (new GenerateAiImage($task->id))->handle(app(AiArticleService::class), $this);
         }
     }
 }

@@ -23,7 +23,7 @@ class PublicationController extends Controller
         Gate::authorize('viewAny', Publication::class);
 
         $publications = Publication::query()
-            ->with(['wordpressSite:id,user_id,name,rest_api_url', 'aiArticle:id,user_id,title,slug'])
+            ->with(['wordpressSite:id,user_id,type,name,rest_api_url,facebook_page_id', 'aiArticle:id,user_id,title,slug'])
             ->latest()
             ->get();
 
@@ -37,31 +37,33 @@ class PublicationController extends Controller
 
     public function publish(PublicationRequest $request, AiArticle $aiArticle): RedirectResponse
     {
-        $activeSites = $request->user()->wordpressSites()
+        $activeProfiles = $request->user()->wordpressSites()
             ->where('active', true)
             ->where('status', 'active')
             ->orderBy('name')
             ->get();
 
-        if ($activeSites->isEmpty()) {
+        if ($activeProfiles->isEmpty()) {
             return redirect()->route('admin.wordpress-sites.create')
-                ->with('warning', 'Configura tu primer sitio WordPress antes de publicar.');
+                ->with('warning', 'Configura tu primer perfil de publicación antes de publicar.');
         }
 
-        if ($activeSites->count() === 1) {
-            $selectedSites = $activeSites;
+        if ($activeProfiles->count() === 1) {
+            $selectedProfiles = $activeProfiles;
         } else {
             $selectedIds = collect($request->validated('site_ids', []))->map(fn ($id) => (int) $id);
 
             if ($selectedIds->isEmpty()) {
-                return back()->withErrors(['site_ids' => 'Selecciona al menos un sitio WordPress.']);
+                return back()->withErrors(['site_ids' => 'Selecciona al menos un perfil de publicación.']);
             }
 
-            $selectedSites = $activeSites->whereIn('id', $selectedIds);
+            $selectedProfiles = $activeProfiles->whereIn('id', $selectedIds);
         }
 
         $aiArticle->load('images');
-        $results = $selectedSites->map(fn ($site) => $this->publicationService->publishNow($site, $aiArticle, $aiArticle->mainImage()));
+        $results = $selectedProfiles
+            ->sortBy(fn ($profile) => $profile->isFacebookPage() ? 1 : 0)
+            ->map(fn ($profile) => $this->publicationService->publishNow($profile, $aiArticle, $aiArticle->mainImage()));
         $successful = $results->filter(fn (Publication $publication) => $publication->isSuccessful())->count();
         $failed = $results->where('status', Publication::STATUS_FAILED)->count();
 
@@ -69,14 +71,14 @@ class PublicationController extends Controller
 
         if ($successful > 0) {
             $redirect->with('status', $successful === 1
-                ? 'Artículo publicado correctamente en WordPress.'
-                : "Artículo publicado correctamente en {$successful} sitios WordPress.");
+                ? 'Artículo publicado correctamente.'
+                : "Artículo publicado correctamente en {$successful} perfiles.");
         }
 
         if ($failed > 0) {
             $redirect->with('warning', $failed === 1
-                ? 'Un sitio no pudo publicar el artículo. Revisa el detalle en Publicaciones.'
-                : "{$failed} sitios no pudieron publicar el artículo. Revisa el detalle en Publicaciones.");
+                ? 'Un perfil no pudo publicar el artículo. Revisa el detalle en Publicaciones.'
+                : "{$failed} perfiles no pudieron publicar el artículo. Revisa el detalle en Publicaciones.");
         }
 
         return $redirect;

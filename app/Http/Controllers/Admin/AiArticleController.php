@@ -92,14 +92,14 @@ class AiArticleController extends Controller
             'images',
             'promptProfile:id,name',
             'publications' => fn ($query) => $query
-                ->with('wordpressSite:id,user_id,name,rest_api_url')
+                ->with('wordpressSite:id,user_id,type,name,rest_api_url,facebook_page_id')
                 ->latest(),
         ]);
 
         return view('admin.ai-articles.show', [
             'article' => $aiArticle,
             'sourcePosts' => $aiArticle->sourcePosts()->load('sourceSite:id,name'),
-            'wordpressSites' => $request->user()->wordpressSites()
+            'publicationProfiles' => $request->user()->wordpressSites()
                 ->where('active', true)
                 ->where('status', 'active')
                 ->orderBy('name')

@@ -12,16 +12,16 @@
         <div>
             <a href="{{ route('admin.ai-articles.index') }}" class="text-muted text-hover-primary fw-semibold d-inline-flex align-items-center mb-3"><i class="ki-outline ki-left fs-4 me-1"></i>Artículos IA</a>
             <h1 class="page-heading text-gray-900 fw-bold fs-3 my-0">{{ $article->title ?: 'Generación #'.$article->id }}</h1>
-            <div class="text-muted fw-semibold fs-7 pt-1">Vista previa del contenido{{ $publishedDestinations ? ' · publicado en '.$publishedDestinations.' sitio(s)' : ' · aún no publicado' }}</div>
+            <div class="text-muted fw-semibold fs-7 pt-1">Vista previa del contenido{{ $publishedDestinations ? ' · publicado en '.$publishedDestinations.' perfil(es)' : ' · aún no publicado' }}</div>
         </div>
         <div class="d-flex gap-3">
             @if ($article->status === 'draft' && auth()->user()->can('update', $article))
                 <a href="{{ route('admin.ai-articles.edit', $article) }}" class="btn btn-primary"><i class="ki-outline ki-pencil fs-2"></i>Editar borrador</a>
             @endif
             @if ($article->status !== 'failed' && auth()->user()->can('update', $article))
-                @if ($wordpressSites->isEmpty())
+                @if ($publicationProfiles->isEmpty())
                     <a href="{{ route('admin.wordpress-sites.create') }}" class="btn btn-success"><i class="ki-outline ki-send fs-2"></i>Configurar y publicar</a>
-                @elseif ($wordpressSites->count() === 1)
+                @elseif ($publicationProfiles->count() === 1)
                     <form method="POST" action="{{ route('admin.publications.publish', $article) }}">
                         @csrf
                         <button class="btn btn-success" type="submit"><i class="ki-outline ki-send fs-2"></i>Publicar</button>
@@ -91,7 +91,8 @@
                         @foreach ($article->publications as $publication)
                             <div class="d-flex justify-content-between align-items-center gap-3 {{ $loop->last ? '' : 'border-bottom pb-4 mb-4' }}">
                                 <div>
-                                    <div class="fw-bold text-gray-900">{{ $publication->wordpressSite?->name ?: 'Sitio eliminado' }}</div>
+                                    <div class="fw-bold text-gray-900">{{ $publication->wordpressSite?->name ?: 'Perfil eliminado' }}</div>
+                                    @if ($publication->wordpressSite)<div class="text-muted fs-8">{{ $publication->wordpressSite->typeLabel() }}</div>@endif
                                     <div class="text-muted fs-8">{{ $publication->updated_at->format('d/m/Y H:i') }}</div>
                                 </div>
                                 <div class="text-end">
@@ -122,7 +123,7 @@
                     @foreach ($sourcePosts as $sourcePost)
                         <div class="pb-4 mb-4 border-bottom">
                             <a href="{{ route('admin.news.show', $sourcePost) }}" class="fw-bold text-gray-900 text-hover-primary">{{ $sourcePost->title }}</a>
-                            <div class="text-muted fs-8 mt-1">{{ $sourcePost->sourceSite?->name }}</div>
+                            <div class="text-muted fs-8 mt-1">{{ $sourcePost->originLabel() }}</div>
                         </div>
                     @endforeach
                 </div>
@@ -130,23 +131,23 @@
         </div>
     </div>
 
-    @if ($wordpressSites->count() > 1)
+    @if ($publicationProfiles->count() > 1)
         <div class="modal fade" id="publish-sites-modal" tabindex="-1" aria-labelledby="publish-sites-title" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
                     <form method="POST" action="{{ route('admin.publications.publish', $article) }}">
                         @csrf
                         <div class="modal-header">
-                            <div><h2 class="fw-bold mb-1" id="publish-sites-title">¿Dónde quieres publicar?</h2><div class="text-muted fs-7">Puedes enviar el artículo a uno o varios sitios.</div></div>
+                            <div><h2 class="fw-bold mb-1" id="publish-sites-title">¿Dónde quieres publicar?</h2><div class="text-muted fs-7">Puedes enviar el artículo a uno o varios perfiles.</div></div>
                             <button type="button" class="btn btn-icon btn-sm btn-active-light-primary" data-bs-dismiss="modal" aria-label="Cerrar"><i class="ki-outline ki-cross fs-2"></i></button>
                         </div>
                         <div class="modal-body py-7">
                             <div class="d-flex flex-column gap-4">
-                                @foreach ($wordpressSites as $site)
+                                @foreach ($publicationProfiles as $site)
                                     @php($existing = $article->publications->firstWhere('wordpress_site_id', $site->id))
                                     <label class="border rounded p-4 d-flex align-items-center gap-4 cursor-pointer">
                                         <input class="form-check-input" type="checkbox" name="site_ids[]" value="{{ $site->id }}" @checked(in_array($site->id, old('site_ids', [])))>
-                                        <span class="flex-grow-1"><span class="fw-bold text-gray-900 d-block">{{ $site->name }}</span><span class="text-muted fs-8">{{ $site->rest_api_url }}</span></span>
+                                        <span class="flex-grow-1"><span class="fw-bold text-gray-900 d-block">{{ $site->name }}</span><span class="text-muted fs-8">{{ $site->typeLabel() }} · {{ $site->destinationLabel() }}</span></span>
                                         @if ($existing)<span class="badge badge-light-info">Se actualizará</span>@endif
                                     </label>
                                 @endforeach
