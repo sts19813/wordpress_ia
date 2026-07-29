@@ -6,6 +6,7 @@ use App\Jobs\CaptureQuickPost;
 use App\Jobs\GenerateAiArticle;
 use App\Jobs\GenerateAiImage;
 use App\Jobs\GenerateSourceArticle;
+use App\Jobs\PublishQuickPost;
 use App\Jobs\ScanSourceSite;
 use App\Models\AiArticle;
 use App\Models\AiPromptProfile;
@@ -49,9 +50,11 @@ class SchedulerService
         AiPromptProfile $profile,
         string $url,
         ?string $imageMode = null,
+        array $publicationProfileIds = [],
     ): Scheduler {
         $imageMode ??= $profile->generate_image ? 'generate' : 'original';
         $imageMode = in_array($imageMode, ['generate', 'original'], true) ? $imageMode : 'generate';
+        $publicationProfileIds = array_values(array_unique(array_map('intval', $publicationProfileIds)));
 
         $task = Scheduler::query()->create([
             'user_id' => $user->id,
@@ -67,12 +70,55 @@ class SchedulerService
                 'source_post_ids' => [],
                 'image_mode' => $imageMode,
                 'generate_image' => $imageMode === 'generate',
+                'publication_profile_ids' => $publicationProfileIds,
+                'publication_ready' => false,
             ],
             'events' => [],
         ]);
 
         $this->addEvent($task, 'info', 'URL recibida y añadida a la cola de captura social.');
         CaptureQuickPost::dispatch($task->id)->onQueue('social-capture');
+
+        return $task->fresh();
+    }
+
+    public function completeOrPublish(
+        Scheduler $task,
+        AiArticle $article,
+        string $draftMessage,
+        bool $dispatch = true,
+    ): Scheduler {
+        $payload = $task->payload ?: [];
+        $profileIds = array_values(array_unique(array_map('intval', $payload['publication_profile_ids'] ?? [])));
+
+        if ($profileIds === []) {
+            return $this->completed($task, $draftMessage);
+        }
+
+        $task->update([
+            'ai_article_id' => $article->id,
+            'status' => Scheduler::STATUS_QUEUED,
+            'step' => 'Contenido listo; publicación en cola',
+            'progress' => 90,
+            'last_error' => null,
+            'payload' => [
+                ...$payload,
+                'publication_profile_ids' => $profileIds,
+                'publication_ready' => true,
+            ],
+        ]);
+        $this->addEvent($task, 'success', $draftMessage);
+        $this->addEvent(
+            $task,
+            'info',
+            count($profileIds) === 1
+                ? 'El post se enviará al perfil de publicación seleccionado.'
+                : 'El post se enviará a '.count($profileIds).' perfiles de publicación.',
+        );
+
+        if ($dispatch) {
+            PublishQuickPost::dispatch($task->id)->onQueue('publication');
+        }
 
         return $task->fresh();
     }
@@ -271,7 +317,9 @@ class SchedulerService
             return;
         }
 
-        if ($task->article?->status === AiArticle::STATUS_DRAFT && ($task->payload['generate_image'] ?? false)) {
+        if ($this->shouldPublish($task)) {
+            PublishQuickPost::dispatch($task->id)->onQueue('publication');
+        } elseif ($task->article?->status === AiArticle::STATUS_DRAFT && ($task->payload['generate_image'] ?? false)) {
             GenerateAiImage::dispatch($task->id)->onQueue('ai-image');
         } else {
             GenerateAiArticle::dispatch($task->id)->onQueue('ai-text');
@@ -291,17 +339,41 @@ class SchedulerService
         }
 
         if ($this->shouldGenerateImage($task)) {
-            (new GenerateAiImage($task->id))->handle(app(AiArticleService::class), $this);
+            (new GenerateAiImage($task->id))
+                ->withoutPublicationDispatch()
+                ->handle(app(AiArticleService::class), $this);
+            $this->publishQuickPostNowIfReady($task);
 
             return;
         }
 
-        $article = (new GenerateAiArticle($task->id))->withoutImageDispatch();
+        $article = (new GenerateAiArticle($task->id))
+            ->withoutImageDispatch()
+            ->withoutPublicationDispatch();
         app()->call([$article, 'handle']);
         $task->refresh()->load('article.images');
 
         if ($task->status === Scheduler::STATUS_QUEUED && $this->shouldGenerateImage($task)) {
-            (new GenerateAiImage($task->id))->handle(app(AiArticleService::class), $this);
+            (new GenerateAiImage($task->id))
+                ->withoutPublicationDispatch()
+                ->handle(app(AiArticleService::class), $this);
+        }
+
+        $this->publishQuickPostNowIfReady($task);
+    }
+
+    private function shouldPublish(Scheduler $task): bool
+    {
+        return $task->article?->status === AiArticle::STATUS_DRAFT
+            && (bool) ($task->payload['publication_ready'] ?? false);
+    }
+
+    private function publishQuickPostNowIfReady(Scheduler $task): void
+    {
+        $task->refresh()->load('article.images');
+
+        if ($task->status === Scheduler::STATUS_QUEUED && $this->shouldPublish($task)) {
+            (new PublishQuickPost($task->id))->handle(app(PublicationService::class), $this);
         }
     }
 }

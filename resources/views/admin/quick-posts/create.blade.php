@@ -115,27 +115,59 @@
                         </div>
                         @error('image_mode')<div class="text-danger fs-7 mt-3">{{ $message }}</div>@enderror
 
-                        <div class="row g-5 mt-5">
-                            @foreach ([
-                                ['facebook', 'Facebook', 'ki-facebook'],
-                                ['x', 'X', 'ki-message-text-2'],
-                                ['instagram', 'Instagram', 'ki-instagram'],
-                            ] as [$key, $label, $icon])
-                                <div class="col-md-4">
-                                    <div class="border border-dashed rounded p-4 h-100">
-                                        <i class="ki-outline {{ $icon }} fs-2x text-primary mb-3"></i>
-                                        <div class="fw-bold text-gray-900">{{ $label }}</div>
-                                        <div class="text-muted fs-8">Posts, fotos{{ $key !== 'x' ? ' y reels' : ' e hilos públicos' }}</div>
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                        <div class="notice d-flex bg-light-info rounded border-info border border-dashed p-5 mt-8">
-                            <i class="ki-outline ki-shield-tick fs-2x text-info me-3"></i>
-                            <div class="fs-7 text-gray-700">
-                                Se guardarán el texto, la URL canónica, los metadatos y copias locales de todas las imágenes detectadas. Después continuará la generación en segundo plano.
+                        <div class="separator my-8"></div>
+
+                        <div class="d-flex flex-column flex-md-row align-items-md-end justify-content-between gap-4 mb-5">
+                            <div>
+                                <label class="form-label fw-bold mb-1">Publicar automáticamente al terminar</label>
+                                <div class="text-muted fs-7">Selecciona uno o varios destinos. Sin selección, se guardará únicamente el borrador.</div>
                             </div>
+                            <a href="{{ route('admin.wordpress-sites.index') }}" class="btn btn-sm btn-light-primary text-nowrap">
+                                Administrar perfiles de publicación
+                            </a>
                         </div>
+
+                        @if ($publicationProfiles->isNotEmpty())
+                            <div class="row g-4">
+                                @foreach ($publicationProfiles as $publicationProfile)
+                                    @php($isFacebook = $publicationProfile->isFacebookPage())
+                                    <div class="col-md-6">
+                                        <label class="quick-post-destination border rounded p-5 h-100 d-flex align-items-start gap-4 cursor-pointer">
+                                            <input
+                                                class="form-check-input mt-1"
+                                                type="checkbox"
+                                                name="publication_profile_ids[]"
+                                                value="{{ $publicationProfile->id }}"
+                                                @checked(in_array($publicationProfile->id, array_map('intval', old('publication_profile_ids', []))))
+                                            >
+                                            <span class="quick-post-destination-icon {{ $isFacebook ? 'is-facebook' : 'is-wordpress' }}">
+                                                @if ($isFacebook)
+                                                    <i class="ki-outline ki-facebook"></i>
+                                                @else
+                                                    <strong>W</strong>
+                                                @endif
+                                            </span>
+                                            <span class="min-w-0 flex-grow-1">
+                                                <span class="fw-bold text-gray-900 d-block">{{ $publicationProfile->name }}</span>
+                                                <span class="text-muted fs-8 d-block mt-1">{{ $publicationProfile->typeLabel() }}</span>
+                                                <span class="text-muted fs-8 d-block text-truncate mt-1">{{ $publicationProfile->destinationLabel() }}</span>
+                                            </span>
+                                        </label>
+                                    </div>
+                                @endforeach
+                            </div>
+                            @error('publication_profile_ids')<div class="text-danger fs-7 mt-3">{{ $message }}</div>@enderror
+                            @error('publication_profile_ids.*')<div class="text-danger fs-7 mt-3">{{ $message }}</div>@enderror
+                        @else
+                            <div class="notice d-flex bg-light-warning rounded border-warning border border-dashed p-5">
+                                <i class="ki-outline ki-information-5 fs-2x text-warning me-3"></i>
+                                <div class="flex-grow-1">
+                                    <div class="fw-bold text-gray-900">No hay perfiles listos para publicar</div>
+                                    <div class="text-muted fs-7 mt-1">El post se guardará como borrador. Conecta WordPress o una página de Facebook para publicarlo automáticamente.</div>
+                                </div>
+                                <a href="{{ route('admin.wordpress-sites.create') }}" class="btn btn-sm btn-warning align-self-center">Agregar perfil</a>
+                            </div>
+                        @endif
                     </div>
                     <div class="card-footer d-flex justify-content-end gap-3">
                         <a href="{{ route('admin.quick-posts.index') }}" class="btn btn-light">Cancelar</a>
@@ -148,6 +180,35 @@
         </div>
     </div>
 @endsection
+
+@push('styles')
+<style>
+.quick-post-destination {
+    transition: border-color .18s ease, background-color .18s ease, box-shadow .18s ease;
+}
+
+.quick-post-destination:has(input:checked) {
+    border-color: var(--bs-primary) !important;
+    background: var(--bs-primary-light);
+    box-shadow: 0 0 0 3px rgba(47, 128, 237, .08);
+}
+
+.quick-post-destination-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    flex: 0 0 42px;
+    border-radius: 12px;
+    color: #fff;
+    font-size: 1.25rem;
+}
+
+.quick-post-destination-icon.is-facebook { background: #1877f2; }
+.quick-post-destination-icon.is-wordpress { background: #28799e; }
+</style>
+@endpush
 
 @push('scripts')
 <script>

@@ -39,6 +39,12 @@ class QuickPostController extends Controller
                 ->orderByDesc('is_default')
                 ->orderBy('name')
                 ->get(),
+            'publicationProfiles' => $request->user()
+                ->wordpressSites()
+                ->where('active', true)
+                ->where('status', 'active')
+                ->orderBy('name')
+                ->get(),
         ]);
     }
 
@@ -52,15 +58,22 @@ class QuickPostController extends Controller
             $profile,
             $request->validated('url'),
             $request->validated('image_mode'),
+            $request->validated()['publication_profile_ids'] ?? [],
         );
 
         $imageMessage = $request->validated('image_mode') === 'original'
             ? 'conservando sus imágenes originales'
             : 'generando imágenes nuevas con IA';
+        $publicationCount = count($request->validated()['publication_profile_ids'] ?? []);
+        $publicationMessage = $publicationCount > 0
+            ? ($publicationCount === 1
+                ? ' Después se publicará automáticamente en el perfil seleccionado.'
+                : " Después se publicará automáticamente en {$publicationCount} perfiles.")
+            : ' El resultado quedará como borrador.';
 
         return redirect()
             ->route('admin.scheduler.index', ['task' => $task->id])
-            ->with('status', "La captura y recreación con IA se añadieron a la cola, {$imageMessage}.");
+            ->with('status', "La captura y recreación con IA se añadieron a la cola, {$imageMessage}.{$publicationMessage}");
     }
 
     public function destroy(SourcePost $sourcePost): RedirectResponse

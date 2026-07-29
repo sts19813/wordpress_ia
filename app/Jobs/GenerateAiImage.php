@@ -26,7 +26,16 @@ class GenerateAiImage implements ShouldBeUnique, ShouldQueue
 
     public int $uniqueFor = 600;
 
+    private bool $dispatchPublication = true;
+
     public function __construct(public readonly int $taskId) {}
+
+    public function withoutPublicationDispatch(): self
+    {
+        $this->dispatchPublication = false;
+
+        return $this;
+    }
 
     /**
      * @return array<int, int>
@@ -59,7 +68,12 @@ class GenerateAiImage implements ShouldBeUnique, ShouldQueue
             ->first(fn (AiImage $image) => $image->type === AiImage::TYPE_MAIN && $image->status === AiImage::STATUS_GENERATED);
 
         if ($generatedImage) {
-            $scheduler->completed($task, 'El borrador y su imagen principal quedaron listos.');
+            $scheduler->completeOrPublish(
+                $task,
+                $article,
+                'El borrador y su imagen principal quedaron listos.',
+                $this->dispatchPublication,
+            );
 
             return;
         }
@@ -80,7 +94,12 @@ class GenerateAiImage implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $scheduler->completed($task, 'El borrador y su imagen principal quedaron listos.');
+        $scheduler->completeOrPublish(
+            $task,
+            $article,
+            'El borrador y su imagen principal quedaron listos.',
+            $this->dispatchPublication,
+        );
     }
 
     public function failed(?Throwable $exception): void

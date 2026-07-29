@@ -30,11 +30,20 @@ class GenerateAiArticle implements ShouldBeUnique, ShouldQueue
 
     private bool $dispatchImage = true;
 
+    private bool $dispatchPublication = true;
+
     public function __construct(public readonly int $taskId) {}
 
     public function withoutImageDispatch(): self
     {
         $this->dispatchImage = false;
+
+        return $this;
+    }
+
+    public function withoutPublicationDispatch(): self
+    {
+        $this->dispatchPublication = false;
 
         return $this;
     }
@@ -173,9 +182,11 @@ class GenerateAiArticle implements ShouldBeUnique, ShouldQueue
             }
 
             $count = $originalImages->attach($article, $sourcePost);
-            $scheduler->completed(
+            $scheduler->completeOrPublish(
                 $task,
+                $article,
                 "El borrador quedó listo con {$count} imagen(es) originales conservadas para su publicación.",
+                $this->dispatchPublication,
             );
 
             return;
@@ -187,6 +198,11 @@ class GenerateAiArticle implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $scheduler->completed($task, 'El borrador de texto quedó listo.');
+        $scheduler->completeOrPublish(
+            $task,
+            $article,
+            'El borrador de texto quedó listo.',
+            $this->dispatchPublication,
+        );
     }
 }

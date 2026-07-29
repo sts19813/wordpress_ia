@@ -5,20 +5,25 @@ namespace Tests\Feature\QuickPosts;
 use App\Jobs\CaptureQuickPost;
 use App\Jobs\GenerateAiArticle;
 use App\Jobs\GenerateAiImage;
+use App\Jobs\PublishQuickPost;
 use App\Models\AiArticle;
 use App\Models\AiImage;
 use App\Models\AiPromptProfile;
+use App\Models\Publication;
 use App\Models\Scheduler;
 use App\Models\SourcePost;
 use App\Models\SourcePostMedia;
 use App\Models\User;
+use App\Models\WordPressSite;
 use App\Services\AiArticleService;
 use App\Services\AiPromptProfileService;
+use App\Services\PublicationService;
 use App\Services\QuickPosts\OriginalPostImageService;
 use App\Services\QuickPosts\SocialPostCaptureService;
 use App\Services\SchedulerService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Mockery;
@@ -39,11 +44,13 @@ class QuickPostWorkflowTest extends TestCase
             'system_prompt' => AiPromptProfile::DEFAULT_SYSTEM_PROMPT,
             'content_length' => 'very_short',
         ]);
+        $publicationProfile = $this->publicationProfile($user);
 
         $response = $this->actingAs($user)->post(route('admin.quick-posts.store'), [
             'url' => $url,
             'ai_prompt_profile_id' => $selectedProfile->id,
             'image_mode' => 'original',
+            'publication_profile_ids' => [$publicationProfile->id],
         ]);
 
         $task = Scheduler::query()->sole();
@@ -53,18 +60,33 @@ class QuickPostWorkflowTest extends TestCase
         $this->assertSame('original', $task->payload['image_mode']);
         $this->assertSame($selectedProfile->id, $task->payload['profile_id']);
         $this->assertFalse($task->payload['generate_image']);
+        $this->assertSame([$publicationProfile->id], $task->payload['publication_profile_ids']);
+        $this->assertFalse($task->payload['publication_ready']);
         Queue::assertPushedOn('social-capture', CaptureQuickPost::class);
     }
 
-    public function test_quick_post_form_asks_how_images_should_be_handled(): void
+    public function test_quick_post_form_lists_only_available_publication_profiles(): void
     {
         $user = User::factory()->create();
+        $otherUser = User::factory()->create();
         app(AiPromptProfileService::class)->ensureDefaultFor($user);
         $user->aiPromptProfiles()->create([
             'name' => 'Perfil para redes',
             'system_prompt' => AiPromptProfile::DEFAULT_SYSTEM_PROMPT,
             'content_length' => 'very_short',
         ]);
+        $this->publicationProfile($user, ['name' => 'Mi sitio principal']);
+        $this->publicationProfile($user, [
+            'name' => 'Facebook Noticias',
+            'type' => WordPressSite::TYPE_FACEBOOK_PAGE,
+            'rest_api_url' => '',
+            'username' => '',
+            'application_password' => '',
+            'facebook_page_id' => '123456789',
+            'facebook_access_token' => 'page-token',
+        ]);
+        $this->publicationProfile($user, ['name' => 'Perfil pausado', 'active' => false]);
+        $this->publicationProfile($otherUser, ['name' => 'Perfil de otra cuenta']);
 
         $this->actingAs($user)
             ->get(route('admin.quick-posts.create'))
@@ -74,7 +96,14 @@ class QuickPostWorkflowTest extends TestCase
             ->assertSee('name="image_mode"', false)
             ->assertSee('name="ai_prompt_profile_id"', false)
             ->assertSee('Perfil para redes')
-            ->assertSee('Muy corto (150–200 palabras)');
+            ->assertSee('Muy corto (150–200 palabras)')
+            ->assertSee('Publicar automáticamente al terminar')
+            ->assertSee('name="publication_profile_ids[]"', false)
+            ->assertSee('Mi sitio principal')
+            ->assertSee('Facebook Noticias')
+            ->assertDontSee('Perfil pausado')
+            ->assertDontSee('Perfil de otra cuenta')
+            ->assertDontSee('Posts, fotos e hilos públicos');
     }
 
     public function test_quick_post_cannot_use_another_users_profile(): void
@@ -91,6 +120,26 @@ class QuickPostWorkflowTest extends TestCase
                 'image_mode' => 'original',
             ])
             ->assertSessionHasErrors('ai_prompt_profile_id');
+
+        $this->assertDatabaseCount('schedulers', 0);
+    }
+
+    public function test_quick_post_cannot_use_an_unavailable_publication_profile(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $profile = app(AiPromptProfileService::class)->ensureDefaultFor($user);
+        $otherPublicationProfile = $this->publicationProfile($otherUser);
+
+        $this->actingAs($user)
+            ->post(route('admin.quick-posts.store'), [
+                'url' => 'https://x.com/openai/status/123456',
+                'ai_prompt_profile_id' => $profile->id,
+                'image_mode' => 'original',
+                'publication_profile_ids' => [$otherPublicationProfile->id],
+            ])
+            ->assertSessionHasErrors('publication_profile_ids.0');
 
         $this->assertDatabaseCount('schedulers', 0);
     }
@@ -292,6 +341,113 @@ class QuickPostWorkflowTest extends TestCase
         Queue::assertNotPushed(GenerateAiImage::class);
     }
 
+    public function test_ready_quick_post_is_queued_for_all_selected_publication_profiles(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        $profile = app(AiPromptProfileService::class)->ensureDefaultFor($user);
+        $firstDestination = $this->publicationProfile($user, [
+            'name' => 'Sitio uno',
+            'rest_api_url' => 'https://one.test',
+        ]);
+        $secondDestination = $this->publicationProfile($user, [
+            'name' => 'Sitio dos',
+            'rest_api_url' => 'https://two.test',
+        ]);
+        $task = app(SchedulerService::class)->createQuickPostTask(
+            $user,
+            $profile,
+            'https://x.com/example/status/123456',
+            'original',
+            [$firstDestination->id, $secondDestination->id],
+        );
+        $article = $user->aiArticles()->create([
+            'title' => 'Post listo',
+            'content' => '<p>Contenido listo.</p>',
+            'status' => AiArticle::STATUS_DRAFT,
+        ]);
+
+        app(SchedulerService::class)->completeOrPublish(
+            $task,
+            $article,
+            'El borrador y sus imágenes están listos.',
+        );
+
+        $task->refresh();
+        $this->assertSame(Scheduler::STATUS_QUEUED, $task->status);
+        $this->assertSame(90, $task->progress);
+        $this->assertTrue($task->payload['publication_ready']);
+        Queue::assertPushedOn('publication', PublishQuickPost::class);
+    }
+
+    public function test_publication_job_publishes_in_every_selected_destination(): void
+    {
+        Queue::fake();
+        Http::fake([
+            'one.test/wp-json/wp/v2/posts' => Http::response([
+                'id' => 101,
+                'link' => 'https://one.test/post-rapido',
+                'status' => 'publish',
+            ], 201),
+            'two.test/wp-json/wp/v2/posts' => Http::response([
+                'id' => 202,
+                'link' => 'https://two.test/post-rapido',
+                'status' => 'publish',
+            ], 201),
+        ]);
+        $user = User::factory()->create();
+        $profile = app(AiPromptProfileService::class)->ensureDefaultFor($user);
+        $firstDestination = $this->publicationProfile($user, [
+            'name' => 'Sitio uno',
+            'rest_api_url' => 'https://one.test',
+        ]);
+        $secondDestination = $this->publicationProfile($user, [
+            'name' => 'Sitio dos',
+            'rest_api_url' => 'https://two.test',
+        ]);
+        $task = app(SchedulerService::class)->createQuickPostTask(
+            $user,
+            $profile,
+            'https://x.com/example/status/123456',
+            'original',
+            [$firstDestination->id, $secondDestination->id],
+        );
+        $article = $user->aiArticles()->create([
+            'title' => 'Post listo para publicar',
+            'content' => '<p>Contenido del post rápido.</p>',
+            'excerpt' => 'Extracto',
+            'slug' => 'post-listo',
+            'status' => AiArticle::STATUS_DRAFT,
+        ]);
+        $task->update([
+            'ai_article_id' => $article->id,
+            'payload' => [
+                ...$task->payload,
+                'publication_ready' => true,
+            ],
+        ]);
+
+        (new PublishQuickPost($task->id))->handle(
+            app(PublicationService::class),
+            app(SchedulerService::class),
+        );
+
+        $this->assertSame(Scheduler::STATUS_COMPLETED, $task->fresh()->status);
+        $this->assertDatabaseHas('publications', [
+            'wordpress_site_id' => $firstDestination->id,
+            'ai_article_id' => $article->id,
+            'status' => Publication::STATUS_PUBLISHED,
+            'remote_url' => 'https://one.test/post-rapido',
+        ]);
+        $this->assertDatabaseHas('publications', [
+            'wordpress_site_id' => $secondDestination->id,
+            'ai_article_id' => $article->id,
+            'status' => Publication::STATUS_PUBLISHED,
+            'remote_url' => 'https://two.test/post-rapido',
+        ]);
+        $this->assertDatabaseCount('publications', 2);
+    }
+
     public function test_the_same_task_cannot_generate_two_drafts_concurrently(): void
     {
         Queue::fake();
@@ -320,5 +476,18 @@ class QuickPostWorkflowTest extends TestCase
 
         $this->assertDatabaseCount('ai_articles', 0);
         $this->assertSame(Scheduler::STATUS_QUEUED, $task->fresh()->status);
+    }
+
+    private function publicationProfile(User $user, array $overrides = []): WordPressSite
+    {
+        return $user->wordpressSites()->create(array_merge([
+            'type' => WordPressSite::TYPE_WORDPRESS,
+            'name' => 'Perfil WordPress',
+            'rest_api_url' => 'https://wp.test',
+            'username' => 'editor',
+            'application_password' => 'app-pass',
+            'status' => WordPressSite::STATUS_ACTIVE,
+            'active' => true,
+        ], $overrides));
     }
 }

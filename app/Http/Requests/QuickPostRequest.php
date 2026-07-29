@@ -45,6 +45,22 @@ class QuickPostRequest extends FormRequest
                     ->where('user_id', $this->user()->id),
             ],
             'image_mode' => ['required', Rule::in(['generate', 'original'])],
+            'publication_profile_ids' => ['nullable', 'array'],
+            'publication_profile_ids.*' => [
+                'integer',
+                'distinct',
+                Rule::exists('wordpress_sites', 'id')->where(fn ($query) => $query
+                    ->where('user_id', $this->user()->id)
+                    ->where('active', true)
+                    ->where('status', 'active')),
+            ],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'publication_profile_ids.*.exists' => 'Uno de los perfiles de publicación seleccionados ya no está disponible.',
         ];
     }
 }
