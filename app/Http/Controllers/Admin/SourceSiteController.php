@@ -24,13 +24,10 @@ class SourceSiteController extends Controller
         private readonly AiPromptProfileService $promptProfiles,
     ) {}
 
-    public function index(Request $request): View
+    public function index(): View
     {
         return view('admin.source-sites.index', [
-            'sourceSites' => $this->sourceSites->getForAdmin($request->query()),
-            'filterOptions' => $this->sourceSites->distinctFilterOptions(),
-            'typeOptions' => SourceSite::typeOptions(),
-            'statusOptions' => SourceSite::statusOptions(),
+            'sourceSites' => $this->sourceSites->getForAdmin(),
         ]);
     }
 

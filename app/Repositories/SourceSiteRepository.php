@@ -3,80 +3,14 @@
 namespace App\Repositories;
 
 use App\Models\SourceSite;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 
 class SourceSiteRepository
 {
-    /**
-     * @param  array<string, mixed>  $filters
-     */
-    public function getForAdmin(array $filters): Collection
+    public function getForAdmin(): Collection
     {
-        $sort = $this->allowedSorts()[$filters['sort'] ?? 'created_at'] ?? 'created_at';
-        $direction = ($filters['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
-
         return SourceSite::query()
-            ->when($filters['search'] ?? null, function (Builder $query, string $search): void {
-                $query->where(function (Builder $query) use ($search): void {
-                    $query
-                        ->where('name', 'like', "%{$search}%")
-                        ->orWhere('url', 'like', "%{$search}%")
-                        ->orWhere('filter_topics', 'like', "%{$search}%")
-                        ->orWhere('filter_instructions', 'like', "%{$search}%")
-                        ->orWhere('country', 'like', "%{$search}%")
-                        ->orWhere('language', 'like', "%{$search}%");
-                });
-            })
-            ->when($filters['type'] ?? null, fn (Builder $query, string $type) => $query->where('type', $type))
-            ->when($filters['status'] ?? null, fn (Builder $query, string $status) => $query->where('status', $status))
-            ->when(($filters['active'] ?? '') !== '', fn (Builder $query) => $query->where('active', $filters['active'] === '1'))
-            ->when($filters['topic'] ?? null, fn (Builder $query, string $topic) => $query->whereJsonContains('filter_topics', $topic))
-            ->when($filters['language'] ?? null, fn (Builder $query, string $language) => $query->where('language', $language))
-            ->when($filters['country'] ?? null, fn (Builder $query, string $country) => $query->where('country', $country))
-            ->orderBy($sort, $direction)
-            ->orderBy('id', 'desc')
+            ->latest()
             ->get();
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function distinctFilterOptions(): array
-    {
-        return [
-            'topics' => SourceSite::query()
-                ->whereNotNull('filter_topics')
-                ->get(['filter_topics'])
-                ->flatMap(fn (SourceSite $sourceSite) => $sourceSite->filter_topics ?: [])
-                ->filter()
-                ->unique()
-                ->sort()
-                ->values(),
-            'languages' => SourceSite::query()->whereNotNull('language')->distinct()->orderBy('language')->pluck('language'),
-            'countries' => SourceSite::query()->whereNotNull('country')->distinct()->orderBy('country')->pluck('country'),
-        ];
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function allowedSorts(): array
-    {
-        return [
-            'name' => 'name',
-            'url' => 'url',
-            'type' => 'type',
-            'status' => 'status',
-            'frequency_minutes' => 'frequency_minutes',
-            'category' => 'category',
-            'language' => 'language',
-            'country' => 'country',
-            'priority' => 'priority',
-            'daily_limit' => 'daily_limit',
-            'last_synced_at' => 'last_synced_at',
-            'active' => 'active',
-            'created_at' => 'created_at',
-        ];
     }
 }

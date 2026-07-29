@@ -101,7 +101,19 @@ class AdminDatatablesTest extends TestCase
         $response
             ->assertOk()
             ->assertSee('admin-datatable', false)
+            ->assertSee('data-page-length="50"', false)
             ->assertSee('Fuente para DataTables')
+            ->assertSee('https://example.com/feed-datatables')
+            ->assertSee('Ver bitácora')
+            ->assertSee('>URL</th>', false)
+            ->assertDontSee('Filtros de notas')
+            ->assertDontSee('Prioridad')
+            ->assertDontSee('Todos los tipos')
+            ->assertDontSee('name="type"', false)
+            ->assertDontSee('name="status"', false)
+            ->assertDontSee('name="active"', false)
+            ->assertDontSee('name="language"', false)
+            ->assertDontSee('class="table-responsive"', false)
             ->assertDontSee('role="navigation"', false)
             ->assertDontSee('Showing 1 to', false);
     }

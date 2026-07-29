@@ -1,6 +1,6 @@
 @extends('layouts.admin')
 
-@section('title', 'Sitios Fuente | '.config('app.name'))
+@section('title', 'Sitios fuente | '.config('app.name'))
 
 @php
     $statusClasses = [
@@ -13,8 +13,8 @@
 
 @section('toolbar')
     <div>
-        <h1 class="page-heading text-gray-900 fw-bold fs-3 my-0">Sitios Fuente</h1>
-        <div class="text-muted fw-semibold fs-7 pt-1">Conecta WordPress, feeds, sitemaps, HTML o usa IA para interpretar sitios sin una estructura compatible.</div>
+        <h1 class="page-heading text-gray-900 fw-bold fs-3 my-0">Sitios fuente</h1>
+        <div class="text-muted fw-semibold fs-7 pt-1">Administra los sitios que alimentan el flujo de noticias.</div>
     </div>
     <a href="{{ route('admin.source-sites.create') }}" class="btn btn-primary">
         <i class="ki-outline ki-plus fs-2"></i>
@@ -23,131 +23,160 @@
 @endsection
 
 @section('content')
-    <div class="card card-flush">
-        <div class="card-header align-items-center gap-4 py-5">
-            <div class="card-title">
-                <form method="GET" action="{{ route('admin.source-sites.index') }}" class="d-flex flex-column flex-xl-row align-items-xl-center gap-3">
-                    <div class="position-relative">
-                        <i class="ki-outline ki-magnifier fs-3 position-absolute ms-4 top-50 translate-middle-y text-gray-500"></i>
-                        <input type="text" name="search" value="{{ request('search') }}" class="form-control form-control-solid ps-12 w-250px" placeholder="Buscar sitio, URL o tema...">
-                    </div>
-
-                    <select name="type" class="form-select form-select-solid w-200px">
-                        <option value="">Todos los tipos</option>
-                        @foreach ($typeOptions as $value => $label)
-                            <option value="{{ $value }}" @selected(request('type') === $value)>{{ $label }}</option>
-                        @endforeach
-                    </select>
-
-                    <select name="status" class="form-select form-select-solid w-175px">
-                        <option value="">Todos los estados</option>
-                        @foreach ($statusOptions as $value => $label)
-                            <option value="{{ $value }}" @selected(request('status') === $value)>{{ $label }}</option>
-                        @endforeach
-                    </select>
-
-                    <select name="active" class="form-select form-select-solid w-150px">
-                        <option value="">Activo/Inactivo</option>
-                        <option value="1" @selected(request('active') === '1')>Activo</option>
-                        <option value="0" @selected(request('active') === '0')>Inactivo</option>
-                    </select>
-
-                    <select name="topic" class="form-select form-select-solid w-175px">
-                        <option value="">Tema aceptado</option>
-                        @foreach ($filterOptions['topics'] as $topic)
-                            <option value="{{ $topic }}" @selected(request('topic') === $topic)>{{ $topic }}</option>
-                        @endforeach
-                    </select>
-
-                    <select name="language" class="form-select form-select-solid w-150px">
-                        <option value="">Idioma</option>
-                        @foreach ($filterOptions['languages'] as $language)
-                            <option value="{{ $language }}" @selected(request('language') === $language)>{{ strtoupper($language) }}</option>
-                        @endforeach
-                    </select>
-
-                    <select name="country" class="form-select form-select-solid w-175px">
-                        <option value="">País</option>
-                        @foreach ($filterOptions['countries'] as $country)
-                            <option value="{{ $country }}" @selected(request('country') === $country)>{{ $country }}</option>
-                        @endforeach
-                    </select>
-
-                    <button type="submit" class="btn btn-light-primary">
-                        <i class="ki-outline ki-filter fs-2"></i>
-                        Filtrar
-                    </button>
-
-                    <a href="{{ route('admin.source-sites.index') }}" class="btn btn-light">Limpiar</a>
-                </form>
-            </div>
-        </div>
-
-        <div class="card-body pt-0">
-            <div class="table-responsive">
-                <table class="table align-middle table-row-dashed fs-6 gy-5 admin-datatable">
-                    <thead>
-                        <tr class="text-start text-gray-500 fw-bold fs-7 text-uppercase gs-0">
-                            <th class="min-w-220px">Nombre</th>
-                            <th class="min-w-160px">Tipo</th>
-                            <th class="min-w-125px">Estado</th>
-                            <th class="min-w-125px">Frecuencia</th>
-                            <th class="min-w-180px">Filtros de notas</th>
-                            <th class="min-w-100px">Prioridad</th>
-                            <th class="min-w-150px">Última sync</th>
-                            <th class="min-w-100px">Activo</th>
-                            <th class="text-end min-w-100px no-sort no-search">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody class="fw-semibold text-gray-700">
-                        @foreach ($sourceSites as $sourceSite)
-                            <tr>
-                                <td>
-                                    <a href="{{ route('admin.source-sites.edit', $sourceSite) }}" class="text-gray-900 text-hover-primary fw-bold">{{ $sourceSite->name }}</a>
-                                    <div class="text-muted text-truncate mw-300px">{{ $sourceSite->url }}</div>
-                                    <div class="text-muted fs-8">{{ strtoupper($sourceSite->language) }} @if ($sourceSite->country) · {{ $sourceSite->country }} @endif</div>
-                                </td>
-                                <td>{{ $sourceSite->typeLabel() }}</td>
-                                <td><span class="badge {{ $statusClasses[$sourceSite->status] ?? 'badge-light' }}">{{ $sourceSite->statusLabel() }}</span></td>
-                                <td data-order="{{ $sourceSite->frequency_minutes }}">{{ max(1, (int) ceil($sourceSite->frequency_minutes / 60)) }} h</td>
-                                <td>
-                                    <div class="d-flex flex-wrap gap-1">
-                                        @forelse (array_slice($sourceSite->filter_topics ?: [], 0, 3) as $topic)
-                                            <span class="badge badge-light-primary">{{ $topic }}</span>
-                                        @empty
-                                            <span class="text-muted">Todas las notas</span>
-                                        @endforelse
-                                    </div>
-                                </td>
-                                <td data-order="{{ $sourceSite->priority }}"><span class="badge badge-light-primary">{{ $sourceSite->priority }}</span></td>
-                                <td data-order="{{ $sourceSite->last_synced_at?->timestamp ?: 0 }}">{{ $sourceSite->last_synced_at?->format('d/m/Y H:i') ?: '-' }}</td>
-                                <td data-order="{{ $sourceSite->active ? 1 : 0 }}">
-                                    @if ($sourceSite->active)
-                                        <span class="badge badge-light-success">Sí</span>
-                                    @else
-                                        <span class="badge badge-light-danger">No</span>
-                                    @endif
-                                </td>
-                                <td class="text-end">
-                                    <a href="{{ route('admin.source-scan-logs.index', ['source_site_id' => $sourceSite->id]) }}" class="btn btn-icon btn-light-info btn-sm me-2" aria-label="Ver bitácora" title="Ver bitácora">
-                                        <i class="ki-outline ki-note-2 fs-3"></i>
-                                    </a>
-                                    <a href="{{ route('admin.source-sites.edit', $sourceSite) }}" class="btn btn-icon btn-light btn-sm me-2" aria-label="Editar">
-                                        <i class="ki-outline ki-pencil fs-3"></i>
-                                    </a>
-                                    <form method="POST" action="{{ route('admin.source-sites.destroy', $sourceSite) }}" class="d-inline" data-confirm-delete data-confirm-title="Eliminar sitio fuente" data-confirm-text="Se eliminará {{ $sourceSite->name }}. Esta acción no elimina noticias ya importadas.">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-icon btn-light-danger btn-sm" aria-label="Eliminar">
-                                            <i class="ki-outline ki-trash fs-3"></i>
-                                        </button>
-                                    </form>
-                                </td>
+    <div class="source-sites-index-page">
+        <div class="card card-flush">
+            <div class="card-body py-5">
+                <div class="source-sites-table-wrap">
+                    <table class="table align-middle table-row-dashed fs-7 gy-3 admin-datatable source-sites-table" data-page-length="50">
+                        <thead>
+                            <tr class="text-start text-gray-500 fw-bold fs-8 text-uppercase gs-0">
+                                <th class="min-w-170px">Nombre</th>
+                                <th class="min-w-240px">URL</th>
+                                <th class="min-w-105px">Estado</th>
+                                <th class="min-w-100px">Frecuencia</th>
+                                <th class="min-w-135px">Última sincronización</th>
+                                <th class="min-w-80px">Activo</th>
+                                <th class="text-end min-w-260px no-sort no-search">Acciones</th>
                             </tr>
-                        @endforeach
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody class="fw-semibold text-gray-700">
+                            @foreach ($sourceSites as $sourceSite)
+                                <tr>
+                                    <td>
+                                        <a href="{{ route('admin.source-sites.edit', $sourceSite) }}" class="source-site-name text-gray-900 text-hover-primary fw-bold">
+                                            {{ $sourceSite->name }}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        <a href="{{ $sourceSite->url }}" target="_blank" rel="noopener noreferrer" class="source-site-url text-gray-600 text-hover-primary" title="{{ $sourceSite->url }}">
+                                            {{ $sourceSite->url }}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        <span class="badge {{ $statusClasses[$sourceSite->status] ?? 'badge-light' }}">{{ $sourceSite->statusLabel() }}</span>
+                                    </td>
+                                    <td class="text-nowrap" data-order="{{ $sourceSite->frequency_minutes }}">
+                                        {{ max(1, (int) ceil($sourceSite->frequency_minutes / 60)) }} h
+                                    </td>
+                                    <td class="text-nowrap" data-order="{{ $sourceSite->last_synced_at?->timestamp ?: 0 }}">
+                                        {{ $sourceSite->last_synced_at?->format('d/m/Y H:i') ?: '—' }}
+                                    </td>
+                                    <td data-order="{{ $sourceSite->active ? 1 : 0 }}">
+                                        @if ($sourceSite->active)
+                                            <span class="badge badge-light-success">Sí</span>
+                                        @else
+                                            <span class="badge badge-light-danger">No</span>
+                                        @endif
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="d-inline-flex align-items-center justify-content-end gap-2">
+                                            <a href="{{ route('admin.source-scan-logs.index', ['source_site_id' => $sourceSite->id]) }}" class="btn btn-sm btn-light-info text-nowrap">
+                                                <i class="ki-outline ki-note-2 fs-4"></i>
+                                                Ver bitácora
+                                            </a>
+                                            <a href="{{ route('admin.source-sites.edit', $sourceSite) }}" class="btn btn-icon btn-light btn-sm" aria-label="Editar" title="Editar">
+                                                <i class="ki-outline ki-pencil fs-3"></i>
+                                            </a>
+                                            <form method="POST" action="{{ route('admin.source-sites.destroy', $sourceSite) }}" data-confirm-delete data-confirm-title="Eliminar sitio fuente" data-confirm-text="Se eliminará {{ $sourceSite->name }}. Esta acción no elimina noticias ya importadas.">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-icon btn-light-danger btn-sm" aria-label="Eliminar" title="Eliminar">
+                                                    <i class="ki-outline ki-trash fs-3"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
 @endsection
+
+@push('styles')
+    <style>
+        .source-sites-index-page {
+            padding: 0 20px 8px;
+        }
+
+        .source-sites-table-wrap {
+            width: 100%;
+            min-width: 0;
+            overflow: visible;
+        }
+
+        .source-sites-table {
+            width: 100% !important;
+            margin-bottom: 0 !important;
+        }
+
+        .source-sites-table th,
+        .source-sites-table td {
+            padding-top: .8rem !important;
+            padding-bottom: .8rem !important;
+        }
+
+        .source-sites-table .source-site-name {
+            display: block;
+            overflow: hidden;
+            max-width: 260px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            text-decoration: none;
+        }
+
+        .source-sites-table .source-site-url {
+            display: block;
+            overflow: hidden;
+            max-width: 360px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            text-decoration: none;
+        }
+
+        .source-sites-index-page .admin-datatable-wrapper {
+            width: 100%;
+            overflow: visible;
+        }
+
+        .source-sites-index-page .dataTables_filter {
+            width: 100%;
+            padding-right: 2px;
+        }
+
+        .source-sites-index-page .dataTables_filter label {
+            width: 100%;
+            justify-content: flex-end;
+        }
+
+        .source-sites-index-page .dataTables_filter input {
+            width: 280px !important;
+            max-width: calc(100% - 68px);
+        }
+
+        @media (max-width: 991.98px) {
+            .source-sites-table {
+                min-width: 1050px;
+            }
+        }
+
+        @media (max-width: 767.98px) {
+            .source-sites-index-page {
+                padding-right: 16px;
+                padding-left: 16px;
+            }
+
+            .source-sites-index-page .dataTables_filter label {
+                justify-content: center;
+            }
+
+            .source-sites-index-page .dataTables_filter input {
+                width: 100% !important;
+                max-width: 100%;
+            }
+        }
+    </style>
+@endpush
