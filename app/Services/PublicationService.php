@@ -66,13 +66,16 @@ class PublicationService
     public function testConnection(WordPressSite $site): array
     {
         if ($site->isFacebookPage()) {
-            $response = $this->facebookClient->testConnection($site);
+            $connection = $this->facebookClient->testConnection($site);
+            $response = $connection['response'];
 
             return [
                 'id' => $response->json('id'),
                 'name' => $response->json('name'),
                 'link' => $response->json('link'),
                 'roles' => [],
+                'facebook_page_id' => $connection['page_id'],
+                'facebook_access_token' => $connection['access_token'],
             ];
         }
 

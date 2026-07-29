@@ -32,6 +32,11 @@ class FacebookPublishingWorkflowTest extends TestCase
     public function test_user_can_save_and_verify_an_encrypted_facebook_page_profile(): void
     {
         Http::fake([
+            'graph.facebook.com/v24.0/me*' => Http::response([
+                'id' => '123456789',
+                'name' => 'Noticias Demo',
+                'category' => 'News & media website',
+            ]),
             'graph.facebook.com/v24.0/123456789*' => Http::response([
                 'id' => '123456789',
                 'name' => 'Noticias Demo',
@@ -63,9 +68,54 @@ class FacebookPublishingWorkflowTest extends TestCase
             && $request['access_token'] === 'page-token-secret');
     }
 
+    public function test_a_user_token_is_resolved_to_its_only_managed_page_and_page_token(): void
+    {
+        Http::fake([
+            'graph.facebook.com/v24.0/me/accounts*' => Http::response([
+                'data' => [[
+                    'id' => '123456789',
+                    'name' => 'Noticias Demo',
+                    'tasks' => ['CREATE_CONTENT', 'MANAGE'],
+                    'access_token' => 'resolved-page-token',
+                ]],
+            ]),
+            'graph.facebook.com/v24.0/me*' => Http::response([
+                'error' => [
+                    'message' => '(#100) Tried accessing nonexisting field (category)',
+                    'code' => 100,
+                ],
+            ], 400),
+            'graph.facebook.com/v24.0/123456789*' => Http::response([
+                'id' => '123456789',
+                'name' => 'Noticias Demo',
+                'link' => 'https://www.facebook.com/NoticiasDemo',
+            ]),
+        ]);
+
+        $user = User::factory()->create();
+        $this->actingAs($user)->post(route('admin.wordpress-sites.store'), [
+            'type' => WordPressSite::TYPE_FACEBOOK_PAGE,
+            'name' => 'Facebook Noticias',
+            'facebook_page_id' => '999999999',
+            'facebook_access_token' => 'user-token',
+            'facebook_api_version' => 'v24.0',
+            'active' => '1',
+        ])->assertRedirect(route('admin.wordpress-sites.index'));
+
+        $profile = WordPressSite::query()->sole();
+        $this->assertSame('123456789', $profile->facebook_page_id);
+        $this->assertSame('resolved-page-token', $profile->facebook_access_token);
+        $this->assertSame(WordPressSite::STATUS_ACTIVE, $profile->status);
+    }
+
     public function test_article_can_be_published_to_a_facebook_page(): void
     {
         Http::fake([
+            'graph.facebook.com/v24.0/me*' => Http::response([
+                'id' => '123456789',
+                'name' => 'Noticias Demo',
+                'category' => 'News & media website',
+            ]),
             'graph.facebook.com/v24.0/123456789/feed' => Http::response([
                 'id' => '123456789_987654321',
             ], 200),
@@ -122,6 +172,11 @@ class FacebookPublishingWorkflowTest extends TestCase
         Storage::fake('local');
         Storage::disk('local')->put('ai-images/principal.png', 'fake-image');
         Http::fake([
+            'graph.facebook.com/v24.0/me*' => Http::response([
+                'id' => '123456789',
+                'name' => 'Noticias Demo',
+                'category' => 'News & media website',
+            ]),
             'graph.facebook.com/v24.0/123456789/photos' => Http::response([
                 'id' => '555',
                 'post_id' => '123456789_987654321',

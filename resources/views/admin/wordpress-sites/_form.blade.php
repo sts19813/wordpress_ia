@@ -69,7 +69,7 @@
                                 <div class="col-12">
                                     <label class="form-label {{ filled($site->facebook_access_token) ? '' : 'required' }}">Page Access Token</label>
                                     <textarea name="facebook_access_token" rows="3" class="form-control form-control-solid @error('facebook_access_token') is-invalid @enderror" autocomplete="off" data-required-for="facebook_page" data-required-on-create="{{ filled($site->facebook_access_token) ? '0' : '1' }}" placeholder="{{ filled($site->facebook_access_token) ? 'Déjalo vacío para conservar el token actual' : 'Pega aquí el token de acceso de la página' }}"></textarea>
-                                    <div class="form-text">El token debe poder administrar publicaciones de esta página. Se almacena cifrado y no volverá a mostrarse.</div>
+                                    <div class="form-text">Puedes pegar un Page Access Token o un User Access Token con <code>pages_show_list</code> y <code>pages_manage_posts</code>. Si solo administra una página, la aplicación obtendrá y guardará automáticamente el token correcto de la página.</div>
                                     @error('facebook_access_token')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                 </div>
                             </div>

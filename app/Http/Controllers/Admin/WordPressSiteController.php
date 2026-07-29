@@ -100,23 +100,33 @@ class WordPressSiteController extends Controller
     private function testAndRedirect(WordPressSite $site, string $successMessage): RedirectResponse
     {
         try {
-            $this->publications->testConnection($site);
-            $site->update([
+            $connection = $this->publications->testConnection($site);
+            $updates = [
                 'status' => $site->active ? WordPressSite::STATUS_ACTIVE : WordPressSite::STATUS_PAUSED,
                 'last_tested_at' => now(),
                 'connection_error' => null,
-            ]);
+            ];
+
+            if ($site->isFacebookPage()) {
+                $updates['facebook_page_id'] = $connection['facebook_page_id'];
+                $updates['facebook_access_token'] = $connection['facebook_access_token'];
+            }
+
+            $site->update($updates);
 
             return redirect()->route('admin.wordpress-sites.index')->with('status', $successMessage);
         } catch (Throwable $exception) {
             $remoteMessage = $exception instanceof RequestException
                 ? ($exception->response?->json('error.message') ?: $exception->response?->json('message'))
                 : null;
+            $exceptionMessage = trim($exception->getMessage());
             $message = is_string($remoteMessage) && $remoteMessage !== ''
                 ? $remoteMessage
-                : ($site->isFacebookPage()
-                    ? 'No pudimos autenticar la página. Verifica el ID, el Page Access Token y sus permisos.'
-                    : 'No pudimos autenticar el sitio. Verifica el dominio, el usuario y la contraseña de aplicación.');
+                : ($site->isFacebookPage() && $exceptionMessage !== ''
+                    ? $exceptionMessage
+                    : ($site->isFacebookPage()
+                        ? 'No pudimos autenticar la página. Verifica el ID, el Page Access Token y sus permisos.'
+                        : 'No pudimos autenticar el sitio. Verifica el dominio, el usuario y la contraseña de aplicación.'));
 
             $site->update([
                 'status' => WordPressSite::STATUS_ERROR,
