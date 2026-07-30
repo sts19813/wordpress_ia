@@ -88,7 +88,8 @@
 
         .publication-date {
             display: inline-flex;
-            flex-direction: column;
+            flex-direction: row;
+            gap: .4rem;
             font-size: .75rem;
             line-height: 1.25;
             white-space: nowrap;
@@ -132,10 +133,6 @@
                 justify-self: start;
             }
 
-            .publication-date {
-                flex-direction: row;
-                gap: .4rem;
-            }
         }
     </style>
 @endpush
