@@ -203,7 +203,12 @@ class QuickPostWorkflowTest extends TestCase
             ->get(route('admin.quick-posts.index'))
             ->assertOk()
             ->assertSee('Post visual archivado')
-            ->assertSee('1 archivadas');
+            ->assertSee('1 imagen archivada')
+            ->assertSee('Ver original')
+            ->assertSee('Generar')
+            ->assertDontSee('ki-dots-vertical')
+            ->assertSee('quick-posts-table', false)
+            ->assertDontSee('class="table-responsive"', false);
 
         $this->actingAs($user)
             ->get(route('admin.news.show', $post))
