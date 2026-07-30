@@ -59,8 +59,12 @@ class SourcePipelineQueueTest extends TestCase
             ->assertOk()
             ->assertSee('Próximas consultas de sitios fuente')
             ->assertSee('Forbes programado')
-            ->assertSee('24 h')
-            ->assertSee('Consultar ahora');
+            ->assertSee('24h / 20 por consulta')
+            ->assertSee($site->next_scan_at->format('d/m/y H:i'))
+            ->assertSee('IA · Guarda borrador')
+            ->assertSee('Consultar')
+            ->assertDontSee('Máximo')
+            ->assertDontSee('class="table-responsive"', false);
 
         $this->actingAs($user)
             ->post(route('admin.scheduler.sources.run', $site))
@@ -174,8 +178,12 @@ class SourcePipelineQueueTest extends TestCase
         $this->actingAs($user)
             ->get(route('admin.scheduler.index', ['task' => $articleTask->id]))
             ->assertOk()
-            ->assertSee('Generación y publicación')
-            ->assertSee('Artículo publicado correctamente');
+            ->assertSee('Completados')
+            ->assertSee('Nuevo análisis del paquete económico')
+            ->assertSee('Ver borrador')
+            ->assertSee('Ver fuente')
+            ->assertSee('Ver publicado')
+            ->assertSee('https://target.test/analisis-paquete-economico');
     }
 
     public function test_scan_creates_only_the_configured_number_of_generation_jobs(): void

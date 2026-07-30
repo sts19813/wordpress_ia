@@ -11,8 +11,6 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 class SchedulerController extends Controller
 {
@@ -23,20 +21,51 @@ class SchedulerController extends Controller
 
     public function index(Request $request): View
     {
-        $tasks = Scheduler::query()
-            ->with([
-                'article:id,user_id,title,status',
-                'article.images:id,ai_article_id,status,type',
-                'sourceSite:id,name',
-                'sourcePost:id,title',
-                'publication:id,status,remote_url,error_message',
+        $taskRelations = [
+            'article:id,user_id,title,status',
+            'article.images:id,ai_article_id,status,type',
+            'article.publications' => fn ($query) => $query
+                ->select('id', 'ai_article_id', 'status', 'remote_url', 'published_at')
+                ->where('status', 'published')
+                ->whereNotNull('remote_url')
+                ->latest('published_at'),
+            'sourceSite:id,name',
+            'sourcePost:id,title',
+            'publication:id,status,remote_url,error_message',
+        ];
+        $activeTasks = Scheduler::query()
+            ->with($taskRelations)
+            ->whereIn('status', [
+                Scheduler::STATUS_QUEUED,
+                Scheduler::STATUS_RUNNING,
+                Scheduler::STATUS_FAILED,
             ])
             ->latest()
             ->get();
+        $completedTasks = Scheduler::query()
+            ->with($taskRelations)
+            ->where('status', Scheduler::STATUS_COMPLETED)
+            ->where(function ($query): void {
+                $query
+                    ->whereHas('publication', fn ($publicationQuery) => $publicationQuery
+                        ->where('status', 'published')
+                        ->whereNotNull('remote_url'))
+                    ->orWhereHas('article.publications', fn ($publicationQuery) => $publicationQuery
+                        ->where('status', 'published')
+                        ->whereNotNull('remote_url'));
+            })
+            ->latest('finished_at')
+            ->latest('id')
+            ->get();
+        $selectedTaskId = (int) $request->query('task', 0);
+        $activeTab = ($request->query('tab') === 'completed'
+            || $completedTasks->contains('id', $selectedTaskId))
+                ? 'completed'
+                : 'active';
         $sourceSites = SourceSite::query()
             ->with([
                 'promptProfile:id,name',
-                'wordpressSite:id,type,name,rest_api_url,facebook_page_id',
+                'wordpressSite:id,name',
             ])
             ->orderBy('next_scan_at')
             ->orderBy('name')
@@ -48,18 +77,12 @@ class SchedulerController extends Controller
             ->get()
             ->keyBy('source_site_id');
 
-        $counts = collect(Scheduler::statusOptions())
-            ->mapWithKeys(fn (string $label, string $status) => [
-                $status => $tasks->where('status', $status)->count(),
-            ]);
-
         return view('admin.scheduler.index', [
-            'tasks' => $tasks,
-            'counts' => $counts,
-            'selectedTaskId' => (int) $request->query('task', 0),
-            'databaseQueueSize' => Schema::hasTable('jobs') ? DB::table('jobs')->count() : 0,
-            'failedQueueSize' => Schema::hasTable('failed_jobs') ? DB::table('failed_jobs')->count() : 0,
-            'workerMayBeStopped' => $tasks->contains(fn (Scheduler $task) => $task->status === Scheduler::STATUS_QUEUED && $task->created_at->lt(now()->subMinutes(2))),
+            'activeTasks' => $activeTasks,
+            'completedTasks' => $completedTasks,
+            'activeTab' => $activeTab,
+            'selectedTaskId' => $selectedTaskId,
+            'workerMayBeStopped' => $activeTasks->contains(fn (Scheduler $task) => $task->status === Scheduler::STATUS_QUEUED && $task->created_at->lt(now()->subMinutes(2))),
             'sourceSites' => $sourceSites,
             'activeSourceTasks' => $activeSourceTasks,
         ]);
@@ -102,7 +125,7 @@ class SchedulerController extends Controller
                 $task->status === Scheduler::STATUS_COMPLETED ? 'status' : 'warning',
                 $task->status === Scheduler::STATUS_COMPLETED
                     ? 'El trabajo se ejecutó manualmente y quedó completado.'
-                    : 'La ejecución manual terminó con un error. Revisa la bitácora del trabajo.',
+                    : 'La ejecución manual terminó con un error. Revisa el proceso.',
             );
     }
 
@@ -117,6 +140,21 @@ class SchedulerController extends Controller
             ->with('status', 'El trabajo se añadió nuevamente a la cola.');
     }
 
+    public function destroy(Request $request, Scheduler $scheduler): RedirectResponse
+    {
+        abort_unless(
+            in_array($scheduler->status, [Scheduler::STATUS_FAILED, Scheduler::STATUS_COMPLETED], true),
+            422,
+            'Sólo se pueden eliminar ejecuciones finalizadas o con error.',
+        );
+
+        $scheduler->delete();
+
+        return redirect()
+            ->route('admin.scheduler.index', ['tab' => $request->input('return_tab')])
+            ->with('status', 'Ejecución eliminada. El contenido relacionado se conservó.');
+    }
+
     public function runSource(Request $request, SourceSite $sourceSite): RedirectResponse
     {
         abort_unless($sourceSite->active && $sourceSite->status !== SourceSite::STATUS_PAUSED, 422, 'El sitio fuente no está activo.');
@@ -127,6 +165,6 @@ class SchedulerController extends Controller
 
         return redirect()
             ->route('admin.scheduler.index', ['task' => $task->id])
-            ->with('status', 'La consulta está en la cola. Si el procesador no responde, usa “Ejecutar ahora” en el trabajo.');
+            ->with('status', 'La consulta está en la cola. Si el procesador no responde, usa “Ejecutar” en el trabajo.');
     }
 }

@@ -45,8 +45,10 @@ class AiGenerationQueueTest extends TestCase
         $this->actingAs($user)
             ->get(route('admin.scheduler.index', ['task' => $task->id]))
             ->assertOk()
-            ->assertSee('Programador y colas')
-            ->assertSee('Solicitud recibida y añadida a la cola.');
+            ->assertSee('Programador')
+            ->assertSee('En cola')
+            ->assertSee('task-progress-wrap', false)
+            ->assertDontSee('Solicitud recibida y añadida a la cola.');
 
         $this->actingAs($user)
             ->getJson(route('admin.scheduler.status', $task))
@@ -111,7 +113,7 @@ class AiGenerationQueueTest extends TestCase
         $this->actingAs($other)
             ->get(route('admin.scheduler.index'))
             ->assertOk()
-            ->assertSee('Ejecutar ahora');
+            ->assertSee('Ejecutar');
 
         $this->actingAs($other)
             ->post(route('admin.scheduler.execute', $task))
