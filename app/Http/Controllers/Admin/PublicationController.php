@@ -23,15 +23,13 @@ class PublicationController extends Controller
         Gate::authorize('viewAny', Publication::class);
 
         $publications = Publication::query()
-            ->with(['wordpressSite:id,user_id,type,name,rest_api_url,facebook_page_id', 'aiArticle:id,user_id,title,slug'])
+            ->with(['wordpressSite:id,name', 'aiArticle:id,title'])
             ->latest()
             ->get();
 
         return view('admin.publications.index', [
             'publications' => $publications,
             'sites' => $request->user()->wordpressSites()->latest()->get(),
-            'publishedCount' => $publications->where('status', Publication::STATUS_PUBLISHED)->count(),
-            'failedCount' => $publications->where('status', Publication::STATUS_FAILED)->count(),
         ]);
     }
 

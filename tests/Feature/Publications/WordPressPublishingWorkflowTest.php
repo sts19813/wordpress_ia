@@ -156,7 +156,14 @@ class WordPressPublishingWorkflowTest extends TestCase
         $this->actingAs($user)
             ->get(route('admin.publications.index'))
             ->assertOk()
-            ->assertSee('El usuario no puede crear entradas.')
+            ->assertDontSee('El usuario no puede crear entradas.')
+            ->assertDontSee('Entradas enviadas')
+            ->assertDontSee('Publicadas')
+            ->assertDontSee('Perfiles configurados')
+            ->assertDontSee('Con error')
+            ->assertDontSee('ID remoto:')
+            ->assertDontSee('<th>Estado</th>', false)
+            ->assertDontSee('<th>Detalle</th>', false)
             ->assertSee('https://good.test/post');
     }
 
