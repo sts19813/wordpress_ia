@@ -39,6 +39,7 @@ class WordPressSiteController extends Controller
             'site' => new WordPressSite([
                 'type' => WordPressSite::TYPE_WORDPRESS,
                 'facebook_api_version' => 'v24.0',
+                'instagram_api_version' => 'v24.0',
                 'status' => WordPressSite::STATUS_ACTIVE,
                 'active' => true,
             ]),
@@ -77,6 +78,16 @@ class WordPressSiteController extends Controller
             unset($data['facebook_access_token']);
         }
 
+        if (($data['type'] ?? null) === WordPressSite::TYPE_INSTAGRAM
+            && blank($data['instagram_access_token'] ?? null)) {
+            unset($data['instagram_access_token']);
+        }
+
+        if (($data['type'] ?? null) === WordPressSite::TYPE_X
+            && blank($data['x_access_token'] ?? null)) {
+            unset($data['x_access_token']);
+        }
+
         $wordpressSite->update($data);
 
         return $this->testAndRedirect($wordpressSite, 'Perfil de publicación actualizado y conectado correctamente.');
@@ -112,20 +123,32 @@ class WordPressSiteController extends Controller
                 $updates['facebook_access_token'] = $connection['facebook_access_token'];
             }
 
+            if ($site->isInstagram()) {
+                $updates['instagram_account_id'] = $connection['instagram_account_id'];
+            }
+
+            if ($site->isX()) {
+                $updates['x_user_id'] = $connection['x_user_id'];
+                $updates['x_username'] = $connection['x_username'];
+            }
+
             $site->update($updates);
 
             return redirect()->route('admin.wordpress-sites.index')->with('status', $successMessage);
         } catch (Throwable $exception) {
             $remoteMessage = $exception instanceof RequestException
-                ? ($exception->response?->json('error.message') ?: $exception->response?->json('message'))
+                ? ($exception->response?->json('error.message')
+                    ?: $exception->response?->json('message')
+                    ?: $exception->response?->json('detail')
+                    ?: $exception->response?->json('errors.0.detail'))
                 : null;
             $exceptionMessage = trim($exception->getMessage());
             $message = is_string($remoteMessage) && $remoteMessage !== ''
                 ? $remoteMessage
-                : ($site->isFacebookPage() && $exceptionMessage !== ''
+                : ($site->isSocial() && $exceptionMessage !== ''
                     ? $exceptionMessage
-                    : ($site->isFacebookPage()
-                        ? 'No pudimos autenticar la página. Verifica el ID, el Page Access Token y sus permisos.'
+                    : ($site->isSocial()
+                        ? 'No pudimos autenticar el perfil social. Verifica la cuenta, el token y sus permisos.'
                         : 'No pudimos autenticar el sitio. Verifica el dominio, el usuario y la contraseña de aplicación.'));
 
             $site->update([
@@ -145,20 +168,32 @@ class WordPressSiteController extends Controller
      */
     private function normalizedData(array $data): array
     {
-        if (($data['type'] ?? null) === WordPressSite::TYPE_FACEBOOK_PAGE) {
-            return [
-                ...$data,
-                'rest_api_url' => null,
-                'username' => null,
-                'application_password' => null,
-            ];
-        }
-
-        return [
+        $type = $data['type'] ?? WordPressSite::TYPE_WORDPRESS;
+        $normalized = [
             ...$data,
+            'rest_api_url' => $type === WordPressSite::TYPE_WORDPRESS ? ($data['rest_api_url'] ?? null) : null,
+            'username' => $type === WordPressSite::TYPE_WORDPRESS ? ($data['username'] ?? null) : null,
+            'application_password' => $type === WordPressSite::TYPE_WORDPRESS ? ($data['application_password'] ?? null) : null,
             'facebook_page_id' => null,
             'facebook_access_token' => null,
             'facebook_api_version' => 'v24.0',
+            'instagram_account_id' => null,
+            'instagram_access_token' => null,
+            'instagram_api_version' => 'v24.0',
+            'x_user_id' => null,
+            'x_username' => null,
+            'x_access_token' => null,
         ];
+
+        foreach (match ($type) {
+            WordPressSite::TYPE_FACEBOOK_PAGE => ['facebook_page_id', 'facebook_access_token', 'facebook_api_version'],
+            WordPressSite::TYPE_INSTAGRAM => ['instagram_account_id', 'instagram_access_token', 'instagram_api_version'],
+            WordPressSite::TYPE_X => ['x_username', 'x_access_token'],
+            default => [],
+        } as $field) {
+            $normalized[$field] = $data[$field] ?? null;
+        }
+
+        return $normalized;
     }
 }

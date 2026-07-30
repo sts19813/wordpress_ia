@@ -98,7 +98,7 @@ class PublishQuickPost implements ShouldBeUnique, ShouldQueue
             ->where('active', true)
             ->where('status', WordPressSite::STATUS_ACTIVE)
             ->get()
-            ->sortBy(fn (WordPressSite $profile) => $profile->isFacebookPage() ? 1 : 0)
+            ->sortBy(fn (WordPressSite $profile) => $profile->isSocial() ? 1 : 0)
             ->values();
         $unavailableCount = count($profileIds) - $profiles->count();
 

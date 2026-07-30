@@ -130,7 +130,14 @@
                         @if ($publicationProfiles->isNotEmpty())
                             <div class="row g-4">
                                 @foreach ($publicationProfiles as $publicationProfile)
-                                    @php($isFacebook = $publicationProfile->isFacebookPage())
+                                    @php
+                                        $destinationClass = match ($publicationProfile->type) {
+                                            App\Models\WordPressSite::TYPE_FACEBOOK_PAGE => 'is-facebook',
+                                            App\Models\WordPressSite::TYPE_INSTAGRAM => 'is-instagram',
+                                            App\Models\WordPressSite::TYPE_X => 'is-x',
+                                            default => 'is-wordpress',
+                                        };
+                                    @endphp
                                     <div class="col-md-6">
                                         <label class="quick-post-destination border rounded p-5 h-100 d-flex align-items-start gap-4 cursor-pointer">
                                             <input
@@ -140,9 +147,13 @@
                                                 value="{{ $publicationProfile->id }}"
                                                 @checked(in_array($publicationProfile->id, array_map('intval', old('publication_profile_ids', []))))
                                             >
-                                            <span class="quick-post-destination-icon {{ $isFacebook ? 'is-facebook' : 'is-wordpress' }}">
-                                                @if ($isFacebook)
+                                            <span class="quick-post-destination-icon {{ $destinationClass }}">
+                                                @if ($publicationProfile->isFacebookPage())
                                                     <i class="ki-outline ki-facebook"></i>
+                                                @elseif ($publicationProfile->isInstagram())
+                                                    <i class="ki-outline ki-instagram"></i>
+                                                @elseif ($publicationProfile->isX())
+                                                    <strong>𝕏</strong>
                                                 @else
                                                     <strong>W</strong>
                                                 @endif
@@ -163,7 +174,7 @@
                                 <i class="ki-outline ki-information-5 fs-2x text-warning me-3"></i>
                                 <div class="flex-grow-1">
                                     <div class="fw-bold text-gray-900">No hay perfiles listos para publicar</div>
-                                    <div class="text-muted fs-7 mt-1">El post se guardará como borrador. Conecta WordPress o una página de Facebook para publicarlo automáticamente.</div>
+                                    <div class="text-muted fs-7 mt-1">El post se guardará como borrador. Conecta WordPress, Facebook, Instagram o X para publicarlo automáticamente.</div>
                                 </div>
                                 <a href="{{ route('admin.wordpress-sites.create') }}" class="btn btn-sm btn-warning align-self-center">Agregar perfil</a>
                             </div>
@@ -206,6 +217,8 @@
 }
 
 .quick-post-destination-icon.is-facebook { background: #1877f2; }
+.quick-post-destination-icon.is-instagram { background: #c13584; }
+.quick-post-destination-icon.is-x { background: #111; }
 .quick-post-destination-icon.is-wordpress { background: #28799e; }
 </style>
 @endpush

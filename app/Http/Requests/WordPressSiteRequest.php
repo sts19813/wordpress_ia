@@ -28,6 +28,9 @@ class WordPressSiteRequest extends FormRequest
             'rest_api_url' => rtrim($url, '/'),
             'facebook_page_id' => trim((string) $this->input('facebook_page_id')),
             'facebook_api_version' => trim((string) $this->input('facebook_api_version', 'v24.0')),
+            'instagram_account_id' => trim((string) $this->input('instagram_account_id')),
+            'instagram_api_version' => trim((string) $this->input('instagram_api_version', 'v24.0')),
+            'x_username' => ltrim(trim((string) $this->input('x_username')), '@'),
             'active' => $this->boolean('active'),
         ]);
     }
@@ -38,10 +41,16 @@ class WordPressSiteRequest extends FormRequest
         $storedProfile = $this->route('wordpressSite');
         $isWordPress = $this->input('type') === WordPressSite::TYPE_WORDPRESS;
         $isFacebook = $this->input('type') === WordPressSite::TYPE_FACEBOOK_PAGE;
+        $isInstagram = $this->input('type') === WordPressSite::TYPE_INSTAGRAM;
+        $isX = $this->input('type') === WordPressSite::TYPE_X;
         $requiresWordPressPassword = $isWordPress
             && ($isCreating || ! ($storedProfile instanceof WordPressSite) || blank($storedProfile->application_password));
         $requiresFacebookToken = $isFacebook
             && ($isCreating || ! ($storedProfile instanceof WordPressSite) || blank($storedProfile->facebook_access_token));
+        $requiresInstagramToken = $isInstagram
+            && ($isCreating || ! ($storedProfile instanceof WordPressSite) || blank($storedProfile->instagram_access_token));
+        $requiresXToken = $isX
+            && ($isCreating || ! ($storedProfile instanceof WordPressSite) || blank($storedProfile->x_access_token));
 
         return [
             'name' => ['required', 'string', 'max:255'],
@@ -52,6 +61,11 @@ class WordPressSiteRequest extends FormRequest
             'facebook_page_id' => [$isFacebook ? 'required' : 'nullable', 'regex:/^\d+$/', 'max:255'],
             'facebook_access_token' => [$requiresFacebookToken ? 'required' : 'nullable', 'string', 'max:4096'],
             'facebook_api_version' => [$isFacebook ? 'required' : 'nullable', 'regex:/^v\d+\.\d+$/', 'max:20'],
+            'instagram_account_id' => [$isInstagram ? 'required' : 'nullable', 'regex:/^\d+$/', 'max:255'],
+            'instagram_access_token' => [$requiresInstagramToken ? 'required' : 'nullable', 'string', 'max:4096'],
+            'instagram_api_version' => [$isInstagram ? 'required' : 'nullable', 'regex:/^v\d+\.\d+$/', 'max:20'],
+            'x_username' => ['nullable', 'regex:/^[A-Za-z0-9_]{1,15}$/'],
+            'x_access_token' => [$requiresXToken ? 'required' : 'nullable', 'string', 'max:4096'],
             'active' => ['boolean'],
         ];
     }
@@ -61,6 +75,9 @@ class WordPressSiteRequest extends FormRequest
         return [
             'facebook_page_id.regex' => 'El identificador de la página solo debe contener números.',
             'facebook_api_version.regex' => 'La versión debe tener un formato como v24.0.',
+            'instagram_account_id.regex' => 'El identificador de la cuenta de Instagram solo debe contener números.',
+            'instagram_api_version.regex' => 'La versión debe tener un formato como v24.0.',
+            'x_username.regex' => 'El usuario de X solo puede contener letras, números y guion bajo.',
         ];
     }
 
@@ -75,6 +92,11 @@ class WordPressSiteRequest extends FormRequest
             'facebook_page_id' => 'ID de la página de Facebook',
             'facebook_access_token' => 'Page Access Token',
             'facebook_api_version' => 'versión de Graph API',
+            'instagram_account_id' => 'ID de la cuenta profesional de Instagram',
+            'instagram_access_token' => 'token de acceso de Instagram',
+            'instagram_api_version' => 'versión de Graph API',
+            'x_username' => 'usuario de X',
+            'x_access_token' => 'User Access Token de X',
             'active' => 'perfil activo',
         ];
     }

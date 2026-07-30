@@ -15,6 +15,10 @@ class WordPressSite extends Model
 
     public const TYPE_FACEBOOK_PAGE = 'facebook_page';
 
+    public const TYPE_INSTAGRAM = 'instagram';
+
+    public const TYPE_X = 'x';
+
     public const STATUS_ACTIVE = 'active';
 
     public const STATUS_PAUSED = 'paused';
@@ -31,6 +35,12 @@ class WordPressSite extends Model
         'facebook_page_id',
         'facebook_access_token',
         'facebook_api_version',
+        'instagram_account_id',
+        'instagram_access_token',
+        'instagram_api_version',
+        'x_user_id',
+        'x_username',
+        'x_access_token',
         'categories',
         'tags',
         'status',
@@ -42,6 +52,8 @@ class WordPressSite extends Model
     protected $hidden = [
         'application_password',
         'facebook_access_token',
+        'instagram_access_token',
+        'x_access_token',
     ];
 
     protected function casts(): array
@@ -49,6 +61,8 @@ class WordPressSite extends Model
         return [
             'application_password' => 'encrypted',
             'facebook_access_token' => 'encrypted',
+            'instagram_access_token' => 'encrypted',
+            'x_access_token' => 'encrypted',
             'categories' => 'array',
             'tags' => 'array',
             'active' => 'boolean',
@@ -73,6 +87,8 @@ class WordPressSite extends Model
         return [
             self::TYPE_WORDPRESS => 'Sitio WordPress',
             self::TYPE_FACEBOOK_PAGE => 'Página de Facebook',
+            self::TYPE_INSTAGRAM => 'Cuenta de Instagram',
+            self::TYPE_X => 'Cuenta de X',
         ];
     }
 
@@ -91,11 +107,33 @@ class WordPressSite extends Model
         return $this->type === self::TYPE_FACEBOOK_PAGE;
     }
 
+    public function isInstagram(): bool
+    {
+        return $this->type === self::TYPE_INSTAGRAM;
+    }
+
+    public function isX(): bool
+    {
+        return $this->type === self::TYPE_X;
+    }
+
+    public function isSocial(): bool
+    {
+        return in_array($this->type, [
+            self::TYPE_FACEBOOK_PAGE,
+            self::TYPE_INSTAGRAM,
+            self::TYPE_X,
+        ], true);
+    }
+
     public function destinationLabel(): ?string
     {
-        return $this->isFacebookPage()
-            ? ($this->facebook_page_id ? 'facebook.com/'.$this->facebook_page_id : null)
-            : $this->rest_api_url;
+        return match ($this->type) {
+            self::TYPE_FACEBOOK_PAGE => $this->facebook_page_id ? 'facebook.com/'.$this->facebook_page_id : null,
+            self::TYPE_INSTAGRAM => $this->instagram_account_id ? 'instagram.com / '.$this->instagram_account_id : null,
+            self::TYPE_X => $this->x_username ? 'x.com/'.ltrim($this->x_username, '@') : null,
+            default => $this->rest_api_url,
+        };
     }
 
     public function publications(): HasMany

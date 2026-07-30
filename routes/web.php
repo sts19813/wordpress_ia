@@ -19,6 +19,7 @@ use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Controllers\PublicationMediaController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -26,6 +27,10 @@ Route::get('/', function () {
         ? redirect()->route('admin.dashboard')
         : redirect()->route('login');
 });
+
+Route::get('medios-publicacion/{aiImage}', PublicationMediaController::class)
+    ->middleware('signed')
+    ->name('publication-media.show');
 
 Route::middleware('guest')->group(function () {
     Route::get('login', [AuthenticatedSessionController::class, 'create'])->name('login');

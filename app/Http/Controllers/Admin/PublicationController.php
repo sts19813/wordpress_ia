@@ -60,7 +60,7 @@ class PublicationController extends Controller
 
         $aiArticle->load('images');
         $results = $selectedProfiles
-            ->sortBy(fn ($profile) => $profile->isFacebookPage() ? 1 : 0)
+            ->sortBy(fn ($profile) => $profile->isSocial() ? 1 : 0)
             ->map(fn ($profile) => $this->publicationService->publishNow($profile, $aiArticle, $aiArticle->mainImage()));
         $successful = $results->filter(fn (Publication $publication) => $publication->isSuccessful())->count();
         $failed = $results->where('status', Publication::STATUS_FAILED)->count();

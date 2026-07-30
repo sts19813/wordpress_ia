@@ -335,9 +335,21 @@
                                     <div class="d-flex align-items-center justify-content-between gap-3 mb-4">
                                         <div class="ops-destination-avatars">
                                             @foreach ($article->publications->take(3) as $publication)
-                                                <span class="{{ $publication->wordpressSite?->isFacebookPage() ? 'is-facebook' : 'is-wordpress' }}" title="{{ $publication->wordpressSite?->name }}">
+                                                @php
+                                                    $destinationClass = match ($publication->wordpressSite?->type) {
+                                                        App\Models\WordPressSite::TYPE_FACEBOOK_PAGE => 'is-facebook',
+                                                        App\Models\WordPressSite::TYPE_INSTAGRAM => 'is-instagram',
+                                                        App\Models\WordPressSite::TYPE_X => 'is-x',
+                                                        default => 'is-wordpress',
+                                                    };
+                                                @endphp
+                                                <span class="{{ $destinationClass }}" title="{{ $publication->wordpressSite?->name }}">
                                                     @if ($publication->wordpressSite?->isFacebookPage())
                                                         <i class="ki-outline ki-facebook"></i>
+                                                    @elseif ($publication->wordpressSite?->isInstagram())
+                                                        <i class="ki-outline ki-instagram"></i>
+                                                    @elseif ($publication->wordpressSite?->isX())
+                                                        <strong>𝕏</strong>
                                                     @else
                                                         <strong>W</strong>
                                                     @endif
@@ -807,6 +819,8 @@
         }
 
         .ops-destination-avatars .is-facebook { background: #1877f2; }
+        .ops-destination-avatars .is-instagram { background: #c13584; }
+        .ops-destination-avatars .is-x { background: #111; }
         .ops-destination-avatars .is-wordpress { background: #28799e; }
         .ops-destination-avatars .is-more { background: #eef1f6; color: #667085; font-size: .65rem; font-weight: 800; }
 

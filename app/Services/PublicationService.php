@@ -8,10 +8,15 @@ use App\Models\Publication;
 use App\Models\WordPressSite;
 use App\Services\Publications\FacebookPageClient;
 use App\Services\Publications\FacebookPublicationEngine;
+use App\Services\Publications\InstagramClient;
+use App\Services\Publications\InstagramPublicationEngine;
 use App\Services\Publications\PublicationEngine;
 use App\Services\Publications\WordPressRestClient;
+use App\Services\Publications\XClient;
+use App\Services\Publications\XPublicationEngine;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Storage;
+use RuntimeException;
 use Throwable;
 
 class PublicationService
@@ -21,6 +26,10 @@ class PublicationService
         private readonly WordPressRestClient $client,
         private readonly FacebookPublicationEngine $facebook,
         private readonly FacebookPageClient $facebookClient,
+        private readonly InstagramPublicationEngine $instagram,
+        private readonly InstagramClient $instagramClient,
+        private readonly XPublicationEngine $x,
+        private readonly XClient $xClient,
     ) {}
 
     public function createPublication(WordPressSite $site, AiArticle $article, ?AiImage $image = null): Publication
@@ -79,6 +88,34 @@ class PublicationService
             ];
         }
 
+        if ($site->isInstagram()) {
+            $response = $this->instagramClient->testConnection($site);
+            $accountType = strtoupper((string) $response->json('account_type'));
+
+            if (! in_array($accountType, ['BUSINESS', 'CREATOR', 'MEDIA_CREATOR'], true)) {
+                throw new RuntimeException('La cuenta de Instagram debe ser profesional (Business o Creator).');
+            }
+
+            return [
+                'id' => $response->json('id'),
+                'name' => $response->json('username'),
+                'roles' => [],
+                'instagram_account_id' => (string) $response->json('id'),
+            ];
+        }
+
+        if ($site->isX()) {
+            $response = $this->xClient->testConnection($site);
+
+            return [
+                'id' => $response->json('data.id'),
+                'name' => $response->json('data.name'),
+                'roles' => [],
+                'x_user_id' => (string) $response->json('data.id'),
+                'x_username' => (string) $response->json('data.username'),
+            ];
+        }
+
         $response = $this->client->testConnection($site);
 
         return [
@@ -92,6 +129,14 @@ class PublicationService
     {
         if ($site->isFacebookPage()) {
             return $this->facebook->publishNow($site, $article, $image);
+        }
+
+        if ($site->isInstagram()) {
+            return $this->instagram->publishNow($site, $article, $image);
+        }
+
+        if ($site->isX()) {
+            return $this->x->publishNow($site, $article, $image);
         }
 
         $publication = Publication::query()
