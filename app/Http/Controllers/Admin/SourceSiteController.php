@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SourceSiteRequest;
 use App\Models\SourceSite;
+use App\Models\SystemLog;
 use App\Repositories\SourceSiteRepository;
 use App\Services\AiPromptProfileService;
 use App\Services\NewsSources\SourceSiteTester;
 use App\Services\SourceSiteService;
+use App\Services\SystemLogService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -22,6 +24,7 @@ class SourceSiteController extends Controller
         private readonly SourceSiteRepository $sourceSites,
         private readonly SourceSiteService $sourceSiteService,
         private readonly AiPromptProfileService $promptProfiles,
+        private readonly SystemLogService $systemLogs,
     ) {}
 
     public function index(): View
@@ -116,6 +119,14 @@ class SourceSiteController extends Controller
                 'auth_method' => $validated['auth_method'] ?? SourceSite::AUTH_NONE,
             ])));
         } catch (Throwable $exception) {
+            $this->systemLogs->recordError(
+                SystemLog::EVENT_SOURCE_FAILED,
+                'Sitios fuente',
+                $exception->getMessage(),
+                context: ['url' => $validated['url']],
+                userId: $request->user()?->id,
+            );
+
             return response()->json([
                 'ok' => false,
                 'message' => $exception->getMessage(),

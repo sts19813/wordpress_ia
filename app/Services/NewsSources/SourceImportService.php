@@ -4,7 +4,9 @@ namespace App\Services\NewsSources;
 
 use App\Models\SourceScanLog;
 use App\Models\SourceSite;
+use App\Models\SystemLog;
 use App\Services\SourcePostService;
+use App\Services\SystemLogService;
 use Illuminate\Support\Collection;
 use Throwable;
 
@@ -15,6 +17,7 @@ class SourceImportService
         private readonly SourcePostService $sourcePostService,
         private readonly SourceContentFilter $contentFilter,
         private readonly ArticleContentExtractor $contentExtractor,
+        private readonly SystemLogService $systemLogs,
     ) {}
 
     /**
@@ -164,6 +167,14 @@ class SourceImportService
                 'status' => SourceSite::STATUS_ERROR,
                 'last_synced_at' => now(),
             ])->save();
+            $this->systemLogs->recordError(
+                SystemLog::EVENT_SOURCE_FAILED,
+                'Sitios fuente',
+                "{$sourceSite->name}: {$exception->getMessage()}",
+                $sourceSite,
+                ['source' => $sourceSite->name],
+                $sourceSite->automation_user_id,
+            );
 
             return [
                 'fetched' => 0,
