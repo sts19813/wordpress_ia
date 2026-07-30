@@ -9,102 +9,238 @@
         'duplicate' => 'badge-light-warning',
         'invalid' => 'badge-light-dark',
     ];
+
+    $filterMethodLabels = [
+        'ai' => 'Inteligencia artificial',
+        'keyword_fallback' => 'Respaldo por palabras',
+        'no_filter' => 'Sin filtro',
+        'validation' => 'Validación',
+    ];
 @endphp
 
 @section('toolbar')
     <div>
         <h1 class="page-heading text-gray-900 fw-bold fs-3 my-0">Bitácora de fuentes</h1>
-        <div class="text-muted fw-semibold fs-7 pt-1">Historial de cada nota escaneada y la razón por la que aplicó, se descartó o ya era conocida.</div>
+        <div class="text-muted fw-semibold fs-7 pt-1">Historial de notas escaneadas y su decisión.</div>
     </div>
 @endsection
 
 @section('content')
-    <div class="card card-flush">
-        <div class="card-header align-items-center gap-4 py-5">
-            <div class="card-title w-100">
-                <form method="GET" class="d-flex flex-column flex-xl-row align-items-xl-center gap-3 w-100">
-                    <div class="position-relative">
-                        <i class="ki-outline ki-magnifier fs-3 position-absolute ms-4 top-50 translate-middle-y text-gray-500"></i>
-                        <input type="search" name="search" value="{{ request('search') }}" class="form-control form-control-solid ps-12 w-275px" placeholder="Título, URL o motivo…">
-                    </div>
-                    <select name="source_site_id" class="form-select form-select-solid w-225px">
-                        <option value="">Todos los sitios</option>
-                        @foreach ($sourceSites as $id => $name)
-                            <option value="{{ $id }}" @selected((string) request('source_site_id') === (string) $id)>{{ $name }}</option>
-                        @endforeach
-                    </select>
-                    <select name="outcome" class="form-select form-select-solid w-175px">
-                        <option value="">Todas las decisiones</option>
-                        @foreach ($outcomeOptions as $value => $label)
-                            <option value="{{ $value }}" @selected(request('outcome') === $value)>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                    <input type="date" name="date_from" value="{{ request('date_from') }}" class="form-control form-control-solid w-150px" aria-label="Desde">
-                    <input type="date" name="date_to" value="{{ request('date_to') }}" class="form-control form-control-solid w-150px" aria-label="Hasta">
-                    <button class="btn btn-light-primary" type="submit"><i class="ki-outline ki-filter fs-2"></i>Filtrar</button>
-                    <a href="{{ route('admin.source-scan-logs.index') }}" class="btn btn-light">Limpiar</a>
-                </form>
-            </div>
-        </div>
-
-        <div class="card-body pt-0">
-            <div class="table-responsive">
-                <table class="table align-middle table-row-dashed fs-6 gy-5 admin-datatable">
-                    <thead>
-                        <tr class="text-start text-gray-500 fw-bold fs-7 text-uppercase gs-0">
-                            <th class="min-w-300px">Nota escaneada</th>
-                            <th class="min-w-170px">Sitio</th>
-                            <th class="min-w-130px">Decisión</th>
-                            <th class="min-w-300px">Motivo</th>
-                            <th class="min-w-160px">Método</th>
-                            <th class="min-w-160px">Fecha</th>
-                            <th class="text-end min-w-90px no-sort no-search">Detalle</th>
-                        </tr>
-                    </thead>
-                    <tbody class="fw-semibold text-gray-700">
-                        @foreach ($logs as $log)
-                            <tr>
-                                <td>
-                                    <div class="fw-bold text-gray-900">{{ $log->title ?: 'Elemento sin título' }}</div>
-                                    @if ($log->url)<div class="text-muted text-truncate mw-400px">{{ $log->url }}</div>@endif
-                                    <div class="d-flex flex-wrap gap-1 mt-2">
-                                        @if (data_get($log->metadata, 'connection_type') === \App\Models\SourceSite::TYPE_AI_WEB)
-                                            <span class="badge badge-light-warning" title="{{ data_get($log->metadata, 'structure_summary') }}">
-                                                <i class="ki-outline ki-sparkles fs-7 me-1"></i>Conexión IA
-                                            </span>
-                                        @endif
-                                        @foreach ($log->matched_topics ?: [] as $topic)
-                                            <span class="badge badge-light-primary">{{ $topic }}</span>
-                                        @endforeach
-                                    </div>
-                                </td>
-                                <td>{{ $log->sourceSite?->name ?: 'Sitio eliminado' }}</td>
-                                <td><span class="badge {{ $outcomeClasses[$log->outcome] ?? 'badge-light' }}">{{ $log->outcomeLabel() }}</span></td>
-                                <td>{{ $log->reason ?: '-' }}</td>
-                                <td>
-                                    <span class="badge badge-light-info">
-                                        {{ match($log->filter_method) {
-                                            'ai' => 'Inteligencia artificial',
-                                            'keyword_fallback' => 'Respaldo por palabras',
-                                            'no_filter' => 'Sin filtro',
-                                            'validation' => 'Validación',
-                                            default => $log->filter_method ?: '-',
-                                        } }}
-                                    </span>
-                                </td>
-                                <td data-order="{{ $log->scanned_at?->timestamp ?: 0 }}">{{ $log->scanned_at?->format('d/m/Y H:i:s') ?: '-' }}</td>
-                                <td class="text-end">
-                                    @if ($log->sourcePost)
-                                        <a href="{{ route('admin.news.show', $log->sourcePost) }}" class="btn btn-icon btn-light btn-sm" title="Ver nota"><i class="ki-outline ki-eye fs-3"></i></a>
-                                    @elseif ($log->url)
-                                        <a href="{{ $log->url }}" target="_blank" rel="noopener" class="btn btn-icon btn-light btn-sm" title="Abrir URL"><i class="ki-outline ki-exit-up fs-3"></i></a>
-                                    @endif
-                                </td>
+    <div class="source-scan-logs-page">
+        <div class="card card-flush">
+            <div class="card-body py-5">
+                <div class="source-scan-logs-table-wrap">
+                    <table class="table align-middle table-row-dashed fs-7 gy-3 admin-datatable source-scan-logs-table" data-page-length="50">
+                        <colgroup>
+                            <col class="source-log-col-note">
+                            <col class="source-log-col-site">
+                            <col class="source-log-col-outcome">
+                            <col class="source-log-col-reason">
+                            <col class="source-log-col-date">
+                            <col class="source-log-col-action">
+                        </colgroup>
+                        <thead>
+                            <tr class="text-start text-gray-500 fw-bold fs-8 text-uppercase">
+                                <th>Nota</th>
+                                <th>Sitio</th>
+                                <th>Decisión</th>
+                                <th>Motivo</th>
+                                <th>Fecha</th>
+                                <th class="text-end no-sort no-search">Acción</th>
                             </tr>
-                        @endforeach
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody class="fw-semibold text-gray-700">
+                            @foreach ($logs as $log)
+                                @php
+                                    $filterMethodLabel = $filterMethodLabels[$log->filter_method] ?? ($log->filter_method ?: 'Sin método');
+                                @endphp
+                                <tr>
+                                    <td data-label="Nota">
+                                        <div class="source-log-title fw-bold text-gray-900">{{ $log->title ?: 'Elemento sin título' }}</div>
+                                        @if ($log->url)
+                                            <span class="visually-hidden">{{ $log->url }}</span>
+                                        @endif
+                                    </td>
+                                    <td data-label="Sitio">
+                                        <div class="source-log-site text-gray-800">{{ $log->sourceSite?->name ?: 'Sitio eliminado' }}</div>
+                                    </td>
+                                    <td data-label="Decisión">
+                                        <span
+                                            class="badge {{ $outcomeClasses[$log->outcome] ?? 'badge-light' }}"
+                                            title="Método: {{ $filterMethodLabel }}"
+                                        >
+                                            {{ $log->outcomeLabel() }}
+                                        </span>
+                                    </td>
+                                    <td data-label="Motivo">
+                                        <div class="source-log-reason" title="{{ $log->reason ?: '' }}">{{ $log->reason ?: '—' }}</div>
+                                    </td>
+                                    <td class="text-nowrap text-muted" data-label="Fecha" data-order="{{ $log->scanned_at?->timestamp ?: 0 }}">
+                                        {{ $log->scanned_at?->format('d/m/y H:i') ?: '—' }}
+                                    </td>
+                                    <td class="text-end" data-label="Acción">
+                                        @if ($log->sourcePost)
+                                            <a href="{{ route('admin.news.show', $log->sourcePost) }}" class="btn btn-icon btn-light btn-sm" title="Ver nota" aria-label="Ver nota">
+                                                <i class="ki-outline ki-eye fs-3"></i>
+                                            </a>
+                                        @elseif ($log->url)
+                                            <a href="{{ $log->url }}" target="_blank" rel="noopener noreferrer" class="btn btn-icon btn-light btn-sm" title="Abrir fuente" aria-label="Abrir fuente">
+                                                <i class="ki-outline ki-exit-up fs-3"></i>
+                                            </a>
+                                        @else
+                                            <span class="text-muted">—</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
 @endsection
+
+@push('styles')
+    <style>
+        .source-scan-logs-page {
+            min-width: 0;
+            padding: 0 20px 8px;
+        }
+
+        .source-scan-logs-page .card,
+        .source-scan-logs-page .card-body,
+        .source-scan-logs-table-wrap,
+        .source-scan-logs-page .admin-datatable-wrapper {
+            min-width: 0;
+            overflow: visible;
+        }
+
+        .source-scan-logs-table {
+            width: 100% !important;
+            table-layout: fixed;
+        }
+
+        .source-log-col-note {
+            width: 25%;
+        }
+
+        .source-log-col-site {
+            width: 15%;
+        }
+
+        .source-log-col-outcome {
+            width: 12%;
+        }
+
+        .source-log-col-reason {
+            width: 31%;
+        }
+
+        .source-log-col-date {
+            width: 12%;
+        }
+
+        .source-log-col-action {
+            width: 5%;
+        }
+
+        .source-scan-logs-table th,
+        .source-scan-logs-table td {
+            min-width: 0 !important;
+            padding: .65rem .5rem !important;
+            overflow-wrap: anywhere;
+        }
+
+        .source-log-title,
+        .source-log-site {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .source-log-reason {
+            display: -webkit-box;
+            overflow: hidden;
+            line-height: 1.35;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+        }
+
+        .source-scan-logs-page .dataTables_filter {
+            width: 100%;
+            min-width: 0;
+        }
+
+        .source-scan-logs-page .dataTables_filter label {
+            width: 100%;
+            min-width: 0;
+            justify-content: flex-end;
+        }
+
+        .source-scan-logs-page .dataTables_filter input {
+            width: 280px !important;
+            max-width: calc(100% - 68px);
+            min-width: 0;
+        }
+
+        @media (max-width: 767.98px) {
+            .source-scan-logs-page {
+                padding-right: 16px;
+                padding-left: 16px;
+            }
+
+            .source-scan-logs-page .dataTables_filter label {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .source-scan-logs-page .dataTables_filter input {
+                width: 100% !important;
+                max-width: 100%;
+            }
+
+            .source-scan-logs-table colgroup,
+            .source-scan-logs-table thead {
+                display: none;
+            }
+
+            .source-scan-logs-table,
+            .source-scan-logs-table tbody,
+            .source-scan-logs-table tr,
+            .source-scan-logs-table td {
+                display: block;
+                width: 100% !important;
+            }
+
+            .source-scan-logs-table tr {
+                margin-bottom: .75rem;
+                padding: .5rem .75rem;
+                border: 1px solid var(--bs-gray-200);
+                border-radius: .65rem;
+            }
+
+            .source-scan-logs-table td {
+                display: grid;
+                grid-template-columns: 82px minmax(0, 1fr);
+                gap: .75rem;
+                align-items: center;
+                border: 0 !important;
+                padding: .42rem 0 !important;
+                text-align: left !important;
+            }
+
+            .source-scan-logs-table td::before {
+                color: var(--bs-gray-500);
+                content: attr(data-label);
+                font-size: .75rem;
+                font-weight: 700;
+                text-transform: uppercase;
+            }
+
+            .source-scan-logs-table td:last-child > * {
+                justify-self: start;
+            }
+        }
+    </style>
+@endpush

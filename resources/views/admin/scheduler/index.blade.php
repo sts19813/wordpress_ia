@@ -65,7 +65,9 @@
                             </td>
                             <td data-label="Próxima consulta" class="text-nowrap">
                                 @if (! $sourceSite->active)
-                                    <span class="badge badge-light-secondary">Inactivo</span>
+                                    <span class="badge scheduler-inactive-badge">
+                                        <i class="ki-outline ki-cross-circle fs-7 me-1"></i>Inactivo
+                                    </span>
                                 @elseif ($isDue)
                                     <span class="badge badge-light-warning">Vencida · ejecutar ahora</span>
                                 @else
@@ -166,6 +168,17 @@
         .scheduler-sources-table td {
             min-width: 0;
             overflow-wrap: anywhere;
+        }
+
+        .scheduler-inactive-badge {
+            border: 1px solid var(--bs-gray-400);
+            background: var(--bs-gray-200);
+            color: var(--bs-gray-700);
+            font-weight: 700;
+        }
+
+        .scheduler-inactive-badge i {
+            color: inherit;
         }
 
         .scheduler-task-card {

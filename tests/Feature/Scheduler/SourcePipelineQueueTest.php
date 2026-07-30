@@ -75,6 +75,24 @@ class SourcePipelineQueueTest extends TestCase
         Queue::assertPushed(ScanSourceSite::class);
     }
 
+    public function test_programmer_displays_inactive_sources_with_a_visible_status(): void
+    {
+        $user = User::factory()->create();
+        $profile = app(AiPromptProfileService::class)->ensureDefaultFor($user);
+        $this->sourceSite($user, $profile->id, [
+            'name' => 'Fuente detenida',
+            'active' => false,
+            'next_scan_at' => null,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('admin.scheduler.index'))
+            ->assertOk()
+            ->assertSee('Fuente detenida')
+            ->assertSee('Inactivo')
+            ->assertSee('scheduler-inactive-badge', false);
+    }
+
     public function test_a_queued_source_scan_can_be_executed_manually_when_the_worker_is_stopped(): void
     {
         Queue::fake();
