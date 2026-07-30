@@ -9,6 +9,10 @@ use Illuminate\Support\Facades\Http;
 
 class XClient
 {
+    public function __construct(
+        private readonly XOAuthService $oauth,
+    ) {}
+
     public function testConnection(WordPressSite $profile): Response
     {
         return $this->request($profile)
@@ -45,9 +49,17 @@ class XClient
 
     private function request(WordPressSite $profile): PendingRequest
     {
+        $accessToken = (string) $profile->x_access_token;
+
+        if ($profile->x_refresh_token
+            && $profile->x_token_expires_at
+            && $profile->x_token_expires_at->lte(now()->addMinutes(5))) {
+            $accessToken = $this->oauth->refresh($profile);
+        }
+
         return Http::timeout(90)
             ->connectTimeout(15)
             ->acceptJson()
-            ->withToken((string) $profile->x_access_token);
+            ->withToken($accessToken);
     }
 }

@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\SourceScanLogController;
 use App\Http\Controllers\Admin\SourceSiteController;
 use App\Http\Controllers\Admin\SystemLogController;
 use App\Http\Controllers\Admin\WordPressSiteController;
+use App\Http\Controllers\Admin\XOAuthController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\Auth\NewPasswordController;
@@ -58,6 +59,10 @@ Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
     ->middleware('auth')
     ->name('logout');
 
+Route::get('auth/x/callback', [XOAuthController::class, 'callback'])
+    ->middleware('auth')
+    ->name('x-oauth.callback');
+
 Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::get('noticias', [NewsController::class, 'index'])->name('news.index');
@@ -88,6 +93,8 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         ->except('show');
     Route::post('publicaciones/sitios-wordpress/{wordpressSite}/probar', [WordPressSiteController::class, 'test'])
         ->name('wordpress-sites.test');
+    Route::get('publicaciones/sitios-wordpress/{wordpressSite}/conectar-x', [XOAuthController::class, 'redirect'])
+        ->name('x-oauth.redirect');
     Route::get('programador', [SchedulerController::class, 'index'])->name('scheduler.index');
     Route::get('programador/{scheduler}/estado', [SchedulerController::class, 'status'])->name('scheduler.status');
     Route::post('programador/{scheduler}/ejecutar', [SchedulerController::class, 'execute'])->name('scheduler.execute');

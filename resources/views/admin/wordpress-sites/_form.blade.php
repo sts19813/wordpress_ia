@@ -102,25 +102,29 @@
 
                         <div class="col-12 publication-platform-fields" data-profile-fields="x">
                             <div class="alert alert-info mb-6">
-                                <div class="fw-bold mb-1">Publicación mediante X API v2</div>
-                                <div>Conecta un token de usuario; un Bearer Token de aplicación no puede publicar.</div>
+                                <div class="fw-bold mb-1">{{ filled($site->x_access_token) ? 'Cuenta conectada'.($site->x_username ? ' como @'.$site->x_username : '') : 'Conexión directa desde esta página' }}</div>
+                                <div>Guarda las credenciales de tu app y serás enviado a X para autorizar la cuenta. Los tokens se obtienen y renuevan automáticamente.</div>
                             </div>
                             <div class="row g-6">
-                                <div class="col-md-5">
-                                    <label class="form-label">Usuario de X</label>
-                                    <div class="input-group">
-                                        <span class="input-group-text">@</span>
-                                        <input type="text" name="x_username" value="{{ old('x_username', $site->x_username) }}" class="form-control form-control-solid @error('x_username') is-invalid @enderror" placeholder="mi_cuenta" data-required-for="x" data-required-on-create="0">
+                                <div class="col-md-6">
+                                    <label class="form-label required">Client ID</label>
+                                    <input type="text" name="x_client_id" value="{{ old('x_client_id', $site->x_client_id) }}" class="form-control form-control-solid @error('x_client_id') is-invalid @enderror" autocomplete="off" data-required-for="x">
+                                    <div class="form-text">Está en <strong>Keys &amp; Tokens → OAuth 2.0 Client ID</strong>.</div>
+                                    @error('x_client_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label {{ filled($site->x_client_secret) ? '' : 'required' }}">Client Secret</label>
+                                    <input type="password" name="x_client_secret" class="form-control form-control-solid @error('x_client_secret') is-invalid @enderror" autocomplete="new-password" data-required-for="x" data-required-on-create="{{ filled($site->x_client_secret) ? '0' : '1' }}" placeholder="{{ filled($site->x_client_secret) ? 'Déjalo vacío para conservar el actual' : '' }}">
+                                    <div class="form-text">Se almacena cifrado y nunca vuelve a mostrarse.</div>
+                                    @error('x_client_secret')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
+                                @if ($site->exists && $site->isX() && filled($site->x_client_id) && filled($site->x_client_secret))
+                                    <div class="col-12">
+                                        <a href="{{ route('admin.x-oauth.redirect', $site) }}" class="btn btn-light-primary">
+                                            <span class="fw-bold me-2">𝕏</span>{{ filled($site->x_access_token) ? 'Reconectar cuenta de X' : 'Conectar cuenta de X' }}
+                                        </a>
                                     </div>
-                                    <div class="form-text">Se verificará y actualizará automáticamente al conectar.</div>
-                                    @error('x_username')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-                                </div>
-                                <div class="col-md-7">
-                                    <label class="form-label {{ filled($site->x_access_token) ? '' : 'required' }}">User Access Token</label>
-                                    <textarea name="x_access_token" rows="3" class="form-control form-control-solid @error('x_access_token') is-invalid @enderror" autocomplete="off" data-required-for="x" data-required-on-create="{{ filled($site->x_access_token) ? '0' : '1' }}" placeholder="{{ filled($site->x_access_token) ? 'Déjalo vacío para conservar el token actual' : 'Pega el token OAuth 2.0 del usuario' }}"></textarea>
-                                    <div class="form-text">Necesita los permisos <code>tweet.read</code>, <code>tweet.write</code> y <code>users.read</code>.</div>
-                                    @error('x_access_token')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                                </div>
+                                @endif
                             </div>
                         </div>
 
@@ -192,12 +196,12 @@
                         <h3 class="fw-bold mb-0">Conectar X</h3>
                     </div>
                     <ol class="text-gray-700 fw-semibold ps-5 mb-4">
-                        <li class="mb-3">Crea una app en el portal de desarrolladores de X.</li>
-                        <li class="mb-3">Habilita OAuth 2.0 con permisos de lectura y escritura.</li>
-                        <li class="mb-3">Autoriza la cuenta con <code>tweet.write</code> y copia su User Access Token.</li>
-                        <li>Guarda el perfil; la aplicación verificará la identidad mediante <code>/2/users/me</code>.</li>
+                        <li class="mb-3">En X habilita OAuth 2.0 con permisos de lectura y escritura.</li>
+                        <li class="mb-3">Registra esta callback exactamente: <code>{{ route('x-oauth.callback') }}</code>.</li>
+                        <li class="mb-3">Copia aquí el Client ID y Client Secret.</li>
+                        <li>Guarda y autoriza la cuenta directamente en X.</li>
                     </ol>
-                    <div class="fs-8 text-muted">Se publicará un texto compacto, la imagen generada y, si existe, el enlace del artículo publicado en WordPress.</div>
+                    <div class="fs-8 text-muted">La autorización solicita <code>tweet.write</code>, <code>media.write</code> y <code>offline.access</code> para publicar imágenes y renovar la sesión.</div>
                 </div>
             </div>
 
@@ -213,7 +217,7 @@
     <div class="d-flex justify-content-end gap-3 mt-2">
         <a href="{{ route('admin.wordpress-sites.index') }}" class="btn btn-light">Cancelar</a>
         <button type="submit" class="btn btn-primary">
-            <i class="ki-outline ki-check fs-2"></i>Guardar y probar perfil
+            <i class="ki-outline ki-check fs-2"></i><span data-profile-submit-label>{{ $selectedType === App\Models\WordPressSite::TYPE_X ? 'Guardar y conectar con X' : 'Guardar y probar perfil' }}</span>
         </button>
     </div>
 </form>
@@ -222,6 +226,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const selector = document.getElementById('publication-profile-type');
+    const submitLabel = document.querySelector('[data-profile-submit-label]');
     if (!selector) return;
 
     const refreshProfileFields = function () {
@@ -237,6 +242,10 @@ document.addEventListener('DOMContentLoaded', function () {
             field.required = needsValue;
             field.disabled = field.dataset.requiredFor !== selected;
         });
+
+        if (submitLabel) {
+            submitLabel.textContent = selected === 'x' ? 'Guardar y conectar con X' : 'Guardar y probar perfil';
+        }
     };
 
     selector.addEventListener('change', refreshProfileFields);

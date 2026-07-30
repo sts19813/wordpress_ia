@@ -40,7 +40,11 @@ class WordPressSite extends Model
         'instagram_api_version',
         'x_user_id',
         'x_username',
+        'x_client_id',
+        'x_client_secret',
         'x_access_token',
+        'x_refresh_token',
+        'x_token_expires_at',
         'categories',
         'tags',
         'status',
@@ -53,7 +57,9 @@ class WordPressSite extends Model
         'application_password',
         'facebook_access_token',
         'instagram_access_token',
+        'x_client_secret',
         'x_access_token',
+        'x_refresh_token',
     ];
 
     protected function casts(): array
@@ -62,7 +68,10 @@ class WordPressSite extends Model
             'application_password' => 'encrypted',
             'facebook_access_token' => 'encrypted',
             'instagram_access_token' => 'encrypted',
+            'x_client_secret' => 'encrypted',
             'x_access_token' => 'encrypted',
+            'x_refresh_token' => 'encrypted',
+            'x_token_expires_at' => 'datetime',
             'categories' => 'array',
             'tags' => 'array',
             'active' => 'boolean',

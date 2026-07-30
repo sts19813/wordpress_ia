@@ -65,7 +65,7 @@
                             </div>
                             @if ($site->connection_error)<div class="text-danger fs-7">{{ $site->connection_error }}</div>@endif
                             <div class="d-flex justify-content-end gap-2 mt-auto">
-                                <form method="POST" action="{{ route('admin.wordpress-sites.test', $site) }}">@csrf<button class="btn btn-sm btn-light-primary" type="submit">Probar</button></form>
+                                <form method="POST" action="{{ route('admin.wordpress-sites.test', $site) }}">@csrf<button class="btn btn-sm btn-light-primary" type="submit">{{ $site->isX() && blank($site->x_access_token) ? 'Conectar' : 'Probar' }}</button></form>
                                 <a href="{{ route('admin.wordpress-sites.edit', $site) }}" class="btn btn-sm btn-light">Editar</a>
                                 <form method="POST" action="{{ route('admin.wordpress-sites.destroy', $site) }}" data-confirm-delete data-confirm-title="Eliminar perfil de publicación" data-confirm-text="Se quitará {{ $site->name }}, pero se conservará su historial de publicaciones.">@csrf @method('DELETE')<button class="btn btn-sm btn-light-danger" type="submit">Eliminar</button></form>
                             </div>

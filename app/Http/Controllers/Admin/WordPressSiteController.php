@@ -48,10 +48,17 @@ class WordPressSiteController extends Controller
 
     public function store(WordPressSiteRequest $request): RedirectResponse
     {
+        $data = $this->normalizedData($request->validated());
+        $requiresXAuthorization = ($data['type'] ?? null) === WordPressSite::TYPE_X
+            && blank($data['x_access_token'] ?? null);
         $site = $request->user()->wordpressSites()->create([
-            ...$this->normalizedData($request->validated()),
-            'status' => WordPressSite::STATUS_ACTIVE,
+            ...$data,
+            'status' => $requiresXAuthorization ? WordPressSite::STATUS_PAUSED : WordPressSite::STATUS_ACTIVE,
         ]);
+
+        if ($requiresXAuthorization) {
+            return redirect()->route('admin.x-oauth.redirect', $site);
+        }
 
         return $this->testAndRedirect($site, 'Perfil de publicación guardado y conectado correctamente.');
     }
@@ -88,7 +95,24 @@ class WordPressSiteController extends Controller
             unset($data['x_access_token']);
         }
 
+        if (($data['type'] ?? null) === WordPressSite::TYPE_X
+            && blank($data['x_client_secret'] ?? null)) {
+            unset($data['x_client_secret']);
+        }
+
         $wordpressSite->update($data);
+
+        if ($wordpressSite->isX()
+            && ($wordpressSite->wasChanged(['x_client_id', 'x_client_secret']) || blank($wordpressSite->x_access_token))) {
+            $wordpressSite->update([
+                'x_access_token' => null,
+                'x_refresh_token' => null,
+                'x_token_expires_at' => null,
+                'status' => WordPressSite::STATUS_PAUSED,
+            ]);
+
+            return redirect()->route('admin.x-oauth.redirect', $wordpressSite);
+        }
 
         return $this->testAndRedirect($wordpressSite, 'Perfil de publicación actualizado y conectado correctamente.');
     }
@@ -96,6 +120,10 @@ class WordPressSiteController extends Controller
     public function test(WordPressSite $wordpressSite): RedirectResponse
     {
         Gate::authorize('update', $wordpressSite);
+
+        if ($wordpressSite->isX() && blank($wordpressSite->x_access_token)) {
+            return redirect()->route('admin.x-oauth.redirect', $wordpressSite);
+        }
 
         return $this->testAndRedirect($wordpressSite, 'Conexión verificada correctamente. El perfil está listo para publicar.');
     }
@@ -182,13 +210,15 @@ class WordPressSiteController extends Controller
             'instagram_api_version' => 'v24.0',
             'x_user_id' => null,
             'x_username' => null,
+            'x_client_id' => null,
+            'x_client_secret' => null,
             'x_access_token' => null,
         ];
 
         foreach (match ($type) {
             WordPressSite::TYPE_FACEBOOK_PAGE => ['facebook_page_id', 'facebook_access_token', 'facebook_api_version'],
             WordPressSite::TYPE_INSTAGRAM => ['instagram_account_id', 'instagram_access_token', 'instagram_api_version'],
-            WordPressSite::TYPE_X => ['x_username', 'x_access_token'],
+            WordPressSite::TYPE_X => ['x_username', 'x_client_id', 'x_client_secret', 'x_access_token'],
             default => [],
         } as $field) {
             $normalized[$field] = $data[$field] ?? null;

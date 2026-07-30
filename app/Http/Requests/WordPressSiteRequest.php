@@ -31,6 +31,7 @@ class WordPressSiteRequest extends FormRequest
             'instagram_account_id' => trim((string) $this->input('instagram_account_id')),
             'instagram_api_version' => trim((string) $this->input('instagram_api_version', 'v24.0')),
             'x_username' => ltrim(trim((string) $this->input('x_username')), '@'),
+            'x_client_id' => trim((string) $this->input('x_client_id')),
             'active' => $this->boolean('active'),
         ]);
     }
@@ -49,8 +50,11 @@ class WordPressSiteRequest extends FormRequest
             && ($isCreating || ! ($storedProfile instanceof WordPressSite) || blank($storedProfile->facebook_access_token));
         $requiresInstagramToken = $isInstagram
             && ($isCreating || ! ($storedProfile instanceof WordPressSite) || blank($storedProfile->instagram_access_token));
-        $requiresXToken = $isX
-            && ($isCreating || ! ($storedProfile instanceof WordPressSite) || blank($storedProfile->x_access_token));
+        $hasStoredXClient = $storedProfile instanceof WordPressSite
+            && filled($storedProfile->x_client_id)
+            && filled($storedProfile->x_client_secret);
+        $hasSubmittedXToken = filled($this->input('x_access_token'));
+        $requiresXClient = $isX && ! $hasSubmittedXToken && ($isCreating || ! $hasStoredXClient);
 
         return [
             'name' => ['required', 'string', 'max:255'],
@@ -65,7 +69,9 @@ class WordPressSiteRequest extends FormRequest
             'instagram_access_token' => [$requiresInstagramToken ? 'required' : 'nullable', 'string', 'max:4096'],
             'instagram_api_version' => [$isInstagram ? 'required' : 'nullable', 'regex:/^v\d+\.\d+$/', 'max:20'],
             'x_username' => ['nullable', 'regex:/^[A-Za-z0-9_]{1,15}$/'],
-            'x_access_token' => [$requiresXToken ? 'required' : 'nullable', 'string', 'max:4096'],
+            'x_client_id' => [$requiresXClient ? 'required' : 'nullable', 'string', 'max:255'],
+            'x_client_secret' => [$requiresXClient ? 'required' : 'nullable', 'string', 'max:4096'],
+            'x_access_token' => ['nullable', 'string', 'max:4096'],
             'active' => ['boolean'],
         ];
     }
@@ -96,6 +102,8 @@ class WordPressSiteRequest extends FormRequest
             'instagram_access_token' => 'token de acceso de Instagram',
             'instagram_api_version' => 'versión de Graph API',
             'x_username' => 'usuario de X',
+            'x_client_id' => 'Client ID de X',
+            'x_client_secret' => 'Client Secret de X',
             'x_access_token' => 'User Access Token de X',
             'active' => 'perfil activo',
         ];
