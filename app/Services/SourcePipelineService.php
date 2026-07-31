@@ -69,6 +69,7 @@ class SourcePipelineService
                     'trigger' => $trigger,
                     'profile_id' => $site->ai_prompt_profile_id,
                     'wordpress_site_id' => $site->wordpress_site_id,
+                    'publication_profile_ids' => $site->selectedPublicationProfileIds(),
                     'auto_generate' => (bool) $site->auto_generate,
                     'auto_publish' => (bool) $site->auto_publish,
                 ],
@@ -132,6 +133,8 @@ class SourcePipelineService
                     'payload' => [
                         'profile_id' => $payload['profile_id'] ?? null,
                         'wordpress_site_id' => $payload['wordpress_site_id'] ?? null,
+                        'publication_profile_ids' => $payload['publication_profile_ids']
+                            ?? array_values(array_filter([$payload['wordpress_site_id'] ?? null])),
                         'auto_publish' => (bool) ($payload['auto_publish'] ?? false),
                         'filter_reason' => $post->filter_reason,
                         'matched_topics' => $post->matched_topics ?: [],

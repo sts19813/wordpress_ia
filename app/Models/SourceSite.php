@@ -49,6 +49,7 @@ class SourceSite extends Model
         'automation_user_id',
         'ai_prompt_profile_id',
         'wordpress_site_id',
+        'publication_profile_ids',
         'auto_generate',
         'auto_publish',
         'url',
@@ -89,6 +90,7 @@ class SourceSite extends Model
             'cookies' => 'array',
             'filter_topics' => 'array',
             'excluded_topics' => 'array',
+            'publication_profile_ids' => 'array',
             'api_key' => 'encrypted',
             'password' => 'encrypted',
             'last_synced_at' => 'datetime',
@@ -177,6 +179,23 @@ class SourceSite extends Model
     public function wordpressSite(): BelongsTo
     {
         return $this->belongsTo(WordPressSite::class);
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    public function selectedPublicationProfileIds(): array
+    {
+        $profileIds = array_values(array_unique(array_filter(array_map(
+            'intval',
+            $this->publication_profile_ids ?: [],
+        ))));
+
+        if ($profileIds === [] && $this->wordpress_site_id) {
+            return [(int) $this->wordpress_site_id];
+        }
+
+        return $profileIds;
     }
 
     public function scheduledTasks(): HasMany

@@ -132,8 +132,17 @@ class SourcePipelineQueueTest extends TestCase
             'status' => WordPressSite::STATUS_ACTIVE,
             'active' => true,
         ]);
+        $secondWordpressSite = $user->wordpressSites()->create([
+            'name' => 'Destino secundario',
+            'rest_api_url' => 'https://second-target.test',
+            'username' => 'editor',
+            'application_password' => 'app-pass',
+            'status' => WordPressSite::STATUS_ACTIVE,
+            'active' => true,
+        ]);
         $sourceSite = $this->sourceSite($user, $profile->id, [
             'wordpress_site_id' => $wordpressSite->id,
+            'publication_profile_ids' => [$wordpressSite->id, $secondWordpressSite->id],
             'auto_publish' => true,
         ]);
 
@@ -171,6 +180,11 @@ class SourcePipelineQueueTest extends TestCase
                 'link' => 'https://target.test/analisis-paquete-economico',
                 'status' => 'publish',
             ], 201),
+            'second-target.test/wp-json/wp/v2/posts' => Http::response([
+                'id' => 654,
+                'link' => 'https://second-target.test/analisis-paquete-economico',
+                'status' => 'publish',
+            ], 201),
         ]);
 
         $this->actingAs($user)->post(route('admin.scheduler.sources.run', $sourceSite))->assertRedirect();
@@ -190,8 +204,14 @@ class SourcePipelineQueueTest extends TestCase
         $articleTask->refresh();
         $this->assertSame(Scheduler::STATUS_COMPLETED, $articleTask->status);
         $this->assertSame(AiArticle::STATUS_DRAFT, AiArticle::query()->sole()->status);
-        $this->assertSame(Publication::STATUS_PUBLISHED, Publication::query()->sole()->status);
-        $this->assertSame('https://target.test/analisis-paquete-economico', $articleTask->publication->remote_url);
+        $this->assertSame(2, Publication::query()->where('status', Publication::STATUS_PUBLISHED)->count());
+        $this->assertEqualsCanonicalizing(
+            [$wordpressSite->id, $secondWordpressSite->id],
+            Publication::query()->pluck('wordpress_site_id')->all(),
+        );
+        $this->assertTrue(collect($articleTask->fresh()->events)->contains(
+            fn (array $event) => str_contains($event['message'], '2 perfiles'),
+        ));
 
         $this->actingAs($user)
             ->get(route('admin.scheduler.index', ['task' => $articleTask->id]))

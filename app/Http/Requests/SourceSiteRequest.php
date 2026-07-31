@@ -30,6 +30,10 @@ class SourceSiteRequest extends FormRequest
             'active' => $this->has('active') ? $this->boolean('active') : ($sourceSite?->active ?? true),
             'auto_generate' => $this->has('auto_generate') ? $this->boolean('auto_generate') : ($sourceSite?->auto_generate ?? true),
             'auto_publish' => $this->has('auto_publish') ? $this->boolean('auto_publish') : ($sourceSite?->auto_publish ?? false),
+            'publication_profile_ids' => array_values(array_unique(array_filter(array_map(
+                'intval',
+                (array) $this->input('publication_profile_ids', []),
+            )))),
             'max_posts_per_scan' => $this->input('max_posts_per_scan', $sourceSite?->max_posts_per_scan ?: 20),
             'max_generations_per_scan' => $this->input('max_generations_per_scan', $sourceSite?->max_generations_per_scan ?: 5),
         ], fn (mixed $value) => $value !== null));
@@ -75,10 +79,14 @@ class SourceSiteRequest extends FormRequest
                 'integer',
                 Rule::exists('ai_prompt_profiles', 'id')->where('user_id', $this->user()->id),
             ],
-            'wordpress_site_id' => [
+            'publication_profile_ids' => [
                 'nullable',
                 'required_if:auto_publish,1',
+                'array',
+            ],
+            'publication_profile_ids.*' => [
                 'integer',
+                'distinct',
                 Rule::exists('wordpress_sites', 'id')->where(fn ($query) => $query
                     ->where('user_id', $this->user()->id)
                     ->where('active', true)
@@ -116,7 +124,8 @@ class SourceSiteRequest extends FormRequest
             'auto_generate' => 'generación automática',
             'auto_publish' => 'publicación automática',
             'ai_prompt_profile_id' => 'perfil editorial IA',
-            'wordpress_site_id' => 'perfil de publicación',
+            'publication_profile_ids' => 'perfiles de publicación',
+            'publication_profile_ids.*' => 'perfil de publicación',
         ];
     }
 

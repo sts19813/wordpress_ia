@@ -48,6 +48,7 @@ class SourceSiteController extends Controller
                 'automation_user_id' => $request->user()->id,
                 'ai_prompt_profile_id' => $defaultProfile->id,
                 'wordpress_site_id' => $wordpressSites->count() === 1 ? $wordpressSites->first()->id : null,
+                'publication_profile_ids' => $wordpressSites->count() === 1 ? [$wordpressSites->first()->id] : [],
                 'auto_generate' => true,
                 'auto_publish' => $wordpressSites->count() === 1,
                 'type' => SourceSite::TYPE_AUTO,

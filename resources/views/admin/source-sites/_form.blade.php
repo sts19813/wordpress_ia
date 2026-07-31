@@ -18,7 +18,8 @@
     };
     $filterErrors = $errors->hasAny(['filter_topics', 'filter_topics.*', 'excluded_topics', 'excluded_topics.*', 'filter_instructions']);
     $advancedErrors = $errors->hasAny(['daily_limit', 'max_posts_per_scan', 'active', 'auth_method', 'api_key', 'username', 'password', 'custom_headers', 'cookies']);
-    $automationErrors = $errors->hasAny(['auto_generate', 'auto_publish', 'ai_prompt_profile_id', 'wordpress_site_id', 'max_generations_per_scan']);
+    $automationErrors = $errors->hasAny(['auto_generate', 'auto_publish', 'ai_prompt_profile_id', 'publication_profile_ids', 'publication_profile_ids.*', 'max_generations_per_scan']);
+    $selectedPublicationProfileIds = array_map('intval', old('publication_profile_ids', $sourceSite->selectedPublicationProfileIds()));
     $activeTab = $automationErrors ? 'automation' : ($advancedErrors ? 'advanced' : ($filterErrors ? 'filters' : 'basic'));
 @endphp
 
@@ -159,15 +160,28 @@
                             @error('ai_prompt_profile_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-lg-6">
-                            <label class="form-label">Destino de publicación automática</label>
-                            <select name="wordpress_site_id" class="form-select form-select-solid @error('wordpress_site_id') is-invalid @enderror">
-                                <option value="">Solo guardar como borrador</option>
+                            <div class="d-flex align-items-center justify-content-between gap-3">
+                                <label class="form-label mb-0">Destinos de publicación automática</label>
+                                @if ($wordpressSites->isNotEmpty())
+                                    <button type="button" class="btn btn-sm btn-light-primary py-1 px-3" id="select-all-publication-profiles">
+                                        Seleccionar todos
+                                    </button>
+                                @endif
+                            </div>
+                            <select
+                                name="publication_profile_ids[]"
+                                id="publication-profile-ids"
+                                class="form-select form-select-solid @error('publication_profile_ids') is-invalid @enderror @error('publication_profile_ids.*') is-invalid @enderror"
+                                multiple
+                                data-placeholder="Solo guardar como borrador"
+                            >
                                 @foreach ($wordpressSites as $wordpressSite)
-                                    <option value="{{ $wordpressSite->id }}" @selected((int) old('wordpress_site_id', $sourceSite->wordpress_site_id) === $wordpressSite->id)>{{ $wordpressSite->typeLabel() }} · {{ $wordpressSite->name }}</option>
+                                    <option value="{{ $wordpressSite->id }}" @selected(in_array($wordpressSite->id, $selectedPublicationProfileIds, true))>{{ $wordpressSite->typeLabel() }} · {{ $wordpressSite->name }}</option>
                                 @endforeach
                             </select>
-                            <div class="form-text">El destino debe estar activo y pertenecer a tu cuenta.</div>
-                            @error('wordpress_site_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            <div class="form-text">Busca y selecciona uno, varios o todos tus perfiles activos. Al elegir destinos se activa la publicación; sin selección, la nota quedará como borrador.</div>
+                            @error('publication_profile_ids')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            @error('publication_profile_ids.*')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-lg-6">
                             <label class="form-label required">Máximo de artículos generados por consulta</label>
@@ -346,7 +360,37 @@ document.addEventListener('DOMContentLoaded', () => {
     const typeHelp = document.getElementById('source-type-help');
     const aiNotice = document.getElementById('ai-connection-notice');
     const requiresTest = @json(! $isEdit);
+    const publicationProfiles = document.getElementById('publication-profile-ids');
+    const selectAllPublicationProfiles = document.getElementById('select-all-publication-profiles');
+    const autoPublishToggle = form.querySelector('input[type="checkbox"][name="auto_publish"]');
     let lastRecommendation = null;
+
+    const syncAutoPublishWithDestinations = () => {
+        if (autoPublishToggle && publicationProfiles) {
+            autoPublishToggle.checked = publicationProfiles.selectedOptions.length > 0;
+        }
+    };
+
+    if (publicationProfiles && window.jQuery?.fn?.select2) {
+        const publicationProfilesSelect = window.jQuery(publicationProfiles).select2({
+            placeholder: publicationProfiles.dataset.placeholder,
+            width: '100%',
+            closeOnSelect: false,
+        });
+        publicationProfilesSelect.on('select2:select select2:unselect', syncAutoPublishWithDestinations);
+
+        selectAllPublicationProfiles?.addEventListener('click', () => {
+            const allProfileIds = Array.from(publicationProfiles.options).map(option => option.value);
+            publicationProfilesSelect.val(allProfileIds).trigger('change');
+            syncAutoPublishWithDestinations();
+        });
+    } else {
+        publicationProfiles?.addEventListener('change', syncAutoPublishWithDestinations);
+        selectAllPublicationProfiles?.addEventListener('click', () => {
+            Array.from(publicationProfiles?.options || []).forEach(option => { option.selected = true; });
+            syncAutoPublishWithDestinations();
+        });
+    }
 
     const typeDescriptions = {
         auto: 'Probará primero los conectores convencionales y usará IA automáticamente si ninguno localiza publicaciones.',

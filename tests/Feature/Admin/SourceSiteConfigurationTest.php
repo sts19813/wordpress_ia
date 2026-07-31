@@ -4,6 +4,8 @@ namespace Tests\Feature\Admin;
 
 use App\Models\SourceSite;
 use App\Models\User;
+use App\Models\WordPressSite;
+use App\Services\AiPromptProfileService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -15,7 +17,17 @@ class SourceSiteConfigurationTest extends TestCase
 
     public function test_create_form_uses_basic_filter_and_advanced_tabs(): void
     {
-        $response = $this->actingAs(User::factory()->create())
+        $user = User::factory()->create();
+        $user->wordpressSites()->create([
+            'name' => 'Destino disponible',
+            'rest_api_url' => 'https://destination.test',
+            'username' => 'editor',
+            'application_password' => 'app-pass',
+            'status' => WordPressSite::STATUS_ACTIVE,
+            'active' => true,
+        ]);
+
+        $response = $this->actingAs($user)
             ->get(route('admin.source-sites.create'));
 
         $response->assertOk()
@@ -29,9 +41,52 @@ class SourceSiteConfigurationTest extends TestCase
             ->assertSee('Límite de posts escaneados al día')
             ->assertSee('Máximo de posts por consulta')
             ->assertSee('Máximo de artículos generados por consulta')
+            ->assertSee('name="publication_profile_ids[]"', false)
+            ->assertSee('multiple', false)
+            ->assertSee('Seleccionar todos')
             ->assertDontSee('name="status"', false)
             ->assertDontSee('name="language"', false)
             ->assertDontSee('name="priority"', false);
+    }
+
+    public function test_it_stores_multiple_automatic_publication_profiles(): void
+    {
+        $user = User::factory()->create();
+        $promptProfile = app(AiPromptProfileService::class)->ensureDefaultFor($user);
+        $publicationProfiles = collect(['Sitio principal', 'Sitio secundario'])->map(
+            fn (string $name) => $user->wordpressSites()->create([
+                'name' => $name,
+                'rest_api_url' => 'https://'.str($name)->slug().'.test',
+                'username' => 'editor',
+                'application_password' => 'app-pass',
+                'status' => WordPressSite::STATUS_ACTIVE,
+                'active' => true,
+            ]),
+        );
+
+        $response = $this->actingAs($user)
+            ->post(route('admin.source-sites.store'), [
+                'name' => 'Medio con multidestino',
+                'url' => 'https://example.com',
+                'type' => SourceSite::TYPE_AUTO,
+                'frequency_hours' => 3,
+                'auth_method' => SourceSite::AUTH_NONE,
+                'daily_limit' => 20,
+                'max_posts_per_scan' => 12,
+                'max_generations_per_scan' => 4,
+                'ai_prompt_profile_id' => $promptProfile->id,
+                'publication_profile_ids' => $publicationProfiles->pluck('id')->all(),
+                'auto_generate' => '1',
+                'auto_publish' => '1',
+                'active' => '1',
+            ]);
+
+        $response->assertRedirect(route('admin.source-sites.index'));
+        $sourceSite = SourceSite::query()->sole();
+
+        $this->assertSame($publicationProfiles->pluck('id')->all(), $sourceSite->publication_profile_ids);
+        $this->assertSame($publicationProfiles->first()->id, $sourceSite->wordpress_site_id);
+        $this->assertTrue($sourceSite->auto_publish);
     }
 
     public function test_it_stores_hours_and_topic_filters(): void

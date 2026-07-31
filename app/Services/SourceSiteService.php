@@ -54,6 +54,15 @@ class SourceSiteService
     {
         unset($data['frequency_hours']);
 
+        if (array_key_exists('publication_profile_ids', $data)) {
+            $data['publication_profile_ids'] = array_values(array_unique(array_filter(array_map(
+                'intval',
+                (array) $data['publication_profile_ids'],
+            ))));
+            // Keep the original column synchronized for older integrations.
+            $data['wordpress_site_id'] = $data['publication_profile_ids'][0] ?? null;
+        }
+
         foreach (['custom_headers', 'cookies'] as $jsonField) {
             if (isset($data[$jsonField]) && is_string($data[$jsonField])) {
                 $data[$jsonField] = json_decode($data[$jsonField], true);

@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\AiArticle;
+use App\Models\Publication;
 use App\Models\Scheduler;
 use App\Models\WordPressSite;
 use App\Services\AiArticleService;
@@ -109,33 +110,93 @@ class GenerateSourceArticle implements ShouldBeUnique, ShouldQueue
                 return;
             }
 
-            $publicationProfile = WordPressSite::query()
-                ->whereKey($payload['wordpress_site_id'] ?? null)
+            $profileIds = array_values(array_unique(array_filter(array_map(
+                'intval',
+                $payload['publication_profile_ids']
+                    ?? array_values(array_filter([$payload['wordpress_site_id'] ?? null])),
+            ))));
+            $publicationProfiles = WordPressSite::query()
+                ->whereIn('id', $profileIds)
                 ->where('user_id', $user->id)
                 ->where('active', true)
                 ->where('status', WordPressSite::STATUS_ACTIVE)
-                ->first();
+                ->get()
+                ->sortBy(fn (WordPressSite $profile) => $profile->isSocial() ? 1 : 0)
+                ->values();
 
-            if (! $publicationProfile) {
-                throw new RuntimeException('El perfil de publicación automático no está disponible.');
+            if ($profileIds === [] || $publicationProfiles->isEmpty()) {
+                throw new RuntimeException('Los perfiles de publicación automática no están disponibles.');
             }
 
             $scheduler->progress(
                 $task,
-                'Publicando en '.$publicationProfile->name,
+                'Publicando el artículo en los destinos seleccionados',
                 90,
-                'Se inició el envío del artículo a '.$publicationProfile->typeLabel().'.',
+                count($profileIds) === 1
+                    ? 'Se inició el envío al perfil de publicación seleccionado.'
+                    : 'Se inició el envío a '.count($profileIds).' perfiles de publicación.',
             );
-            $publication = $publications->publishNow($publicationProfile, $article->fresh('images'), $article->fresh('images')->mainImage());
-            $task->update(['publication_id' => $publication->id]);
+            $successful = collect();
+            $failed = collect();
+            $article->load('images');
+            $image = $article->mainImage();
 
-            if (! $publication->isSuccessful()) {
-                throw new RuntimeException($publication->error_message ?: 'El destino no confirmó la publicación.');
+            foreach ($publicationProfiles as $publicationProfile) {
+                $existing = Publication::query()
+                    ->where('wordpress_site_id', $publicationProfile->id)
+                    ->where('ai_article_id', $article->id)
+                    ->where('status', Publication::STATUS_PUBLISHED)
+                    ->latest('id')
+                    ->first();
+
+                if ($existing) {
+                    $successful->push($existing);
+
+                    continue;
+                }
+
+                $scheduler->progress(
+                    $task,
+                    'Publicando en '.$publicationProfile->name,
+                    min(99, 91 + $successful->count() + $failed->count()),
+                    'Enviando el artículo a '.$publicationProfile->typeLabel().' “'.$publicationProfile->name.'”.',
+                );
+                $publication = $publications->publishNow($publicationProfile, $article, $image);
+                $task->update(['publication_id' => $publication->id]);
+
+                if ($publication->isSuccessful()) {
+                    $successful->push($publication);
+                } else {
+                    $failed->push($publication);
+                    $scheduler->addEvent(
+                        $task,
+                        'warning',
+                        $publicationProfile->name.': '.($publication->error_message ?: 'el destino no confirmó la publicación.'),
+                    );
+                }
+            }
+
+            $failedCount = $failed->count() + (count($profileIds) - $publicationProfiles->count());
+
+            if ($successful->isEmpty()) {
+                throw new RuntimeException(
+                    $failedCount === 1
+                        ? 'No fue posible publicar en el perfil seleccionado. El borrador quedó guardado.'
+                        : "No fue posible publicar en los {$failedCount} perfiles seleccionados. El borrador quedó guardado.",
+                );
+            }
+
+            $message = $successful->count() === 1
+                ? 'Artículo publicado correctamente en 1 perfil.'
+                : 'Artículo publicado correctamente en '.$successful->count().' perfiles.';
+
+            if ($failedCount > 0) {
+                $message .= " {$failedCount} destino(s) requieren revisión en Publicaciones.";
             }
 
             $scheduler->completed(
                 $task,
-                'Artículo publicado correctamente'.($publication->remote_url ? ': '.$publication->remote_url : '.'),
+                $message,
             );
         } catch (Throwable $exception) {
             $this->handleFailure($task, $scheduler, $exception);
