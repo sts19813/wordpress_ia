@@ -88,6 +88,11 @@ class WordPressSite extends Model
         ];
     }
 
+    public function statusLabel(): string
+    {
+        return self::statusOptions()[$this->status] ?? $this->status;
+    }
+
     /**
      * @return array<string, string>
      */

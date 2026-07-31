@@ -70,6 +70,18 @@ class WordPressPublishingWorkflowTest extends TestCase
         $this->assertSame($site->id, Publication::query()->firstOrFail()->wordpressSite->id);
     }
 
+    public function test_wordpress_sites_index_displays_a_paused_profile_status(): void
+    {
+        $user = User::factory()->create();
+        $site = $this->site($user);
+        $site->update(['status' => WordPressSite::STATUS_PAUSED]);
+
+        $this->actingAs($user)
+            ->get(route('admin.wordpress-sites.index'))
+            ->assertOk()
+            ->assertSee('Pausado');
+    }
+
     public function test_one_configured_site_publishes_directly_without_a_site_selector(): void
     {
         Http::fake([
