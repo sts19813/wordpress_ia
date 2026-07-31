@@ -72,6 +72,7 @@ class WordPressSiteRequest extends FormRequest
             'x_client_id' => [$requiresXClient ? 'required' : 'nullable', 'string', 'max:255'],
             'x_client_secret' => [$requiresXClient ? 'required' : 'nullable', 'string', 'max:4096'],
             'x_access_token' => ['nullable', 'string', 'max:4096'],
+            'x_refresh_token' => ['nullable', 'string', 'max:4096'],
             'active' => ['boolean'],
         ];
     }
@@ -105,6 +106,7 @@ class WordPressSiteRequest extends FormRequest
             'x_client_id' => 'Client ID de X',
             'x_client_secret' => 'Client Secret de X',
             'x_access_token' => 'User Access Token de X',
+            'x_refresh_token' => 'Refresh Token de X',
             'active' => 'perfil activo',
         ];
     }

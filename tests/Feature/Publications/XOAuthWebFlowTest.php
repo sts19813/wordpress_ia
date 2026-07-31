@@ -35,6 +35,37 @@ class XOAuthWebFlowTest extends TestCase
         $this->assertNull($profile->x_access_token);
     }
 
+    public function test_x_profile_can_be_connected_with_portal_generated_oauth_tokens(): void
+    {
+        Http::fake([
+            'api.x.com/2/users/me' => Http::response([
+                'data' => [
+                    'id' => '324573630',
+                    'name' => 'STS',
+                    'username' => 'sts19813',
+                ],
+            ]),
+        ]);
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->post(route('admin.wordpress-sites.store'), [
+            'name' => 'X directo',
+            'type' => WordPressSite::TYPE_X,
+            'x_client_id' => 'client-id-123',
+            'x_client_secret' => 'client-secret-456',
+            'x_access_token' => 'portal-access-token',
+            'x_refresh_token' => 'portal-refresh-token',
+            'active' => '1',
+        ])->assertRedirect(route('admin.wordpress-sites.index'));
+
+        $profile = WordPressSite::query()->sole();
+        $this->assertSame('portal-access-token', $profile->x_access_token);
+        $this->assertSame('portal-refresh-token', $profile->x_refresh_token);
+        $this->assertSame('sts19813', $profile->x_username);
+        $this->assertSame(WordPressSite::STATUS_ACTIVE, $profile->status);
+        $this->assertTrue($profile->x_token_expires_at->isFuture());
+    }
+
     public function test_browser_oauth_callback_stores_tokens_and_verifies_the_x_account(): void
     {
         Http::fake([

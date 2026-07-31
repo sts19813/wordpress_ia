@@ -118,6 +118,23 @@
                                     <div class="form-text">Se almacena cifrado y nunca vuelve a mostrarse.</div>
                                     @error('x_client_secret')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                 </div>
+                                <div class="col-12">
+                                    <div class="separator separator-dashed my-2"></div>
+                                    <div class="fw-bold text-gray-800 mb-1">Tokens OAuth 2.0 de usuario <span class="text-muted fw-semibold">(alternativa al botón de conexión)</span></div>
+                                    <div class="text-muted fs-8">Si X no completa la autorización, genera estos tokens en Keys &amp; Tokens y pégalos aquí. Se validarán al guardar.</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Token de acceso</label>
+                                    <textarea name="x_access_token" rows="3" class="form-control form-control-solid @error('x_access_token') is-invalid @enderror" autocomplete="off" placeholder="{{ filled($site->x_access_token) ? 'Déjalo vacío para conservar el actual' : 'Access Token OAuth 2.0' }}"></textarea>
+                                    <div class="form-text">Caduca aproximadamente en dos horas.</div>
+                                    @error('x_access_token')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Token de actualización</label>
+                                    <textarea name="x_refresh_token" rows="3" class="form-control form-control-solid @error('x_refresh_token') is-invalid @enderror" autocomplete="off" placeholder="{{ filled($site->x_refresh_token) ? 'Déjalo vacío para conservar el actual' : 'Refresh Token OAuth 2.0' }}"></textarea>
+                                    <div class="form-text">Permite renovar la conexión sin volver a autorizar.</div>
+                                    @error('x_refresh_token')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
                                 @if ($site->exists && $site->isX() && filled($site->x_client_id) && filled($site->x_client_secret))
                                     <div class="col-12">
                                         <a href="{{ route('admin.x-oauth.redirect', $site) }}" class="btn btn-light-primary">
@@ -199,7 +216,8 @@
                         <li class="mb-3">En X habilita OAuth 2.0 con permisos de lectura y escritura.</li>
                         <li class="mb-3">Registra esta callback exactamente: <code>{{ route('x-oauth.callback') }}</code>.</li>
                         <li class="mb-3">Copia aquí el Client ID y Client Secret.</li>
-                        <li>Guarda y autoriza la cuenta directamente en X.</li>
+                        <li class="mb-3">Guarda y autoriza la cuenta directamente en X.</li>
+                        <li>Si X falla al autorizar, genera y pega un Access Token y Refresh Token OAuth 2.0.</li>
                     </ol>
                     <div class="fs-8 text-muted">La autorización solicita <code>tweet.write</code>, <code>media.write</code> y <code>offline.access</code> para publicar imágenes y renovar la sesión.</div>
                 </div>

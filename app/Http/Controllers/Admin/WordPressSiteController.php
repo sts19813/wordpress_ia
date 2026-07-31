@@ -49,6 +49,9 @@ class WordPressSiteController extends Controller
     public function store(WordPressSiteRequest $request): RedirectResponse
     {
         $data = $this->normalizedData($request->validated());
+        if (($data['type'] ?? null) === WordPressSite::TYPE_X && filled($data['x_access_token'] ?? null)) {
+            $data['x_token_expires_at'] = now()->addHours(2);
+        }
         $requiresXAuthorization = ($data['type'] ?? null) === WordPressSite::TYPE_X
             && blank($data['x_access_token'] ?? null);
         $site = $request->user()->wordpressSites()->create([
@@ -74,6 +77,11 @@ class WordPressSiteController extends Controller
     {
         Gate::authorize('update', $wordpressSite);
         $data = $this->normalizedData($request->validated());
+        $submittedXAccessToken = filled($data['x_access_token'] ?? null);
+
+        if (($data['type'] ?? null) === WordPressSite::TYPE_X && $submittedXAccessToken) {
+            $data['x_token_expires_at'] = now()->addHours(2);
+        }
 
         if (($data['type'] ?? null) === WordPressSite::TYPE_WORDPRESS
             && blank($data['application_password'] ?? null)) {
@@ -96,6 +104,11 @@ class WordPressSiteController extends Controller
         }
 
         if (($data['type'] ?? null) === WordPressSite::TYPE_X
+            && blank($data['x_refresh_token'] ?? null)) {
+            unset($data['x_refresh_token']);
+        }
+
+        if (($data['type'] ?? null) === WordPressSite::TYPE_X
             && blank($data['x_client_secret'] ?? null)) {
             unset($data['x_client_secret']);
         }
@@ -103,7 +116,8 @@ class WordPressSiteController extends Controller
         $wordpressSite->update($data);
 
         if ($wordpressSite->isX()
-            && ($wordpressSite->wasChanged(['x_client_id', 'x_client_secret']) || blank($wordpressSite->x_access_token))) {
+            && (($wordpressSite->wasChanged('x_client_id') && ! $submittedXAccessToken)
+                || blank($wordpressSite->x_access_token))) {
             $wordpressSite->update([
                 'x_access_token' => null,
                 'x_refresh_token' => null,
@@ -213,12 +227,13 @@ class WordPressSiteController extends Controller
             'x_client_id' => null,
             'x_client_secret' => null,
             'x_access_token' => null,
+            'x_refresh_token' => null,
         ];
 
         foreach (match ($type) {
             WordPressSite::TYPE_FACEBOOK_PAGE => ['facebook_page_id', 'facebook_access_token', 'facebook_api_version'],
             WordPressSite::TYPE_INSTAGRAM => ['instagram_account_id', 'instagram_access_token', 'instagram_api_version'],
-            WordPressSite::TYPE_X => ['x_username', 'x_client_id', 'x_client_secret', 'x_access_token'],
+            WordPressSite::TYPE_X => ['x_username', 'x_client_id', 'x_client_secret', 'x_access_token', 'x_refresh_token'],
             default => [],
         } as $field) {
             $normalized[$field] = $data[$field] ?? null;

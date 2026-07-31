@@ -166,6 +166,41 @@ class InstagramAndXPublishingWorkflowTest extends TestCase
             && $request->hasHeader('Authorization', 'Bearer x-user-secret'));
     }
 
+    public function test_x_publication_falls_back_to_text_when_media_upload_is_not_authorized(): void
+    {
+        Storage::fake('local');
+        Http::fake([
+            'api.x.com/2/media/upload' => Http::response([
+                'detail' => 'The access token is missing media.write.',
+            ], 403),
+            'api.x.com/2/tweets' => Http::response([
+                'data' => [
+                    'id' => '190000000000002',
+                    'text' => 'Artículo para redes',
+                ],
+            ], 201),
+        ]);
+        $user = User::factory()->create();
+        $profile = $this->profile($user, [
+            'type' => WordPressSite::TYPE_X,
+            'name' => 'X sin media.write',
+            'x_username' => 'noticias_x',
+            'x_access_token' => 'x-user-secret',
+        ]);
+        [$article] = $this->articleWithImage($user);
+
+        $this->actingAs($user)
+            ->post(route('admin.publications.publish', $article), ['site_ids' => [$profile->id]])
+            ->assertRedirect(route('admin.ai-articles.show', $article));
+
+        $publication = Publication::query()->sole();
+        $this->assertSame(Publication::STATUS_PUBLISHED, $publication->status);
+        $this->assertTrue((bool) data_get($publication->full_response, 'media.omitted'));
+        $this->assertStringContainsString('media.write', (string) data_get($publication->full_response, 'media.error'));
+        Http::assertSent(fn (Request $request) => $request->url() === 'https://api.x.com/2/tweets'
+            && data_get($request->data(), 'media') === null);
+    }
+
     private function profile(User $user, array $attributes): WordPressSite
     {
         return WordPressSite::query()->create([
