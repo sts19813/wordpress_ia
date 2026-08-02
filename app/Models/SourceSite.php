@@ -47,6 +47,7 @@ class SourceSite extends Model
     protected $fillable = [
         'name',
         'automation_user_id',
+        'company_id',
         'ai_prompt_profile_id',
         'wordpress_site_id',
         'publication_profile_ids',
@@ -169,6 +170,11 @@ class SourceSite extends Model
     public function automationUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'automation_user_id');
+    }
+
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
     }
 
     public function promptProfile(): BelongsTo

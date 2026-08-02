@@ -21,6 +21,7 @@ class AiArticle extends Model
     protected $fillable = [
         'source_post_ids',
         'user_id',
+        'company_id',
         'ai_prompt_profile_id',
         'title',
         'content',
@@ -87,6 +88,11 @@ class AiArticle extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
     }
 
     public function promptProfile(): BelongsTo

@@ -13,6 +13,16 @@
                 <div class="card-header"><div class="card-title"><h3 class="fw-bold mb-0">Datos del perfil de publicación</h3></div></div>
                 <div class="card-body">
                     <div class="row g-6">
+                        <div class="col-12">
+                            <label class="form-label required">Empresa</label>
+                            <select name="company_id" class="form-select form-select-solid @error('company_id') is-invalid @enderror" required>
+                                @foreach ($companies as $company)
+                                    <option value="{{ $company->id }}" @selected((int) old('company_id', $site->company_id) === $company->id)>{{ $company->name }}</option>
+                                @endforeach
+                            </select>
+                            <div class="form-text">Este perfil quedará disponible únicamente dentro de la empresa seleccionada.</div>
+                            @error('company_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
                         <div class="col-md-6">
                             <label class="form-label required">Nombre para identificarlo</label>
                             <input type="text" name="name" value="{{ old('name', $site->name) }}" class="form-control form-control-solid @error('name') is-invalid @enderror" placeholder="Blog principal, Instagram o X" required autofocus>

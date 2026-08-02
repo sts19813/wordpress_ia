@@ -47,6 +47,7 @@
                                     <div class="symbol symbol-50px me-4"><div class="symbol-label bg-light-primary"><i class="ki-outline {{ $platformIcon }} fs-2x text-primary"></i></div></div>
                                     <div class="min-w-0">
                                         <a href="{{ route('admin.wordpress-sites.edit', $site) }}" class="fs-4 fw-bold text-gray-900 text-hover-primary">{{ $site->name }}</a>
+                                        <div class="text-primary fs-8 fw-semibold">{{ $site->company?->name ?: 'Sin empresa' }}</div>
                                         <div class="text-muted text-truncate">{{ $site->destinationLabel() }}</div>
                                     </div>
                                 </div>

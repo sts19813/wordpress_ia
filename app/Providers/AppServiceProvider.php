@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\AiArticle;
 use App\Models\AiImage;
+use App\Models\Company;
 use App\Models\Publication;
 use App\Models\Scheduler;
 use App\Models\WordPressSite;
@@ -30,5 +31,6 @@ class AppServiceProvider extends ServiceProvider
         AiArticle::observe(SystemActivityObserver::class);
         AiImage::observe(SystemActivityObserver::class);
         WordPressSite::observe(SystemActivityObserver::class);
+        Company::observe(SystemActivityObserver::class);
     }
 }

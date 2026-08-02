@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\WordPressSiteRequest;
+use App\Models\Company;
 use App\Models\WordPressSite;
 use App\Services\PublicationService;
 use Illuminate\Contracts\View\View;
@@ -25,30 +26,35 @@ class WordPressSiteController extends Controller
 
         return view('admin.wordpress-sites.index', [
             'sites' => $request->user()->wordpressSites()
+                ->with('company:id,name')
                 ->withCount('publications')
                 ->latest()
                 ->get(),
         ]);
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
         Gate::authorize('create', WordPressSite::class);
+        $defaultCompany = $this->ensureCompany($request);
 
         return view('admin.wordpress-sites.create', [
             'site' => new WordPressSite([
+                'company_id' => (int) $request->query('company', $defaultCompany->id),
                 'type' => WordPressSite::TYPE_WORDPRESS,
                 'facebook_api_version' => 'v24.0',
                 'instagram_api_version' => 'v24.0',
                 'status' => WordPressSite::STATUS_ACTIVE,
                 'active' => true,
             ]),
+            'companies' => $request->user()->companies()->where('active', true)->orderBy('name')->get(),
         ]);
     }
 
     public function store(WordPressSiteRequest $request): RedirectResponse
     {
         $data = $this->normalizedData($request->validated());
+        $data['company_id'] ??= $this->ensureCompany($request)->id;
         if (($data['type'] ?? null) === WordPressSite::TYPE_X && filled($data['x_access_token'] ?? null)) {
             $data['x_token_expires_at'] = now()->addHours(2);
         }
@@ -70,7 +76,13 @@ class WordPressSiteController extends Controller
     {
         Gate::authorize('update', $wordpressSite);
 
-        return view('admin.wordpress-sites.edit', ['site' => $wordpressSite]);
+        return view('admin.wordpress-sites.edit', [
+            'site' => $wordpressSite,
+            'companies' => $wordpressSite->user->companies()
+                ->where(fn ($query) => $query->where('active', true)->orWhere('id', $wordpressSite->company_id))
+                ->orderBy('name')
+                ->get(),
+        ]);
     }
 
     public function update(WordPressSiteRequest $request, WordPressSite $wordpressSite): RedirectResponse
@@ -240,5 +252,23 @@ class WordPressSiteController extends Controller
         }
 
         return $normalized;
+    }
+
+    private function ensureCompany(Request $request): Company
+    {
+        $companies = $request->user()->companies();
+        $requestedCompanyId = (int) $request->input('company_id', $request->query('company'));
+
+        if ($requestedCompanyId && ($requested = (clone $companies)->find($requestedCompanyId))) {
+            return $requested;
+        }
+
+        return (clone $companies)->where('active', true)->orderBy('name')->first()
+            ?: (clone $companies)->orderBy('name')->first()
+            ?: $companies->create([
+                'name' => 'Empresa principal',
+                'description' => 'Empresa predeterminada para tus perfiles de publicación.',
+                'active' => true,
+            ]);
     }
 }

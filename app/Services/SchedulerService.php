@@ -51,6 +51,7 @@ class SchedulerService
         string $url,
         ?string $imageMode = null,
         array $publicationProfileIds = [],
+        ?int $companyId = null,
     ): Scheduler {
         $imageMode ??= $profile->generate_image ? 'generate' : 'original';
         $imageMode = in_array($imageMode, ['generate', 'original'], true) ? $imageMode : 'generate';
@@ -70,6 +71,7 @@ class SchedulerService
                 'source_post_ids' => [],
                 'image_mode' => $imageMode,
                 'generate_image' => $imageMode === 'generate',
+                'company_id' => $companyId,
                 'publication_profile_ids' => $publicationProfileIds,
                 'publication_ready' => false,
             ],

@@ -93,6 +93,10 @@ class GenerateAiArticle implements ShouldBeUnique, ShouldQueue
         $payload = $task->payload ?: [];
         $profile = $task->user?->aiPromptProfiles()->findOrFail($payload['profile_id'] ?? null);
 
+        if ($task->article && array_key_exists('company_id', $payload)) {
+            $task->article->update(['company_id' => $payload['company_id']]);
+        }
+
         if ($task->article?->status === AiArticle::STATUS_DRAFT) {
             $this->completeImageChoice($task, $task->article, $scheduler, $originalImages, $profile->generate_image);
 
@@ -121,7 +125,10 @@ class GenerateAiArticle implements ShouldBeUnique, ShouldQueue
             $task->user,
             $profile,
             $sourcePosts,
-            fn (AiArticle $pendingArticle) => $task->update(['ai_article_id' => $pendingArticle->id]),
+            function (AiArticle $pendingArticle) use ($task, $payload): void {
+                $pendingArticle->update(['company_id' => $payload['company_id'] ?? null]);
+                $task->update(['ai_article_id' => $pendingArticle->id]);
+            },
         );
         $task->update(['ai_article_id' => $article->id]);
 

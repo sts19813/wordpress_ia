@@ -10,6 +10,7 @@ class SourceSiteRepository
     public function getForAdmin(): Collection
     {
         return SourceSite::query()
+            ->with('company:id,name')
             ->latest()
             ->get();
     }

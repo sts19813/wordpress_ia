@@ -4,6 +4,7 @@
         ['label' => 'Dashboard', 'route' => 'admin.dashboard', 'active' => 'admin.dashboard', 'icon' => 'ki-chart-line'],
         ['label' => 'Noticias', 'route' => 'admin.news.index', 'active' => 'admin.news.*', 'icon' => 'ki-document'],
         ['label' => 'Post rápido', 'route' => 'admin.quick-posts.index', 'active' => 'admin.quick-posts.*', 'icon' => 'ki-flash-circle'],
+        ['label' => 'Empresas', 'route' => 'admin.companies.index', 'active' => 'admin.companies.*', 'icon' => 'ki-briefcase'],
         ['label' => 'Sitios Fuente', 'route' => 'admin.source-sites.index', 'active' => 'admin.source-sites.*', 'icon' => 'ki-satellite'],
         ['label' => 'Bitácora de Fuentes', 'route' => 'admin.source-scan-logs.index', 'active' => 'admin.source-scan-logs.*', 'icon' => 'ki-note-2'],
         ['label' => 'Artículos IA', 'route' => 'admin.ai-articles.index', 'active' => 'admin.ai-articles.*', 'icon' => 'ki-abstract-26'],

@@ -37,20 +37,35 @@ class SourceSiteController extends Controller
     public function create(Request $request): View
     {
         $defaultProfile = $this->promptProfiles->ensureDefaultFor($request->user());
+        $companies = $request->user()->companies()->where('active', true)->orderBy('name')->get();
+
+        if ($companies->isEmpty()) {
+            $companies = collect([$request->user()->companies()->create([
+                'name' => 'Empresa principal',
+                'description' => 'Empresa predeterminada para organizar tus publicaciones.',
+                'active' => true,
+            ])]);
+        }
+
         $wordpressSites = $request->user()->wordpressSites()
             ->where('active', true)
             ->where('status', 'active')
             ->orderBy('name')
             ->get();
+        $defaultCompanyId = $companies->count() === 1 ? $companies->first()->id : null;
+        $defaultPublicationProfileIds = $defaultCompanyId
+            ? $wordpressSites->where('company_id', $defaultCompanyId)->pluck('id')->values()->all()
+            : [];
 
         return view('admin.source-sites.create', [
             'sourceSite' => new SourceSite([
                 'automation_user_id' => $request->user()->id,
+                'company_id' => $defaultCompanyId,
                 'ai_prompt_profile_id' => $defaultProfile->id,
-                'wordpress_site_id' => $wordpressSites->count() === 1 ? $wordpressSites->first()->id : null,
-                'publication_profile_ids' => $wordpressSites->count() === 1 ? [$wordpressSites->first()->id] : [],
+                'wordpress_site_id' => $defaultPublicationProfileIds[0] ?? null,
+                'publication_profile_ids' => $defaultPublicationProfileIds,
                 'auto_generate' => true,
-                'auto_publish' => $wordpressSites->count() === 1,
+                'auto_publish' => $defaultPublicationProfileIds !== [],
                 'type' => SourceSite::TYPE_AUTO,
                 'status' => SourceSite::STATUS_PENDING,
                 'frequency_minutes' => 60,
@@ -65,6 +80,7 @@ class SourceSiteController extends Controller
             'typeOptions' => SourceSite::typeOptions(),
             'authMethodOptions' => SourceSite::authMethodOptions(),
             'promptProfiles' => $request->user()->aiPromptProfiles()->orderByDesc('is_default')->orderBy('name')->get(),
+            'companies' => $companies,
             'wordpressSites' => $wordpressSites,
         ]);
     }
@@ -142,6 +158,10 @@ class SourceSiteController extends Controller
             'typeOptions' => SourceSite::typeOptions(),
             'authMethodOptions' => SourceSite::authMethodOptions(),
             'promptProfiles' => $request->user()->aiPromptProfiles()->orderByDesc('is_default')->orderBy('name')->get(),
+            'companies' => $request->user()->companies()
+                ->where(fn ($query) => $query->where('active', true)->orWhere('id', $sourceSite->company_id))
+                ->orderBy('name')
+                ->get(),
             'wordpressSites' => $request->user()->wordpressSites()
                 ->where('active', true)
                 ->where('status', 'active')

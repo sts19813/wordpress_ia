@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AccountController;
 use App\Http\Controllers\Admin\AiArticleController;
 use App\Http\Controllers\Admin\AiImageController;
+use App\Http\Controllers\Admin\CompanyController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\NewsController;
 use App\Http\Controllers\Admin\PublicationController;
@@ -86,6 +87,10 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     Route::get('imagenes-ia', [AiImageController::class, 'index'])->name('ai-images.index');
     Route::get('imagenes-ia/{aiImage}/archivo', [AiImageController::class, 'file'])->name('ai-images.file');
     Route::get('publicaciones', [PublicationController::class, 'index'])->name('publications.index');
+    Route::resource('empresas', CompanyController::class)
+        ->names('companies')
+        ->parameters(['empresas' => 'company'])
+        ->except('show');
     Route::post('publicaciones/articulos/{aiArticle}', [PublicationController::class, 'publish'])->name('publications.publish');
     Route::resource('publicaciones/sitios-wordpress', WordPressSiteController::class)
         ->names('wordpress-sites')

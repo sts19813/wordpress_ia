@@ -36,6 +36,7 @@ class PublicationController extends Controller
     public function publish(PublicationRequest $request, AiArticle $aiArticle): RedirectResponse
     {
         $activeProfiles = $request->user()->wordpressSites()
+            ->when($aiArticle->company_id, fn ($query, $companyId) => $query->where('company_id', $companyId))
             ->where('active', true)
             ->where('status', 'active')
             ->orderBy('name')

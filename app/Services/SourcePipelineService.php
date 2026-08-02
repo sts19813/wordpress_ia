@@ -68,6 +68,7 @@ class SourcePipelineService
                 'payload' => [
                     'trigger' => $trigger,
                     'profile_id' => $site->ai_prompt_profile_id,
+                    'company_id' => $site->company_id,
                     'wordpress_site_id' => $site->wordpress_site_id,
                     'publication_profile_ids' => $site->selectedPublicationProfileIds(),
                     'auto_generate' => (bool) $site->auto_generate,
@@ -132,6 +133,7 @@ class SourcePipelineService
                     'max_attempts' => 3,
                     'payload' => [
                         'profile_id' => $payload['profile_id'] ?? null,
+                        'company_id' => $payload['company_id'] ?? null,
                         'wordpress_site_id' => $payload['wordpress_site_id'] ?? null,
                         'publication_profile_ids' => $payload['publication_profile_ids']
                             ?? array_values(array_filter([$payload['wordpress_site_id'] ?? null])),

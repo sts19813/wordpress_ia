@@ -96,6 +96,7 @@
                 <div class="card-body d-flex flex-column gap-5">
                     <div><div class="text-muted fs-7">Estado</div><span class="badge {{ $article->status === 'draft' ? 'badge-light-success' : 'badge-light-danger' }}">{{ $article->statusLabel() }}</span></div>
                     <div><div class="text-muted fs-7">Perfil</div><div class="fw-bold">{{ $article->promptProfile?->name ?: '-' }}</div></div>
+                    @if ($article->company)<div><div class="text-muted fs-7">Empresa</div><div class="fw-bold">{{ $article->company->name }}</div></div>@endif
                     <div><div class="text-muted fs-7">Modelo</div><code>{{ $article->model }}</code></div>
                     <div><div class="text-muted fs-7">Temperatura configurada</div><div class="fw-bold">{{ $article->temperature }}</div></div>
                     <div><div class="text-muted fs-7">Extensión</div><div class="fw-bold">{{ App\Models\AiPromptProfile::lengthOptions()[$article->content_length] ?? $article->content_length }}</div></div>

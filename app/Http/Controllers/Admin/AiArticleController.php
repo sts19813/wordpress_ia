@@ -90,6 +90,7 @@ class AiArticleController extends Controller
         Gate::authorize('view', $aiArticle);
         $aiArticle->load([
             'images',
+            'company:id,name',
             'promptProfile:id,name',
             'publications' => fn ($query) => $query
                 ->with('wordpressSite:id,user_id,type,name,rest_api_url,facebook_page_id')
@@ -100,6 +101,7 @@ class AiArticleController extends Controller
             'article' => $aiArticle,
             'sourcePosts' => $aiArticle->sourcePosts()->load('sourceSite:id,name'),
             'publicationProfiles' => $request->user()->wordpressSites()
+                ->when($aiArticle->company_id, fn ($query, $companyId) => $query->where('company_id', $companyId))
                 ->where('active', true)
                 ->where('status', 'active')
                 ->orderBy('name')

@@ -31,6 +31,7 @@
                         <thead>
                             <tr class="text-start text-gray-500 fw-bold fs-8 text-uppercase gs-0">
                                 <th class="min-w-170px">Nombre</th>
+                                <th class="min-w-150px">Empresa</th>
                                 <th class="min-w-240px">URL</th>
                                 <th class="min-w-105px">Estado</th>
                                 <th class="min-w-100px">Frecuencia</th>
@@ -47,6 +48,7 @@
                                             {{ $sourceSite->name }}
                                         </a>
                                     </td>
+                                    <td>{{ $sourceSite->company?->name ?: '—' }}</td>
                                     <td>
                                         <a href="{{ $sourceSite->url }}" target="_blank" rel="noopener noreferrer" class="source-site-url text-gray-600 text-hover-primary" title="{{ $sourceSite->url }}">
                                             {{ $sourceSite->url }}

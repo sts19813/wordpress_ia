@@ -75,6 +75,11 @@ class User extends Authenticatable
         return $this->hasMany(WordPressSite::class);
     }
 
+    public function companies(): HasMany
+    {
+        return $this->hasMany(Company::class);
+    }
+
     public function publications(): HasMany
     {
         return $this->hasMany(Publication::class);

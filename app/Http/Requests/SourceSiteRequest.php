@@ -6,6 +6,7 @@ use App\Models\SourceSite;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class SourceSiteRequest extends FormRequest
 {
@@ -30,6 +31,7 @@ class SourceSiteRequest extends FormRequest
             'active' => $this->has('active') ? $this->boolean('active') : ($sourceSite?->active ?? true),
             'auto_generate' => $this->has('auto_generate') ? $this->boolean('auto_generate') : ($sourceSite?->auto_generate ?? true),
             'auto_publish' => $this->has('auto_publish') ? $this->boolean('auto_publish') : ($sourceSite?->auto_publish ?? false),
+            'company_id' => filled($this->input('company_id')) ? (int) $this->input('company_id') : null,
             'publication_profile_ids' => array_values(array_unique(array_filter(array_map(
                 'intval',
                 (array) $this->input('publication_profile_ids', []),
@@ -79,6 +81,11 @@ class SourceSiteRequest extends FormRequest
                 'integer',
                 Rule::exists('ai_prompt_profiles', 'id')->where('user_id', $this->user()->id),
             ],
+            'company_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('companies', 'id')->where('user_id', $this->user()->id),
+            ],
             'publication_profile_ids' => [
                 'nullable',
                 'required_if:auto_publish,1',
@@ -124,9 +131,31 @@ class SourceSiteRequest extends FormRequest
             'auto_generate' => 'generación automática',
             'auto_publish' => 'publicación automática',
             'ai_prompt_profile_id' => 'perfil editorial IA',
+            'company_id' => 'empresa',
             'publication_profile_ids' => 'perfiles de publicación',
             'publication_profile_ids.*' => 'perfil de publicación',
         ];
+    }
+
+    public function after(): array
+    {
+        return [function (Validator $validator): void {
+            $companyId = (int) $this->input('company_id');
+            $profileIds = array_map('intval', (array) $this->input('publication_profile_ids', []));
+
+            if (! $companyId || $profileIds === []) {
+                return;
+            }
+
+            $validCount = $this->user()->wordpressSites()
+                ->where('company_id', $companyId)
+                ->whereIn('id', $profileIds)
+                ->count();
+
+            if ($validCount !== count(array_unique($profileIds))) {
+                $validator->errors()->add('publication_profile_ids', 'Todos los destinos deben pertenecer a la empresa seleccionada.');
+            }
+        }];
     }
 
     /**

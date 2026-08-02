@@ -75,6 +75,10 @@ class GenerateSourceArticle implements ShouldBeUnique, ShouldQueue
 
             $article = $task->article;
 
+            if ($article && array_key_exists('company_id', $payload)) {
+                $article->update(['company_id' => $payload['company_id']]);
+            }
+
             if ($article?->status === AiArticle::STATUS_FAILED) {
                 $article->delete();
                 $task->update(['ai_article_id' => null]);
@@ -89,6 +93,7 @@ class GenerateSourceArticle implements ShouldBeUnique, ShouldQueue
                     max(1, $this->attempts()),
                 );
                 $article = $articles->generateDraft($user, $profile, [$sourcePost]);
+                $article->update(['company_id' => $payload['company_id'] ?? null]);
                 $task->update(['ai_article_id' => $article->id]);
 
                 if ($article->status !== AiArticle::STATUS_DRAFT) {
@@ -118,6 +123,7 @@ class GenerateSourceArticle implements ShouldBeUnique, ShouldQueue
             $publicationProfiles = WordPressSite::query()
                 ->whereIn('id', $profileIds)
                 ->where('user_id', $user->id)
+                ->when($payload['company_id'] ?? null, fn ($query, $companyId) => $query->where('company_id', $companyId))
                 ->where('active', true)
                 ->where('status', WordPressSite::STATUS_ACTIVE)
                 ->get()

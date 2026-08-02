@@ -1,5 +1,13 @@
 @extends('layouts.admin')
 
+@php
+    $selectedCompanyId = (int) old('company_id', $companies->count() === 1 ? $companies->first()->id : 0);
+    $oldPublicationProfileIds = array_map('intval', old(
+        'publication_profile_ids',
+        $selectedCompanyId ? $publicationProfiles->where('company_id', $selectedCompanyId)->pluck('id')->all() : [],
+    ));
+@endphp
+
 @section('title', 'Nuevo Post rápido | '.config('app.name'))
 
 @section('toolbar')
@@ -127,8 +135,22 @@
                             </a>
                         </div>
 
+                        @if ($companies->isNotEmpty())
+                            <div class="mb-6">
+                                <label for="quick-post-company" class="form-label fw-bold">Empresa</label>
+                                <select id="quick-post-company" name="company_id" class="form-select form-select-solid @error('company_id') is-invalid @enderror">
+                                    <option value="">No publicar; guardar como borrador</option>
+                                    @foreach ($companies as $company)
+                                        <option value="{{ $company->id }}" @selected($selectedCompanyId === $company->id)>{{ $company->name }} · {{ $company->publicationProfiles->count() }} destino(s)</option>
+                                    @endforeach
+                                </select>
+                                <div class="form-text">Al seleccionar una empresa se marcarán todos sus destinos; puedes desmarcar los que no apliquen.</div>
+                                @error('company_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            </div>
+                        @endif
+
                         @if ($publicationProfiles->isNotEmpty())
-                            <div class="row g-4">
+                            <div class="row g-4" id="quick-post-destinations">
                                 @foreach ($publicationProfiles as $publicationProfile)
                                     @php
                                         $destinationClass = match ($publicationProfile->type) {
@@ -138,14 +160,14 @@
                                             default => 'is-wordpress',
                                         };
                                     @endphp
-                                    <div class="col-md-6">
+                                    <div class="col-md-6 @if ((int) $publicationProfile->company_id !== $selectedCompanyId) d-none @endif" data-company-destination="{{ $publicationProfile->company_id }}">
                                         <label class="quick-post-destination border rounded p-5 h-100 d-flex align-items-start gap-4 cursor-pointer">
                                             <input
                                                 class="form-check-input mt-1"
                                                 type="checkbox"
                                                 name="publication_profile_ids[]"
                                                 value="{{ $publicationProfile->id }}"
-                                                @checked(in_array($publicationProfile->id, array_map('intval', old('publication_profile_ids', []))))
+                                                @checked(in_array($publicationProfile->id, $oldPublicationProfileIds))
                                             >
                                             <span class="quick-post-destination-icon {{ $destinationClass }}">
                                                 @if ($publicationProfile->isFacebookPage())
@@ -228,6 +250,26 @@
 document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('quick-post-form');
     const button = document.getElementById('quick-post-submit');
+    const company = document.getElementById('quick-post-company');
+    const destinationCards = Array.from(document.querySelectorAll('[data-company-destination]'));
+
+    const refreshDestinations = function (selectAll) {
+        const companyId = Number(company?.value || 0);
+
+        destinationCards.forEach(function (card) {
+            const visible = Number(card.dataset.companyDestination) === companyId;
+            const checkbox = card.querySelector('input[type="checkbox"]');
+            card.classList.toggle('d-none', !visible);
+
+            if (checkbox) {
+                if (!visible) checkbox.checked = false;
+                else if (selectAll) checkbox.checked = true;
+            }
+        });
+    };
+
+    company?.addEventListener('change', function () { refreshDestinations(true); });
+    refreshDestinations(false);
 
     form?.addEventListener('submit', function () {
         button.disabled = true;

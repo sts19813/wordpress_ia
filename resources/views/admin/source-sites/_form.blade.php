@@ -18,8 +18,9 @@
     };
     $filterErrors = $errors->hasAny(['filter_topics', 'filter_topics.*', 'excluded_topics', 'excluded_topics.*', 'filter_instructions']);
     $advancedErrors = $errors->hasAny(['daily_limit', 'max_posts_per_scan', 'active', 'auth_method', 'api_key', 'username', 'password', 'custom_headers', 'cookies']);
-    $automationErrors = $errors->hasAny(['auto_generate', 'auto_publish', 'ai_prompt_profile_id', 'publication_profile_ids', 'publication_profile_ids.*', 'max_generations_per_scan']);
+    $automationErrors = $errors->hasAny(['auto_generate', 'auto_publish', 'ai_prompt_profile_id', 'company_id', 'publication_profile_ids', 'publication_profile_ids.*', 'max_generations_per_scan']);
     $selectedPublicationProfileIds = array_map('intval', old('publication_profile_ids', $sourceSite->selectedPublicationProfileIds()));
+    $selectedCompanyId = (int) old('company_id', $sourceSite->company_id ?: ($companies->count() === 1 ? $companies->first()->id : 0));
     $activeTab = $automationErrors ? 'automation' : ($advancedErrors ? 'advanced' : ($filterErrors ? 'filters' : 'basic'));
 @endphp
 
@@ -142,11 +143,22 @@
                         <i class="ki-outline ki-arrows-circle fs-2tx text-success me-4"></i>
                         <div>
                             <div class="fw-bold text-gray-900 mb-1">Flujo completo mediante colas</div>
-                            <div class="text-gray-700">Cada nota aceptada por los filtros inteligentes puede generar un artículo con IA y publicarse en WordPress o Facebook. El progreso completo aparecerá en el Programador.</div>
+                            <div class="text-gray-700">Cada nota aceptada puede generar un artículo con IA y publicarse en todos los WordPress, Facebook, Instagram y X seleccionados para la empresa. El progreso completo aparecerá en el Programador.</div>
                         </div>
                     </div>
 
                     <div class="row g-7">
+                        <div class="col-lg-6">
+                            <label class="form-label required">Empresa que publicará las notas</label>
+                            <select name="company_id" id="source-company-id" class="form-select form-select-solid @error('company_id') is-invalid @enderror" required>
+                                <option value="">Selecciona una empresa</option>
+                                @foreach ($companies as $company)
+                                    <option value="{{ $company->id }}" @selected($selectedCompanyId === $company->id)>{{ $company->name }}</option>
+                                @endforeach
+                            </select>
+                            <div class="form-text">Al cambiarla se cargarán y marcarán todos sus destinos disponibles.</div>
+                            @error('company_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
                         <div class="col-lg-6">
                             <label class="form-label required">Perfil editorial para generar artículos</label>
                             <select name="ai_prompt_profile_id" class="form-select form-select-solid @error('ai_prompt_profile_id') is-invalid @enderror">
@@ -159,7 +171,7 @@
                             </select>
                             @error('ai_prompt_profile_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
-                        <div class="col-lg-6">
+                        <div class="col-12">
                             <div class="d-flex align-items-center justify-content-between gap-3">
                                 <label class="form-label mb-0">Destinos de publicación automática</label>
                                 @if ($wordpressSites->isNotEmpty())
@@ -176,7 +188,9 @@
                                 data-placeholder="Solo guardar como borrador"
                             >
                                 @foreach ($wordpressSites as $wordpressSite)
-                                    <option value="{{ $wordpressSite->id }}" @selected(in_array($wordpressSite->id, $selectedPublicationProfileIds, true))>{{ $wordpressSite->typeLabel() }} · {{ $wordpressSite->name }}</option>
+                                    @if ((int) $wordpressSite->company_id === $selectedCompanyId)
+                                        <option value="{{ $wordpressSite->id }}" @selected(in_array($wordpressSite->id, $selectedPublicationProfileIds, true))>{{ $wordpressSite->typeLabel() }} · {{ $wordpressSite->name }}</option>
+                                    @endif
                                 @endforeach
                             </select>
                             <div class="form-text">Busca y selecciona uno, varios o todos tus perfiles activos. Al elegir destinos se activa la publicación; sin selección, la nota quedará como borrador.</div>
@@ -361,8 +375,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const aiNotice = document.getElementById('ai-connection-notice');
     const requiresTest = @json(! $isEdit);
     const publicationProfiles = document.getElementById('publication-profile-ids');
+    const companySelector = document.getElementById('source-company-id');
     const selectAllPublicationProfiles = document.getElementById('select-all-publication-profiles');
     const autoPublishToggle = form.querySelector('input[type="checkbox"][name="auto_publish"]');
+    const allPublicationProfiles = @json($wordpressSites->map(fn ($profile) => ['id' => $profile->id, 'company_id' => $profile->company_id, 'label' => $profile->typeLabel().' · '.$profile->name])->values());
+    const initiallySelectedProfileIds = @json($selectedPublicationProfileIds);
     let lastRecommendation = null;
 
     const syncAutoPublishWithDestinations = () => {
@@ -371,13 +388,46 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    if (publicationProfiles && window.jQuery?.fn?.select2) {
-        const publicationProfilesSelect = window.jQuery(publicationProfiles).select2({
+    let publicationProfilesSelect = null;
+    const initializePublicationProfiles = () => {
+        if (!publicationProfiles || !window.jQuery?.fn?.select2) return;
+        publicationProfilesSelect = window.jQuery(publicationProfiles).select2({
             placeholder: publicationProfiles.dataset.placeholder,
             width: '100%',
             closeOnSelect: false,
         });
         publicationProfilesSelect.on('select2:select select2:unselect', syncAutoPublishWithDestinations);
+    };
+
+    const loadCompanyProfiles = (selectAll = false) => {
+        if (!publicationProfiles) return;
+        const companyId = Number(companySelector?.value || 0);
+        const previousSelection = selectAll
+            ? []
+            : Array.from(publicationProfiles.selectedOptions).map(option => Number(option.value)).concat(initiallySelectedProfileIds);
+
+        if (publicationProfilesSelect) {
+            publicationProfilesSelect.off('select2:select select2:unselect');
+            publicationProfilesSelect.select2('destroy');
+            publicationProfilesSelect = null;
+        }
+
+        publicationProfiles.innerHTML = '';
+        allPublicationProfiles
+            .filter(profile => Number(profile.company_id) === companyId)
+            .forEach(profile => {
+                const option = new Option(profile.label, profile.id, false, selectAll || previousSelection.includes(Number(profile.id)));
+                publicationProfiles.add(option);
+            });
+
+        initializePublicationProfiles();
+        syncAutoPublishWithDestinations();
+    };
+
+    companySelector?.addEventListener('change', () => loadCompanyProfiles(true));
+
+    if (publicationProfiles && window.jQuery?.fn?.select2) {
+        initializePublicationProfiles();
 
         selectAllPublicationProfiles?.addEventListener('click', () => {
             const allProfileIds = Array.from(publicationProfiles.options).map(option => option.value);

@@ -33,6 +33,15 @@ class QuickPostController extends Controller
     {
         $this->profiles->ensureDefaultFor($request->user());
 
+        $companies = $request->user()->companies()
+            ->where('active', true)
+            ->with(['publicationProfiles' => fn ($query) => $query
+                ->where('active', true)
+                ->where('status', 'active')
+                ->orderBy('name')])
+            ->orderBy('name')
+            ->get();
+
         return view('admin.quick-posts.create', [
             'profiles' => $request->user()
                 ->aiPromptProfiles()
@@ -45,6 +54,7 @@ class QuickPostController extends Controller
                 ->where('status', 'active')
                 ->orderBy('name')
                 ->get(),
+            'companies' => $companies,
         ]);
     }
 
@@ -59,6 +69,7 @@ class QuickPostController extends Controller
             $request->validated('url'),
             $request->validated('image_mode'),
             $request->validated()['publication_profile_ids'] ?? [],
+            $request->validated('company_id'),
         );
 
         $imageMessage = $request->validated('image_mode') === 'original'

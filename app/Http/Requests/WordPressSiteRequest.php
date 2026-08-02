@@ -57,6 +57,11 @@ class WordPressSiteRequest extends FormRequest
         $requiresXClient = $isX && ! $hasSubmittedXToken && ($isCreating || ! $hasStoredXClient);
 
         return [
+            'company_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('companies', 'id')->where('user_id', $this->user()->id),
+            ],
             'name' => ['required', 'string', 'max:255'],
             'type' => ['required', Rule::in(array_keys(WordPressSite::typeOptions()))],
             'rest_api_url' => [$isWordPress ? 'required' : 'nullable', 'url:http,https', 'max:2048'],
@@ -91,6 +96,7 @@ class WordPressSiteRequest extends FormRequest
     public function attributes(): array
     {
         return [
+            'company_id' => 'empresa',
             'name' => 'nombre',
             'type' => 'tipo de perfil',
             'rest_api_url' => 'dominio',
