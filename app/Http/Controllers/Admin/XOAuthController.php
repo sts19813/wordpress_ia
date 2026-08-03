@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Company;
 use App\Models\WordPressSite;
 use App\Services\Publications\XOAuthService;
 use App\Services\PublicationService;
@@ -32,6 +33,7 @@ class XOAuthController extends Controller
             'profile_id' => $wordpressSite->id,
             'state' => $state,
             'verifier' => $verifier,
+            'return_company_id' => $this->returnCompany($request)?->id,
         ]);
 
         return redirect()->away($this->oauth->authorizationUrl($wordpressSite, $state, $challenge));
@@ -40,18 +42,24 @@ class XOAuthController extends Controller
     public function callback(Request $request): RedirectResponse
     {
         $pending = $request->session()->pull('x_oauth');
+        $returnCompany = is_array($pending) && filled($pending['return_company_id'] ?? null)
+            ? $request->user()->companies()->find((int) $pending['return_company_id'])
+            : null;
 
         if (! is_array($pending)
             || blank($pending['state'] ?? null)
             || ! hash_equals((string) $pending['state'], (string) $request->query('state'))) {
-            return redirect()->route('admin.wordpress-sites.index')
+            return $this->profilesRedirect($returnCompany)
                 ->with('warning', 'La autorización de X expiró o no es válida. Intenta conectarla nuevamente.');
         }
 
         $profile = $request->user()->wordpressSites()->findOrFail($pending['profile_id']);
 
         if ($request->filled('error')) {
-            return redirect()->route('admin.wordpress-sites.edit', $profile)
+            return redirect()->route('admin.wordpress-sites.edit', [
+                'wordpressSite' => $profile,
+                ...($returnCompany ? ['return_company' => $returnCompany->id] : []),
+            ])
                 ->with('warning', 'X no autorizó la conexión: '.($request->query('error_description') ?: $request->query('error')));
         }
 
@@ -71,7 +79,7 @@ class XOAuthController extends Controller
                 'connection_error' => null,
             ]);
 
-            return redirect()->route('admin.wordpress-sites.index')
+            return $this->profilesRedirect($returnCompany)
                 ->with('status', 'Cuenta de X conectada correctamente como @'.$connection['x_username'].'.');
         } catch (Throwable $exception) {
             $profile->update([
@@ -80,8 +88,27 @@ class XOAuthController extends Controller
                 'connection_error' => $exception->getMessage(),
             ]);
 
-            return redirect()->route('admin.wordpress-sites.edit', $profile)
+            return redirect()->route('admin.wordpress-sites.edit', [
+                'wordpressSite' => $profile,
+                ...($returnCompany ? ['return_company' => $returnCompany->id] : []),
+            ])
                 ->with('warning', 'No se pudo completar la conexión con X. '.$exception->getMessage());
         }
+    }
+
+    private function returnCompany(Request $request): ?Company
+    {
+        $companyId = (int) $request->query('return_company');
+
+        return $companyId > 0
+            ? $request->user()->companies()->find($companyId)
+            : null;
+    }
+
+    private function profilesRedirect(?Company $company): RedirectResponse
+    {
+        return $company
+            ? redirect()->route('admin.companies.edit', ['company' => $company, 'tab' => 'destinos'])
+            : redirect()->route('admin.wordpress-sites.index');
     }
 }

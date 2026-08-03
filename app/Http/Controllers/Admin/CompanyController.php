@@ -3,11 +3,14 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\CompanyDestinationsRequest;
 use App\Http\Requests\CompanyRequest;
 use App\Models\Company;
+use App\Models\SourceSite;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 class CompanyController extends Controller
@@ -22,6 +25,8 @@ class CompanyController extends Controller
                 ->with(['publicationProfiles' => fn ($query) => $query->orderBy('type')->orderBy('name')])
                 ->orderBy('name')
                 ->get(),
+            'profileCount' => $request->user()->wordpressSites()->count(),
+            'unassignedProfileCount' => $request->user()->wordpressSites()->whereNull('company_id')->count(),
         ]);
     }
 
@@ -42,19 +47,81 @@ class CompanyController extends Controller
             ->with('status', "Empresa {$company->name} creada correctamente.");
     }
 
-    public function edit(Company $company): View
+    public function edit(Request $request, Company $company): View
     {
         Gate::authorize('update', $company);
 
-        return view('admin.companies.edit', ['company' => $company]);
+        $company->loadCount(['publicationProfiles', 'sourceSites']);
+
+        return view('admin.companies.edit', [
+            'company' => $company,
+            'publicationProfiles' => $request->user()->wordpressSites()
+                ->with('company:id,name')
+                ->withCount('publications')
+                ->orderBy('type')
+                ->orderBy('name')
+                ->get(),
+            'activeTab' => $request->query('tab') === 'destinos' ? 'destinos' : 'general',
+        ]);
     }
 
     public function update(CompanyRequest $request, Company $company): RedirectResponse
     {
         $company->update($request->validated());
 
-        return redirect()->route('admin.companies.index')
+        return redirect()->route('admin.companies.edit', ['company' => $company, 'tab' => 'general'])
             ->with('status', 'Empresa actualizada correctamente.');
+    }
+
+    public function updateDestinations(CompanyDestinationsRequest $request, Company $company): RedirectResponse
+    {
+        $selectedIds = $request->validated('publication_profile_ids');
+
+        DB::transaction(function () use ($request, $company, $selectedIds): void {
+            $profiles = $request->user()->wordpressSites()->lockForUpdate()->get(['id', 'company_id']);
+            $selectedLookup = array_fill_keys($selectedIds, true);
+
+            foreach ($profiles as $profile) {
+                if (isset($selectedLookup[$profile->id])) {
+                    if ($profile->company_id !== $company->id) {
+                        $profile->update(['company_id' => $company->id]);
+                    }
+
+                    continue;
+                }
+
+                if ($profile->company_id === $company->id) {
+                    $profile->update(['company_id' => null]);
+                }
+            }
+
+            $profilesById = $request->user()->wordpressSites()
+                ->get(['id', 'company_id'])
+                ->keyBy('id');
+
+            SourceSite::query()
+                ->where('automation_user_id', $request->user()->id)
+                ->whereNotNull('publication_profile_ids')
+                ->get()
+                ->each(function (SourceSite $source) use ($profilesById): void {
+                    $validIds = collect($source->publication_profile_ids)
+                        ->map(fn ($id) => (int) $id)
+                        ->filter(fn (int $id) => $profilesById->get($id)?->company_id === $source->company_id)
+                        ->unique()
+                        ->values()
+                        ->all();
+
+                    if ($validIds !== $source->selectedPublicationProfileIds()) {
+                        $source->update([
+                            'publication_profile_ids' => $validIds,
+                            'wordpress_site_id' => $validIds[0] ?? null,
+                        ]);
+                    }
+                });
+        });
+
+        return redirect()->route('admin.companies.edit', ['company' => $company, 'tab' => 'destinos'])
+            ->with('status', 'Destinos de publicación actualizados correctamente.');
     }
 
     public function destroy(Company $company): RedirectResponse

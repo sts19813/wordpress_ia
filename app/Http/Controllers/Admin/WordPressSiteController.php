@@ -30,6 +30,7 @@ class WordPressSiteController extends Controller
                 ->withCount('publications')
                 ->latest()
                 ->get(),
+            'companies' => $request->user()->companies()->orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -48,6 +49,7 @@ class WordPressSiteController extends Controller
                 'active' => true,
             ]),
             'companies' => $request->user()->companies()->where('active', true)->orderBy('name')->get(),
+            'returnCompany' => $this->returnCompany($request),
         ]);
     }
 
@@ -66,13 +68,22 @@ class WordPressSiteController extends Controller
         ]);
 
         if ($requiresXAuthorization) {
-            return redirect()->route('admin.x-oauth.redirect', $site);
+            $returnCompany = $this->returnCompany($request);
+
+            return redirect()->route('admin.x-oauth.redirect', [
+                'wordpressSite' => $site,
+                ...($returnCompany ? ['return_company' => $returnCompany->id] : []),
+            ]);
         }
 
-        return $this->testAndRedirect($site, 'Perfil de publicación guardado y conectado correctamente.');
+        return $this->testAndRedirect(
+            $site,
+            'Perfil de publicación guardado y conectado correctamente.',
+            $this->returnCompany($request),
+        );
     }
 
-    public function edit(WordPressSite $wordpressSite): View
+    public function edit(Request $request, WordPressSite $wordpressSite): View
     {
         Gate::authorize('update', $wordpressSite);
 
@@ -82,6 +93,7 @@ class WordPressSiteController extends Controller
                 ->where(fn ($query) => $query->where('active', true)->orWhere('id', $wordpressSite->company_id))
                 ->orderBy('name')
                 ->get(),
+            'returnCompany' => $this->returnCompany($request),
         ]);
     }
 
@@ -137,21 +149,40 @@ class WordPressSiteController extends Controller
                 'status' => WordPressSite::STATUS_PAUSED,
             ]);
 
-            return redirect()->route('admin.x-oauth.redirect', $wordpressSite);
+            $returnCompany = $this->returnCompany($request);
+
+            return redirect()->route('admin.x-oauth.redirect', [
+                'wordpressSite' => $wordpressSite,
+                ...($returnCompany ? ['return_company' => $returnCompany->id] : []),
+            ]);
         }
 
-        return $this->testAndRedirect($wordpressSite, 'Perfil de publicación actualizado y conectado correctamente.');
+        return $this->testAndRedirect(
+            $wordpressSite,
+            'Perfil de publicación actualizado y conectado correctamente.',
+            $this->returnCompany($request),
+        );
     }
 
-    public function test(WordPressSite $wordpressSite): RedirectResponse
+    public function test(Request $request, WordPressSite $wordpressSite): RedirectResponse
     {
         Gate::authorize('update', $wordpressSite);
 
         if ($wordpressSite->isX() && blank($wordpressSite->x_access_token)) {
-            return redirect()->route('admin.x-oauth.redirect', $wordpressSite);
+            $returnCompany = $this->returnCompany($request);
+
+            return redirect()->route('admin.x-oauth.redirect', [
+                'wordpressSite' => $wordpressSite,
+                ...($returnCompany ? ['return_company' => $returnCompany->id] : []),
+            ]);
         }
 
-        return $this->testAndRedirect($wordpressSite, 'Conexión verificada correctamente. El perfil está listo para publicar.');
+        return $this->testAndRedirect(
+            $wordpressSite,
+            'Conexión verificada correctamente. El perfil está listo para publicar.',
+            $this->returnCompany($request),
+            true,
+        );
     }
 
     public function destroy(WordPressSite $wordpressSite): RedirectResponse
@@ -162,8 +193,12 @@ class WordPressSiteController extends Controller
         return redirect()->route('admin.wordpress-sites.index')->with('status', 'Perfil de publicación eliminado. El historial de publicaciones se conservó.');
     }
 
-    private function testAndRedirect(WordPressSite $site, string $successMessage): RedirectResponse
-    {
+    private function testAndRedirect(
+        WordPressSite $site,
+        string $successMessage,
+        ?Company $returnCompany = null,
+        bool $returnToCompanyOnFailure = false,
+    ): RedirectResponse {
         try {
             $connection = $this->publications->testConnection($site);
             $updates = [
@@ -188,7 +223,7 @@ class WordPressSiteController extends Controller
 
             $site->update($updates);
 
-            return redirect()->route('admin.wordpress-sites.index')->with('status', $successMessage);
+            return $this->profilesRedirect($returnCompany)->with('status', $successMessage);
         } catch (Throwable $exception) {
             $remoteMessage = $exception instanceof RequestException
                 ? ($exception->response?->json('error.message')
@@ -211,9 +246,31 @@ class WordPressSiteController extends Controller
                 'connection_error' => $message,
             ]);
 
-            return redirect()->route('admin.wordpress-sites.edit', $site)
-                ->with('warning', 'El perfil quedó guardado, pero la prueba de conexión falló. '.$message);
+            $redirect = $returnCompany && $returnToCompanyOnFailure
+                ? $this->profilesRedirect($returnCompany)
+                : redirect()->route('admin.wordpress-sites.edit', [
+                    'wordpressSite' => $site,
+                    ...($returnCompany ? ['return_company' => $returnCompany->id] : []),
+                ]);
+
+            return $redirect->with('warning', 'El perfil quedó guardado, pero la prueba de conexión falló. '.$message);
         }
+    }
+
+    private function returnCompany(Request $request): ?Company
+    {
+        $companyId = (int) $request->input('return_company_id', $request->query('return_company'));
+
+        return $companyId > 0
+            ? $request->user()->companies()->find($companyId)
+            : null;
+    }
+
+    private function profilesRedirect(?Company $company): RedirectResponse
+    {
+        return $company
+            ? redirect()->route('admin.companies.edit', ['company' => $company, 'tab' => 'destinos'])
+            : redirect()->route('admin.wordpress-sites.index');
     }
 
     /**

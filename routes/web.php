@@ -87,6 +87,8 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     Route::get('imagenes-ia', [AiImageController::class, 'index'])->name('ai-images.index');
     Route::get('imagenes-ia/{aiImage}/archivo', [AiImageController::class, 'file'])->name('ai-images.file');
     Route::get('publicaciones', [PublicationController::class, 'index'])->name('publications.index');
+    Route::put('empresas/{company}/destinos', [CompanyController::class, 'updateDestinations'])
+        ->name('companies.destinations.update');
     Route::resource('empresas', CompanyController::class)
         ->names('companies')
         ->parameters(['empresas' => 'company'])

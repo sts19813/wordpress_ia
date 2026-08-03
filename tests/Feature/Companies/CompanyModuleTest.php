@@ -69,6 +69,92 @@ class CompanyModuleTest extends TestCase
         $this->assertSame([$profile->id], $source->publication_profile_ids);
     }
 
+    public function test_company_destinations_tab_lists_the_catalog_and_profile_actions(): void
+    {
+        $user = User::factory()->create();
+        $company = $user->companies()->create(['name' => 'Empresa A', 'active' => true]);
+        $otherCompany = $user->companies()->create(['name' => 'Empresa B', 'active' => true]);
+        $profile = $this->publicationProfile($user, $company, 'WordPress A');
+        $otherProfile = $this->publicationProfile($user, $otherCompany, 'WordPress B');
+
+        $this->actingAs($user)
+            ->get(route('admin.companies.edit', ['company' => $company, 'tab' => 'destinos']))
+            ->assertOk()
+            ->assertSee('Catálogo de destinos')
+            ->assertSee('WordPress A')
+            ->assertSee('WordPress B')
+            ->assertSee('Actualmente en Empresa B')
+            ->assertSee(route('admin.wordpress-sites.edit', [
+                'wordpressSite' => $otherProfile,
+                'return_company' => $company->id,
+            ]), false)
+            ->assertSee(route('admin.wordpress-sites.test', $profile), false);
+    }
+
+    public function test_user_can_assign_move_and_remove_destinations_from_a_company(): void
+    {
+        $user = User::factory()->create();
+        $company = $user->companies()->create(['name' => 'Empresa A', 'active' => true]);
+        $otherCompany = $user->companies()->create(['name' => 'Empresa B', 'active' => true]);
+        $removed = $this->publicationProfile($user, $company, 'Destino removido');
+        $kept = $this->publicationProfile($user, $company, 'Destino conservado');
+        $moved = $this->publicationProfile($user, $otherCompany, 'Destino movido');
+        $source = SourceSite::query()->create([
+            'name' => 'Fuente existente',
+            'url' => 'https://fuente.test',
+            'type' => SourceSite::TYPE_RSS,
+            'status' => SourceSite::STATUS_ACTIVE,
+            'frequency_minutes' => 60,
+            'auth_method' => SourceSite::AUTH_NONE,
+            'daily_limit' => 20,
+            'automation_user_id' => $user->id,
+            'company_id' => $company->id,
+            'wordpress_site_id' => $removed->id,
+            'publication_profile_ids' => [$removed->id, $kept->id],
+            'active' => true,
+        ]);
+
+        $this->actingAs($user)
+            ->put(route('admin.companies.destinations.update', $company), [
+                'publication_profile_ids' => [$kept->id, $moved->id],
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('admin.companies.edit', ['company' => $company, 'tab' => 'destinos']));
+
+        $this->assertNull($removed->fresh()->company_id);
+        $this->assertSame($company->id, $kept->fresh()->company_id);
+        $this->assertSame($company->id, $moved->fresh()->company_id);
+        $this->assertSame([$kept->id], $source->fresh()->publication_profile_ids);
+        $this->assertSame($kept->id, $source->fresh()->wordpress_site_id);
+
+        $this->actingAs($user)
+            ->put(route('admin.companies.destinations.update', $company))
+            ->assertSessionHasNoErrors();
+
+        $this->assertNull($kept->fresh()->company_id);
+        $this->assertNull($moved->fresh()->company_id);
+        $this->assertSame([], $source->fresh()->publication_profile_ids);
+        $this->assertNull($source->fresh()->wordpress_site_id);
+    }
+
+    public function test_company_cannot_assign_another_users_destination(): void
+    {
+        $user = User::factory()->create();
+        $company = $user->companies()->create(['name' => 'Empresa A', 'active' => true]);
+        $profile = $this->publicationProfile($user, $company, 'Destino propio');
+        $otherUser = User::factory()->create();
+        $otherCompany = $otherUser->companies()->create(['name' => 'Empresa ajena', 'active' => true]);
+        $otherProfile = $this->publicationProfile($otherUser, $otherCompany, 'Destino ajeno');
+
+        $this->actingAs($user)
+            ->put(route('admin.companies.destinations.update', $company), [
+                'publication_profile_ids' => [$profile->id, $otherProfile->id],
+            ])
+            ->assertSessionHasErrors('publication_profile_ids.1');
+
+        $this->assertSame($otherCompany->id, $otherProfile->fresh()->company_id);
+    }
+
     public function test_quick_post_records_company_and_allows_its_selected_destinations(): void
     {
         Queue::fake();

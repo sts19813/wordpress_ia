@@ -6,6 +6,9 @@
 <form method="POST" action="{{ $isEdit ? route('admin.wordpress-sites.update', $site) : route('admin.wordpress-sites.store') }}">
     @csrf
     @if ($isEdit) @method('PUT') @endif
+    @if ($returnCompany)
+        <input type="hidden" name="return_company_id" value="{{ $returnCompany->id }}">
+    @endif
 
     <div class="row g-7">
         <div class="col-xl-8">
@@ -147,7 +150,7 @@
                                 </div>
                                 @if ($site->exists && $site->isX() && filled($site->x_client_id) && filled($site->x_client_secret))
                                     <div class="col-12">
-                                        <a href="{{ route('admin.x-oauth.redirect', $site) }}" class="btn btn-light-primary">
+                                        <a href="{{ route('admin.x-oauth.redirect', ['wordpressSite' => $site, ...($returnCompany ? ['return_company' => $returnCompany->id] : [])]) }}" class="btn btn-light-primary">
                                             <span class="fw-bold me-2">𝕏</span>{{ filled($site->x_access_token) ? 'Reconectar cuenta de X' : 'Conectar cuenta de X' }}
                                         </a>
                                     </div>
@@ -243,7 +246,7 @@
     </div>
 
     <div class="d-flex justify-content-end gap-3 mt-2">
-        <a href="{{ route('admin.wordpress-sites.index') }}" class="btn btn-light">Cancelar</a>
+        <a href="{{ $returnCompany ? route('admin.companies.edit', ['company' => $returnCompany, 'tab' => 'destinos']) : route('admin.wordpress-sites.index') }}" class="btn btn-light">Cancelar</a>
         <button type="submit" class="btn btn-primary">
             <i class="ki-outline ki-check fs-2"></i><span data-profile-submit-label>{{ $selectedType === App\Models\WordPressSite::TYPE_X ? 'Guardar y conectar con X' : 'Guardar y probar perfil' }}</span>
         </button>
