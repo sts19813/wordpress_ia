@@ -93,7 +93,7 @@ class SourcePipelineQueueTest extends TestCase
             ->assertSee('scheduler-inactive-badge', false);
     }
 
-    public function test_a_queued_source_scan_can_be_executed_manually_when_the_worker_is_stopped(): void
+    public function test_a_queued_source_scan_can_be_requested_without_running_it_in_the_http_request(): void
     {
         Queue::fake();
         Http::fake([
@@ -110,11 +110,12 @@ class SourcePipelineQueueTest extends TestCase
             ->post(route('admin.scheduler.execute', $task))
             ->assertRedirect(route('admin.scheduler.index', ['task' => $task->id]));
 
-        $this->assertSame(Scheduler::STATUS_COMPLETED, $task->fresh()->status);
-        $this->assertSame('Finalizado', $task->fresh()->step);
+        $this->assertSame(Scheduler::STATUS_QUEUED, $task->fresh()->status);
+        $this->assertSame('Esperando un procesador de cola', $task->fresh()->step);
         $this->assertTrue(collect($task->fresh()->events)->contains(
-            fn (array $event) => str_contains($event['message'], 'Ejecución manual iniciada'),
+            fn (array $event) => str_contains($event['message'], 'continuará en segundo plano'),
         ));
+        Queue::assertPushed(ScanSourceSite::class);
     }
 
     public function test_complete_pipeline_scans_generates_and_publishes_accepted_notes_as_tracked_jobs(): void

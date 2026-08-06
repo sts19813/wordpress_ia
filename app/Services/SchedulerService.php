@@ -12,8 +12,6 @@ use App\Models\AiArticle;
 use App\Models\AiPromptProfile;
 use App\Models\Scheduler;
 use App\Models\User;
-use App\Services\QuickPosts\SocialPostCaptureService;
-use Throwable;
 
 class SchedulerService
 {
@@ -242,41 +240,11 @@ class SchedulerService
         return $task->fresh();
     }
 
-    public function executeNow(Scheduler $task): Scheduler
+    public function requestExecution(Scheduler $task): Scheduler
     {
         $task->load('article.images');
-        $this->addEvent($task, 'info', 'Ejecución manual iniciada desde el programador.');
-
-        try {
-            if ($task->type === Scheduler::TYPE_SOURCE_SCAN) {
-                app()->call([new ScanSourceSite($task->id, (int) $task->source_site_id), 'handle']);
-            } elseif ($task->type === Scheduler::TYPE_SOURCE_ARTICLE) {
-                app()->call([new GenerateSourceArticle($task->id, (int) $task->source_site_id), 'handle']);
-            } elseif ($task->type === Scheduler::TYPE_QUICK_POST) {
-                $this->executeQuickPostNow($task);
-            } elseif ($this->shouldGenerateImage($task)) {
-                $job = new GenerateAiImage($task->id);
-                $job->handle(app(AiArticleService::class), $this);
-            } else {
-                $job = (new GenerateAiArticle($task->id))->withoutImageDispatch();
-                app()->call([$job, 'handle']);
-
-                $task->refresh()->load('article.images');
-
-                if ($task->status === Scheduler::STATUS_QUEUED && $this->shouldGenerateImage($task)) {
-                    $imageJob = new GenerateAiImage($task->id);
-                    $imageJob->handle(app(AiArticleService::class), $this);
-                }
-            }
-        } catch (Throwable $exception) {
-            $task->refresh();
-
-            if ($task->status !== Scheduler::STATUS_COMPLETED) {
-                $this->failed($task, $exception->getMessage() ?: 'La ejecución manual no pudo completarse.');
-            }
-
-            report($exception);
-        }
+        $this->addEvent($task, 'info', 'Ejecución solicitada desde el programador; continuará en segundo plano.');
+        $this->dispatchTask($task);
 
         return $task->fresh(['article.images']);
     }
@@ -328,54 +296,9 @@ class SchedulerService
         }
     }
 
-    private function executeQuickPostNow(Scheduler $task): void
-    {
-        if (! $task->source_post_id) {
-            $capture = (new CaptureQuickPost($task->id))->withoutArticleDispatch();
-            $capture->handle(app(SocialPostCaptureService::class), $this);
-            $task->refresh()->load('article.images');
-        }
-
-        if ($task->status === Scheduler::STATUS_FAILED || ! $task->source_post_id) {
-            return;
-        }
-
-        if ($this->shouldGenerateImage($task)) {
-            (new GenerateAiImage($task->id))
-                ->withoutPublicationDispatch()
-                ->handle(app(AiArticleService::class), $this);
-            $this->publishQuickPostNowIfReady($task);
-
-            return;
-        }
-
-        $article = (new GenerateAiArticle($task->id))
-            ->withoutImageDispatch()
-            ->withoutPublicationDispatch();
-        app()->call([$article, 'handle']);
-        $task->refresh()->load('article.images');
-
-        if ($task->status === Scheduler::STATUS_QUEUED && $this->shouldGenerateImage($task)) {
-            (new GenerateAiImage($task->id))
-                ->withoutPublicationDispatch()
-                ->handle(app(AiArticleService::class), $this);
-        }
-
-        $this->publishQuickPostNowIfReady($task);
-    }
-
     private function shouldPublish(Scheduler $task): bool
     {
         return $task->article?->status === AiArticle::STATUS_DRAFT
             && (bool) ($task->payload['publication_ready'] ?? false);
-    }
-
-    private function publishQuickPostNowIfReady(Scheduler $task): void
-    {
-        $task->refresh()->load('article.images');
-
-        if ($task->status === Scheduler::STATUS_QUEUED && $this->shouldPublish($task)) {
-            (new PublishQuickPost($task->id))->handle(app(PublicationService::class), $this);
-        }
     }
 }

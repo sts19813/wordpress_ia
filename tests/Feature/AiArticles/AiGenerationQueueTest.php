@@ -57,7 +57,7 @@ class AiGenerationQueueTest extends TestCase
             ->assertJsonPath('progress', 0);
     }
 
-    public function test_every_authenticated_user_can_see_and_execute_queued_tasks(): void
+    public function test_every_authenticated_user_can_request_a_queued_task_without_running_it_in_the_http_request(): void
     {
         Queue::fake();
         Storage::fake('local');
@@ -117,11 +117,16 @@ class AiGenerationQueueTest extends TestCase
 
         $this->actingAs($other)
             ->post(route('admin.scheduler.execute', $task))
-            ->assertRedirect(route('admin.scheduler.index', ['task' => $task->id]));
+            ->assertRedirect(route('admin.scheduler.index', ['task' => $task->id]))
+            ->assertSessionHas('status', 'El proceso continuará en segundo plano. Puedes seguir su avance en esta pantalla.');
 
-        $this->assertSame(Scheduler::STATUS_COMPLETED, $task->fresh()->status);
-        $this->assertSame(AiArticle::STATUS_DRAFT, AiArticle::query()->sole()->status);
-        $this->assertSame(AiImage::STATUS_GENERATED, AiImage::query()->sole()->status);
+        $this->assertSame(Scheduler::STATUS_QUEUED, $task->fresh()->status);
+        $this->assertDatabaseCount('ai_articles', 0);
+        $this->assertDatabaseCount('ai_images', 0);
+        $this->assertTrue(collect($task->fresh()->events)->contains(
+            fn (array $event) => str_contains($event['message'], 'continuará en segundo plano'),
+        ));
+        Queue::assertPushed(GenerateAiArticle::class);
     }
 
     public function test_database_worker_processes_text_and_image_as_separate_stages(): void

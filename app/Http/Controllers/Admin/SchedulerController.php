@@ -117,16 +117,11 @@ class SchedulerController extends Controller
     {
         abort_unless($scheduler->status === Scheduler::STATUS_QUEUED, 422, 'Sólo se pueden ejecutar trabajos que estén en cola.');
 
-        $task = $this->scheduler->executeNow($scheduler);
+        $task = $this->scheduler->requestExecution($scheduler);
 
         return redirect()
             ->route('admin.scheduler.index', ['task' => $task->id])
-            ->with(
-                $task->status === Scheduler::STATUS_COMPLETED ? 'status' : 'warning',
-                $task->status === Scheduler::STATUS_COMPLETED
-                    ? 'El trabajo se ejecutó manualmente y quedó completado.'
-                    : 'La ejecución manual terminó con un error. Revisa el proceso.',
-            );
+            ->with('status', 'El proceso continuará en segundo plano. Puedes seguir su avance en esta pantalla.');
     }
 
     public function retry(Request $request, Scheduler $scheduler): RedirectResponse
