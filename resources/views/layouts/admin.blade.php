@@ -334,13 +334,46 @@
 
         .app-sidebar-menu-primary .menu-sub {
             margin-left: 0;
-            padding-left: 14px;
+            padding: 4px 0 2px 37px;
         }
 
         .app-sidebar-menu-primary .menu-sub .menu-link {
-            min-height: 40px;
-            border-radius: 12px;
-            padding-left: 10px;
+            min-height: 38px;
+            border-radius: 10px;
+            padding: 0 12px;
+            font-size: .86rem;
+        }
+
+        .app-sidebar-menu-primary .menu-sub .menu-item {
+            margin-bottom: 3px;
+        }
+
+        .app-sidebar-menu-primary .menu-sub .menu-bullet {
+            width: 16px;
+            margin-right: 6px;
+        }
+
+        .app-sidebar-menu-primary .menu-sub .bullet-dot {
+            width: 5px;
+            height: 5px;
+            background: currentColor;
+            opacity: .7;
+        }
+
+        .app-sidebar-menu-primary .sidebar-module > .menu-link {
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .app-sidebar-menu-primary .sidebar-module.here > .menu-link,
+        .app-sidebar-menu-primary .sidebar-module.show > .menu-link {
+            background: rgba(52, 163, 255, .12);
+            color: var(--admin-sidebar-text-active);
+        }
+
+        .mobile-app-header,
+        .mobile-app-nav {
+            display: none;
         }
 
         .sidebar-hover-card {
@@ -775,11 +808,121 @@
 
             .sidebar-user-details,
             .sidebar-user-actions,
-            .app-sidebar-menu-primary .menu-heading,
             .app-sidebar-menu-primary .menu-title,
-            .app-sidebar-menu-primary .menu-arrow,
-            .app-sidebar-menu-primary .menu-sub {
+            .app-sidebar-menu-primary .menu-arrow {
                 display: initial !important;
+            }
+
+            .sidebar-shell {
+                padding-bottom: max(18px, env(safe-area-inset-bottom));
+            }
+
+            .mobile-app-header {
+                position: sticky;
+                top: 0;
+                z-index: 100;
+                align-items: center;
+                justify-content: space-between;
+                min-height: 64px;
+                padding: 10px 16px;
+                background: rgba(255, 255, 255, .96);
+                border-bottom: 1px solid rgba(15, 23, 42, .07);
+                box-shadow: 0 4px 18px rgba(15, 23, 42, .05);
+                backdrop-filter: blur(14px);
+            }
+
+            .mobile-app-brand {
+                display: flex;
+                align-items: center;
+                gap: 9px;
+                min-width: 0;
+                color: #1f2a44;
+            }
+
+            .mobile-app-brand-mark {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 36px;
+                height: 36px;
+                flex: 0 0 36px;
+                border-radius: 11px;
+                background: linear-gradient(135deg, #34a3ff 0%, #2f80ed 100%);
+                color: #fff;
+                font-size: .92rem;
+                font-weight: 800;
+            }
+
+            .mobile-app-brand-name {
+                overflow: hidden;
+                font-weight: 800;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .mobile-app-icon-button {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 40px;
+                height: 40px;
+                flex: 0 0 40px;
+                padding: 0;
+                border: 0;
+                border-radius: 12px;
+                background: #eef4fc;
+                color: #365071;
+            }
+
+            .mobile-app-nav {
+                position: fixed;
+                right: 10px;
+                bottom: max(10px, env(safe-area-inset-bottom));
+                left: 10px;
+                z-index: 103;
+                align-items: stretch;
+                justify-content: space-around;
+                min-height: 66px;
+                padding: 7px 5px;
+                border: 1px solid rgba(15, 23, 42, .08);
+                border-radius: 20px;
+                background: rgba(255, 255, 255, .97);
+                box-shadow: 0 14px 38px rgba(15, 23, 42, .18);
+                backdrop-filter: blur(16px);
+            }
+
+            .mobile-app-nav-item {
+                display: flex;
+                flex: 1 1 20%;
+                min-width: 0;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 3px;
+                padding: 4px 2px;
+                border: 0;
+                border-radius: 14px;
+                background: transparent;
+                color: #7a869f;
+                font-family: inherit;
+                font-size: .66rem;
+                font-weight: 700;
+                line-height: 1.1;
+                text-decoration: none;
+            }
+
+            .mobile-app-nav-item i {
+                color: currentColor;
+                font-size: 1.45rem;
+            }
+
+            .mobile-app-nav-item.active {
+                background: var(--bs-primary-light);
+                color: var(--bs-primary);
+            }
+
+            .app-shell {
+                padding-bottom: calc(86px + env(safe-area-inset-bottom));
             }
 
             .sidebar-hover-card {
@@ -793,6 +936,21 @@
             .app-container {
                 padding-left: 16px;
                 padding-right: 16px;
+            }
+
+            [data-bs-theme="dark"] .mobile-app-header,
+            [data-bs-theme="dark"] .mobile-app-nav {
+                background: rgba(31, 34, 52, .96);
+                border-color: rgba(255, 255, 255, .08);
+            }
+
+            [data-bs-theme="dark"] .mobile-app-brand {
+                color: #fff;
+            }
+
+            [data-bs-theme="dark"] .mobile-app-icon-button {
+                background: rgba(255, 255, 255, .1);
+                color: #d4ddf8;
             }
         }
 
@@ -852,6 +1010,8 @@
 
                 <main class="app-main" id="kt_app_main">
                     <div class="app-shell">
+                        @include('partials.mobile-navigation')
+
                         @hasSection('toolbar')
                             <div id="kt_app_toolbar" class="app-toolbar">
                                 <div id="kt_app_toolbar_container"
