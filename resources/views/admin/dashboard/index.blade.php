@@ -225,12 +225,12 @@
                             <a href="{{ $error['url'] }}" class="ops-error-row">
                                 <span class="ops-error-mark"></span>
                                 <span class="flex-grow-1 min-w-0">
-                                    <span class="d-flex align-items-center justify-content-between gap-3">
+                                    <span class="ops-error-heading d-flex align-items-center justify-content-between gap-3">
                                         <strong class="text-gray-900 fs-7">{{ $error['title'] }}</strong>
                                         <time class="text-muted fs-8 text-nowrap">{{ $error['occurred_at']->diffForHumans() }}</time>
                                     </span>
-                                    <span class="d-block text-gray-600 fs-8 text-truncate mt-1">{{ $error['context'] }}</span>
-                                    <span class="d-block text-danger fs-8 text-truncate mt-1">{{ \Illuminate\Support\Str::limit($error['message'], 115) }}</span>
+                                    <span class="ops-error-context d-block text-gray-600 fs-8 text-truncate mt-1">{{ $error['context'] }}</span>
+                                    <span class="ops-error-message d-block text-danger fs-8 text-truncate mt-1">{{ $error['message'] }}</span>
                                 </span>
                                 <i class="ki-outline ki-right fs-3 text-gray-400"></i>
                             </a>
@@ -947,6 +947,26 @@
                 max-width: 5.5rem;
                 white-space: normal !important;
                 text-align: right;
+            }
+
+            .ops-error-heading {
+                align-items: flex-start !important;
+                flex-wrap: wrap;
+                gap: .25rem .75rem !important;
+            }
+
+            .ops-error-heading time {
+                max-width: none;
+                text-align: left;
+            }
+
+            .ops-error-context,
+            .ops-error-message {
+                overflow: visible !important;
+                white-space: normal !important;
+                text-overflow: clip !important;
+                overflow-wrap: anywhere;
+                line-height: 1.45;
             }
         }
     </style>
