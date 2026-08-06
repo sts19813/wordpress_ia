@@ -73,6 +73,7 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     Route::delete('post-rapido/{sourcePost}', [QuickPostController::class, 'destroy'])->name('quick-posts.destroy');
     Route::get('medios-originales/{sourcePostMedia}', SourcePostMediaController::class)->name('source-post-media.file');
     Route::get('bitacora-fuentes', SourceScanLogController::class)->name('source-scan-logs.index');
+    Route::delete('bitacora-fuentes', [SourceScanLogController::class, 'destroy'])->name('source-scan-logs.destroy');
     Route::post('noticias/obtener', [NewsController::class, 'fetch'])->name('news.fetch');
     Route::delete('noticias/{sourcePost}', [NewsController::class, 'destroy'])->name('news.destroy');
     Route::get('noticias/{sourcePost}', [NewsController::class, 'show'])->name('news.show');

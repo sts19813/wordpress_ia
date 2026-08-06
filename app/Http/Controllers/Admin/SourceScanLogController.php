@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\SourceScanLog;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
 
 class SourceScanLogController extends Controller
 {
@@ -16,5 +17,16 @@ class SourceScanLogController extends Controller
                 ->latest('scanned_at')
                 ->get(),
         ]);
+    }
+
+    public function destroy(): RedirectResponse
+    {
+        $deletedLogs = SourceScanLog::query()->delete();
+
+        return redirect()
+            ->route('admin.source-scan-logs.index')
+            ->with('status', $deletedLogs === 1
+                ? 'Se eliminó 1 registro de la bitácora.'
+                : "Se eliminaron {$deletedLogs} registros de la bitácora.");
     }
 }

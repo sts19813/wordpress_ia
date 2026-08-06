@@ -19,9 +19,26 @@
 @endphp
 
 @section('toolbar')
-    <div>
-        <h1 class="page-heading text-gray-900 fw-bold fs-3 my-0">Bitácora de fuentes</h1>
-        <div class="text-muted fw-semibold fs-7 pt-1">Historial de notas escaneadas y su decisión.</div>
+    <div class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-4 w-100">
+        <div>
+            <h1 class="page-heading text-gray-900 fw-bold fs-3 my-0">Bitácora de fuentes</h1>
+            <div class="text-muted fw-semibold fs-7 pt-1">Historial de notas escaneadas y su decisión.</div>
+        </div>
+
+        <form
+            method="POST"
+            action="{{ route('admin.source-scan-logs.destroy') }}"
+            data-confirm-delete
+            data-confirm-title="Borrar bitácora"
+            data-confirm-text="Se eliminarán permanentemente los {{ $logs->count() }} registros de la bitácora. Esta acción no se puede deshacer."
+        >
+            @csrf
+            @method('DELETE')
+            <button type="submit" class="btn btn-light-danger text-nowrap" @disabled($logs->isEmpty())>
+                <i class="ki-outline ki-trash fs-2"></i>
+                Borrar bitácora
+            </button>
+        </form>
     </div>
 @endsection
 
