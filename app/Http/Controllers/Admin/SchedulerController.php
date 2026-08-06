@@ -115,7 +115,18 @@ class SchedulerController extends Controller
 
     public function execute(Scheduler $scheduler): RedirectResponse
     {
-        abort_unless($scheduler->status === Scheduler::STATUS_QUEUED, 422, 'Sólo se pueden ejecutar trabajos que estén en cola.');
+        if ($scheduler->status !== Scheduler::STATUS_QUEUED) {
+            $message = match ($scheduler->status) {
+                Scheduler::STATUS_RUNNING => 'El proceso ya comenzó y continuará en segundo plano.',
+                Scheduler::STATUS_COMPLETED => 'El proceso ya terminó correctamente.',
+                Scheduler::STATUS_FAILED => 'El proceso ya terminó con un error. Puedes reintentarlo desde el programador.',
+                default => 'El proceso ya no está disponible para ejecución manual.',
+            };
+
+            return redirect()
+                ->route('admin.scheduler.index', ['task' => $scheduler->id])
+                ->with($scheduler->status === Scheduler::STATUS_FAILED ? 'warning' : 'status', $message);
+        }
 
         $task = $this->scheduler->requestExecution($scheduler);
 

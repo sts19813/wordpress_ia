@@ -335,6 +335,10 @@
                         badge.classList.add(statusClasses[task.status] || 'badge-light');
                         card.querySelector('.task-step').textContent = task.step || '';
 
+                        if (task.status !== 'queued') {
+                            card.querySelector('[data-manual-execute-form]')?.remove();
+                        }
+
                         const progressWrap = card.querySelector('.task-progress-wrap');
                         if (progressWrap) {
                             if (task.progress >= 100) {

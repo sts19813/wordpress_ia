@@ -127,6 +127,19 @@ class AiGenerationQueueTest extends TestCase
             fn (array $event) => str_contains($event['message'], 'continuará en segundo plano'),
         ));
         Queue::assertPushed(GenerateAiArticle::class);
+
+        $task->update([
+            'status' => Scheduler::STATUS_RUNNING,
+            'step' => 'Analizando fuentes y redactando el artículo',
+        ]);
+        $eventCount = count($task->fresh()->events);
+
+        $this->actingAs($owner)
+            ->post(route('admin.scheduler.execute', $task))
+            ->assertRedirect(route('admin.scheduler.index', ['task' => $task->id]))
+            ->assertSessionHas('status', 'El proceso ya comenzó y continuará en segundo plano.');
+
+        $this->assertSame($eventCount, count($task->fresh()->events));
     }
 
     public function test_database_worker_processes_text_and_image_as_separate_stages(): void
