@@ -122,7 +122,8 @@ class InstagramAndXPublishingWorkflowTest extends TestCase
         $this->assertSame('https://www.instagram.com/p/ABC123/', $publication->remote_url);
         $this->assertSame('publish_instagram_image', $publication->last_action);
         $this->assertNotNull($imageUrl);
-        $mediaResponse = $this->get($imageUrl)
+        $mediaUrlBehindProxy = preg_replace('#^https?://[^/]+#', 'https://media-proxy.example', $imageUrl);
+        $mediaResponse = $this->get($mediaUrlBehindProxy)
             ->assertOk()
             ->assertHeader('Content-Type', 'image/jpeg');
         $this->assertStringEndsWith('/imagen.jpg', parse_url($imageUrl, PHP_URL_PATH));

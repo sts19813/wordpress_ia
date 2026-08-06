@@ -27,11 +27,13 @@ class InstagramPublicationEngine
                 throw new RuntimeException('Instagram requiere una imagen generada disponible para publicar.');
             }
 
-            $imageUrl = URL::temporarySignedRoute(
+            $signedPath = URL::temporarySignedRoute(
                 'publication-media.show',
                 now()->addHour(),
                 ['aiImage' => $image->id],
+                absolute: false,
             );
+            $imageUrl = rtrim((string) config('app.url'), '/').$signedPath;
             $caption = $this->caption($article);
             $container = $this->client->createImageContainer($profile, $imageUrl, $caption);
             $creationId = (string) $container->json('id');
