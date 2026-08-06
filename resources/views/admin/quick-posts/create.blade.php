@@ -258,10 +258,20 @@
         margin-bottom: 1.5rem !important;
     }
 
-    .quick-post-intro .symbol {
+    .quick-post-intro .symbol,
+    .quick-post-intro .symbol-label {
         width: 44px !important;
         height: 44px !important;
-        flex: 0 0 44px;
+        min-width: 44px !important;
+        max-width: 44px !important;
+    }
+
+    .quick-post-intro .symbol {
+        flex: 0 0 44px !important;
+    }
+
+    .quick-post-intro .symbol-label i {
+        font-size: 1.35rem !important;
     }
 
     .quick-post-intro-copy {
@@ -273,10 +283,32 @@
     }
 
     .quick-post-create-page .input-group,
-    .quick-post-create-page .form-select,
-    .quick-post-create-page .form-control {
+    .quick-post-create-page .form-select {
         width: 100%;
         min-width: 0;
+    }
+
+    .quick-post-create-page .input-group {
+        flex-wrap: nowrap;
+    }
+
+    .quick-post-create-page .input-group > .input-group-text {
+        flex: 0 0 auto;
+    }
+
+    .quick-post-create-page .input-group > .form-control {
+        width: 1% !important;
+        min-width: 0;
+        flex: 1 1 auto;
+        font-size: .92rem;
+    }
+
+    #quick-post-profile,
+    #quick-post-company {
+        padding-right: 2.5rem;
+        padding-left: .9rem;
+        font-size: .86rem;
+        text-overflow: ellipsis;
     }
 
     .quick-post-create-page .separator {
