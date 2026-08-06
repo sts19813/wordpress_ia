@@ -3,9 +3,26 @@
 @section('title', 'Logs | '.config('app.name'))
 
 @section('toolbar')
-    <div>
-        <h1 class="page-heading text-gray-900 fw-bold fs-3 my-0">Logs</h1>
-        <div class="text-muted fw-semibold fs-7 pt-1">Errores del sistema y publicaciones confirmadas en destinos externos.</div>
+    <div class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-4 w-100">
+        <div>
+            <h1 class="page-heading text-gray-900 fw-bold fs-3 my-0">Logs</h1>
+            <div class="text-muted fw-semibold fs-7 pt-1">Errores del sistema y publicaciones confirmadas en destinos externos.</div>
+        </div>
+
+        <form
+            method="POST"
+            action="{{ route('admin.system-logs.destroy') }}"
+            data-confirm-delete
+            data-confirm-title="Borrar log del sistema"
+            data-confirm-text="Se eliminarán permanentemente los {{ $logCount }} registros del log del sistema. Esta acción no se puede deshacer."
+        >
+            @csrf
+            @method('DELETE')
+            <button type="submit" class="btn btn-light-danger text-nowrap" @disabled($logCount === 0)>
+                <i class="ki-outline ki-trash fs-2"></i>
+                Borrar log
+            </button>
+        </form>
     </div>
 @endsection
 

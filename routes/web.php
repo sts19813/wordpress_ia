@@ -110,6 +110,7 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     Route::delete('programador/{scheduler}', [SchedulerController::class, 'destroy'])->name('scheduler.destroy');
     Route::post('programador/fuentes/{sourceSite}/ejecutar', [SchedulerController::class, 'runSource'])->name('scheduler.sources.run');
     Route::get('logs', SystemLogController::class)->name('system-logs.index');
+    Route::delete('logs', [SystemLogController::class, 'destroy'])->name('system-logs.destroy');
     Route::get('configuracion', [SettingController::class, 'index'])->name('settings.index');
     Route::get('configuracion/prompts/nuevo', [SettingController::class, 'create'])->name('settings.prompts.create');
     Route::post('configuracion/prompts', [SettingController::class, 'store'])->name('settings.prompts.store');

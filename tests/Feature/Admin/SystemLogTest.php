@@ -42,6 +42,8 @@ class SystemLogTest extends TestCase
         $this->actingAs(User::factory()->create())
             ->get(route('admin.system-logs.index'))
             ->assertOk()
+            ->assertSee('Borrar log')
+            ->assertSee(route('admin.system-logs.destroy'), false)
             ->assertSee('Error visible para soporte.')
             ->assertSee('Post confirmado en el sitio real.')
             ->assertSee('https://site.test/post-confirmado')
@@ -49,6 +51,46 @@ class SystemLogTest extends TestCase
             ->assertSee('system-logs-table', false)
             ->assertSee('data-page-length="50"', false)
             ->assertDontSee('class="table-responsive"', false);
+    }
+
+    public function test_authenticated_user_can_clear_all_system_logs(): void
+    {
+        $user = User::factory()->create();
+
+        SystemLog::query()->create([
+            'level' => SystemLog::LEVEL_ERROR,
+            'event' => SystemLog::EVENT_SYSTEM_ERROR,
+            'message' => 'Error para eliminar.',
+            'occurred_at' => now(),
+        ]);
+        SystemLog::query()->create([
+            'level' => SystemLog::LEVEL_SUCCESS,
+            'event' => 'internal_event',
+            'message' => 'Registro interno para eliminar.',
+            'occurred_at' => now(),
+        ]);
+
+        $response = $this->actingAs($user)->delete(route('admin.system-logs.destroy'));
+
+        $response
+            ->assertRedirect(route('admin.system-logs.index'))
+            ->assertSessionHas('status', 'Se eliminaron 2 registros del log del sistema.');
+        $this->assertDatabaseCount('system_logs', 0);
+    }
+
+    public function test_guest_cannot_clear_system_logs(): void
+    {
+        SystemLog::query()->create([
+            'level' => SystemLog::LEVEL_ERROR,
+            'event' => SystemLog::EVENT_SYSTEM_ERROR,
+            'message' => 'Error protegido.',
+            'occurred_at' => now(),
+        ]);
+
+        $response = $this->delete(route('admin.system-logs.destroy'));
+
+        $response->assertRedirect(route('login'));
+        $this->assertDatabaseCount('system_logs', 1);
     }
 
     public function test_publication_activity_is_logged_only_after_remote_confirmation(): void
