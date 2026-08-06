@@ -31,7 +31,6 @@ Route::get('/', function () {
 });
 
 Route::get('medios-publicacion/{aiImage}/imagen.jpg', PublicationMediaController::class)
-    ->middleware('signed:relative')
     ->name('publication-media.show');
 
 Route::middleware('guest')->group(function () {

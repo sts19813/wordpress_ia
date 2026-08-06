@@ -8,7 +8,6 @@ use App\Models\Publication;
 use App\Models\WordPressSite;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\URL;
 use RuntimeException;
 use Throwable;
 
@@ -16,6 +15,7 @@ class InstagramPublicationEngine
 {
     public function __construct(
         private readonly InstagramClient $client,
+        private readonly InstagramMediaUrl $mediaUrl,
     ) {}
 
     public function publishNow(WordPressSite $profile, AiArticle $article, ?AiImage $image = null): Publication
@@ -27,13 +27,7 @@ class InstagramPublicationEngine
                 throw new RuntimeException('Instagram requiere una imagen generada disponible para publicar.');
             }
 
-            $signedPath = URL::temporarySignedRoute(
-                'publication-media.show',
-                now()->addHour(),
-                ['aiImage' => $image->id],
-                absolute: false,
-            );
-            $imageUrl = rtrim((string) config('app.url'), '/').$signedPath;
+            $imageUrl = $this->mediaUrl->temporary($image, now()->addHour());
             $caption = $this->caption($article);
             $container = $this->client->createImageContainer($profile, $imageUrl, $caption);
             $creationId = (string) $container->json('id');
