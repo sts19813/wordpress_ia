@@ -210,12 +210,40 @@
                         <h3 class="fw-bold mb-0">Conectar Instagram</h3>
                     </div>
                     <ol class="text-gray-700 fw-semibold ps-5 mb-4">
-                        <li class="mb-3">Usa una cuenta Business o Creator vinculada a una app de Meta.</li>
-                        <li class="mb-3">Autoriza <code>instagram_basic</code> e <code>instagram_content_publish</code>.</li>
-                        <li class="mb-3">Obtén el ID profesional y un token de usuario válido.</li>
-                        <li>Guarda el perfil; se comprobará que el token pertenece a la cuenta.</li>
+                        <li class="mb-3">Confirma que Instagram sea una cuenta Business o Creator y esté vinculada a una página de Facebook.</li>
+                        <li class="mb-3">
+                            Abre el
+                            <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener noreferrer">Explorador de la API Graph</a>,
+                            selecciona tu app y genera un token de usuario con
+                            <code>pages_show_list</code>, <code>pages_read_engagement</code>, <code>instagram_basic</code> e <code>instagram_content_publish</code>.
+                        </li>
+                        <li class="mb-3">
+                            Para encontrar las páginas disponibles, ejecuta:
+                            <div class="bg-white border rounded px-3 py-2 mt-2 font-monospace fs-8 text-break">
+                                me/accounts?fields=id,name,access_token,tasks,instagram_business_account
+                            </div>
+                        </li>
+                        <li class="mb-3">
+                            Si ya conoces el ID de la página de Facebook, también puedes consultar directamente:
+                            <div class="bg-white border rounded px-3 py-2 mt-2 font-monospace fs-8 text-break">
+                                {ID_DE_PAGINA_FACEBOOK}?fields=id,name,access_token,instagram_business_account
+                            </div>
+                        </li>
+                        <li class="mb-3">
+                            De la respuesta copia <code>instagram_business_account.id</code> en <strong>ID de la cuenta profesional</strong>.
+                            No uses el <code>id</code> exterior, porque ese pertenece a la página de Facebook.
+                        </li>
+                        <li class="mb-3">
+                            Copia el <code>access_token</code> exterior en <strong>Access Token de Instagram</strong>.
+                            Este es el token de la página vinculada.
+                        </li>
+                        <li>Guarda y prueba el perfil; la aplicación verificará el ID y el usuario de Instagram.</li>
                     </ol>
-                    <div class="fs-8 text-muted">La imagen se comparte con Meta mediante una URL temporal firmada y caduca automáticamente.</div>
+                    <div class="alert alert-warning py-3 px-4 mb-4 fs-8">
+                        Si la respuesta no incluye <code>instagram_business_account</code>, vincula primero Instagram con la página de Facebook desde Meta Business Suite.
+                        No compartas ni muestres el token en capturas de pantalla.
+                    </div>
+                    <div class="fs-8 text-muted">Al publicar, la imagen se comparte con Meta mediante una URL temporal firmada que caduca automáticamente.</div>
                 </div>
             </div>
 

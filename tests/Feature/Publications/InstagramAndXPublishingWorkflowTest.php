@@ -26,6 +26,10 @@ class InstagramAndXPublishingWorkflowTest extends TestCase
             ->assertSee('Cuenta de Instagram')
             ->assertSee('Cuenta de X')
             ->assertSee('instagram_content_publish')
+            ->assertSee('me/accounts?fields=id,name,access_token,tasks,instagram_business_account')
+            ->assertSee('{ID_DE_PAGINA_FACEBOOK}?fields=id,name,access_token,instagram_business_account')
+            ->assertSee('instagram_business_account.id')
+            ->assertSee('No compartas ni muestres el token')
             ->assertSee('tweet.write');
     }
 
@@ -35,7 +39,6 @@ class InstagramAndXPublishingWorkflowTest extends TestCase
             'graph.facebook.com/v24.0/17841400000000000*' => Http::response([
                 'id' => '17841400000000000',
                 'username' => 'noticias_demo',
-                'account_type' => 'BUSINESS',
             ]),
             'api.x.com/2/users/me*' => Http::response([
                 'data' => [
@@ -72,6 +75,8 @@ class InstagramAndXPublishingWorkflowTest extends TestCase
         $this->assertSame('x-user-secret', $x->x_access_token);
         $this->assertNotSame('instagram-secret', DB::table('wordpress_sites')->whereKey($instagram->id)->value('instagram_access_token'));
         $this->assertNotSame('x-user-secret', DB::table('wordpress_sites')->whereKey($x->id)->value('x_access_token'));
+        Http::assertSent(fn (Request $request) => str_contains($request->url(), '/17841400000000000')
+            && $request['fields'] === 'id,username');
     }
 
     public function test_article_with_generated_image_can_be_published_to_instagram(): void
@@ -117,7 +122,15 @@ class InstagramAndXPublishingWorkflowTest extends TestCase
         $this->assertSame('https://www.instagram.com/p/ABC123/', $publication->remote_url);
         $this->assertSame('publish_instagram_image', $publication->last_action);
         $this->assertNotNull($imageUrl);
-        $this->get($imageUrl)->assertOk()->assertHeader('Content-Type', 'image/png');
+        $mediaResponse = $this->get($imageUrl)
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/jpeg');
+        $this->assertStringEndsWith('/imagen.jpg', parse_url($imageUrl, PHP_URL_PATH));
+        $this->assertStringStartsWith("\xFF\xD8", $mediaResponse->getContent());
+        $imageSize = getimagesizefromstring($mediaResponse->getContent());
+        $this->assertIsArray($imageSize);
+        $this->assertGreaterThanOrEqual(0.8, $imageSize[0] / $imageSize[1]);
+        $this->assertLessThanOrEqual(1.91, $imageSize[0] / $imageSize[1]);
         Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/media')
             && str_contains((string) $request['caption'], 'Artículo para redes'));
         $this->assertSame($image->id, $publication->ai_image_id);
@@ -234,7 +247,10 @@ class InstagramAndXPublishingWorkflowTest extends TestCase
             'file_path' => 'ai-images/social.png',
             'mime_type' => 'image/png',
         ]);
-        Storage::disk('local')->put($image->file_path, 'image-contents');
+        Storage::disk('local')->put(
+            $image->file_path,
+            base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='),
+        );
 
         return [$article, $image];
     }

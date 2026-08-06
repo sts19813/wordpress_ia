@@ -13,7 +13,7 @@ class InstagramClient
     {
         return $this->request($profile)
             ->get($this->endpoint($profile), [
-                'fields' => 'id,username,account_type',
+                'fields' => 'id,username',
             ])
             ->throw();
     }

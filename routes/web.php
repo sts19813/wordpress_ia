@@ -30,7 +30,7 @@ Route::get('/', function () {
         : redirect()->route('login');
 });
 
-Route::get('medios-publicacion/{aiImage}', PublicationMediaController::class)
+Route::get('medios-publicacion/{aiImage}/imagen.jpg', PublicationMediaController::class)
     ->middleware('signed')
     ->name('publication-media.show');
 

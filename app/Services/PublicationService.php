@@ -16,7 +16,6 @@ use App\Services\Publications\XClient;
 use App\Services\Publications\XPublicationEngine;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Storage;
-use RuntimeException;
 use Throwable;
 
 class PublicationService
@@ -90,11 +89,6 @@ class PublicationService
 
         if ($site->isInstagram()) {
             $response = $this->instagramClient->testConnection($site);
-            $accountType = strtoupper((string) $response->json('account_type'));
-
-            if (! in_array($accountType, ['BUSINESS', 'CREATOR', 'MEDIA_CREATOR'], true)) {
-                throw new RuntimeException('La cuenta de Instagram debe ser profesional (Business o Creator).');
-            }
 
             return [
                 'id' => $response->json('id'),
