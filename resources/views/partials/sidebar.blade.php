@@ -1,18 +1,43 @@
 @php
     $user = Auth::user();
-    $menuItems = [
-        ['label' => 'Dashboard', 'route' => 'admin.dashboard', 'active' => 'admin.dashboard', 'icon' => 'ki-chart-line'],
-        ['label' => 'Noticias', 'route' => 'admin.news.index', 'active' => 'admin.news.*', 'icon' => 'ki-document'],
-        ['label' => 'Post rápido', 'route' => 'admin.quick-posts.index', 'active' => 'admin.quick-posts.*', 'icon' => 'ki-flash-circle'],
-        ['label' => 'Empresas', 'route' => 'admin.companies.index', 'active' => 'admin.companies.*', 'icon' => 'ki-briefcase'],
-        ['label' => 'Sitios Fuente', 'route' => 'admin.source-sites.index', 'active' => 'admin.source-sites.*', 'icon' => 'ki-satellite'],
-        ['label' => 'Bitácora de Fuentes', 'route' => 'admin.source-scan-logs.index', 'active' => 'admin.source-scan-logs.*', 'icon' => 'ki-note-2'],
-        ['label' => 'Artículos IA', 'route' => 'admin.ai-articles.index', 'active' => 'admin.ai-articles.*', 'icon' => 'ki-abstract-26'],
-        ['label' => 'Imágenes IA', 'route' => 'admin.ai-images.index', 'active' => 'admin.ai-images.*', 'icon' => 'ki-picture'],
-        ['label' => 'Publicaciones', 'route' => 'admin.publications.index', 'active' => 'admin.publications.*', 'icon' => 'ki-send'],
-        ['label' => 'Programador', 'route' => 'admin.scheduler.index', 'active' => 'admin.scheduler.*', 'icon' => 'ki-calendar-tick'],
-        ['label' => 'Logs', 'route' => 'admin.system-logs.index', 'active' => 'admin.system-logs.*', 'icon' => 'ki-code'],
-        ['label' => 'Configuración', 'route' => 'admin.settings.index', 'active' => 'admin.settings.*', 'icon' => 'ki-setting-3'],
+    $menuSections = [
+        [
+            'label' => 'General',
+            'items' => [
+                ['label' => 'Dashboard', 'route' => 'admin.dashboard', 'active' => 'admin.dashboard', 'icon' => 'ki-chart-line'],
+            ],
+        ],
+        [
+            'label' => 'Contenido',
+            'items' => [
+                ['label' => 'Notas obtenidas', 'route' => 'admin.news.index', 'active' => 'admin.news.*', 'icon' => 'ki-document'],
+                ['label' => 'Generar post rápido', 'route' => 'admin.quick-posts.index', 'active' => 'admin.quick-posts.*', 'icon' => 'ki-flash-circle'],
+            ],
+        ],
+        [
+            'label' => 'Empresas y fuentes',
+            'items' => [
+                ['label' => 'Empresas', 'route' => 'admin.companies.index', 'active' => 'admin.companies.*', 'icon' => 'ki-briefcase'],
+                ['label' => 'Sitios fuente', 'route' => 'admin.source-sites.index', 'active' => 'admin.source-sites.*', 'icon' => 'ki-satellite'],
+                ['label' => 'Bitácora de fuentes', 'route' => 'admin.source-scan-logs.index', 'active' => 'admin.source-scan-logs.*', 'icon' => 'ki-note-2'],
+            ],
+        ],
+        [
+            'label' => 'IA y publicación',
+            'items' => [
+                ['label' => 'Notas generadas por IA', 'route' => 'admin.ai-articles.index', 'active' => 'admin.ai-articles.*', 'icon' => 'ki-abstract-26'],
+                ['label' => 'Imágenes generadas por IA', 'route' => 'admin.ai-images.index', 'active' => 'admin.ai-images.*', 'icon' => 'ki-picture'],
+                ['label' => 'Notas publicadas', 'route' => 'admin.publications.index', 'active' => 'admin.publications.*', 'icon' => 'ki-send'],
+                ['label' => 'Programación de eventos', 'route' => 'admin.scheduler.index', 'active' => 'admin.scheduler.*', 'icon' => 'ki-calendar-tick'],
+            ],
+        ],
+        [
+            'label' => 'Sistema',
+            'items' => [
+                ['label' => 'Logs del sistema', 'route' => 'admin.system-logs.index', 'active' => 'admin.system-logs.*', 'icon' => 'ki-code'],
+                ['label' => 'Configuración', 'route' => 'admin.settings.index', 'active' => 'admin.settings.*', 'icon' => 'ki-setting-3'],
+            ],
+        ],
     ];
 @endphp
 
@@ -56,23 +81,25 @@
                 <div id="kt_app_sidebar_menu" data-kt-menu="true" data-kt-menu-expand="false"
                     class="app-sidebar-menu-primary menu menu-column">
 
-                    <div class="menu-item pt-3">
-                        <div class="menu-content">
-                            <span class="menu-heading fw-bold text-uppercase fs-8">Administracion</span>
-                        </div>
-                    </div>
-
-                    @foreach ($menuItems as $item)
-                        <div class="menu-item">
-                            <a class="menu-link {{ request()->routeIs($item['active']) ? 'active' : '' }}"
-                                href="{{ route($item['route']) }}">
-                                <span class="menu-icon"><i class="ki-outline {{ $item['icon'] }} fs-2"></i></span>
-                                <span class="menu-title">{{ $item['label'] }}</span>
-                            </a>
-                            <div class="sidebar-hover-card">
-                                <a href="{{ route($item['route']) }}" class="sidebar-hover-title">{{ $item['label'] }}</a>
+                    @foreach ($menuSections as $section)
+                        <div class="menu-item {{ $loop->first ? 'pt-3' : 'pt-4' }}">
+                            <div class="menu-content">
+                                <span class="menu-heading fw-bold text-uppercase fs-8">{{ $section['label'] }}</span>
                             </div>
                         </div>
+
+                        @foreach ($section['items'] as $item)
+                            <div class="menu-item">
+                                <a class="menu-link {{ request()->routeIs($item['active']) ? 'active' : '' }}"
+                                    href="{{ route($item['route']) }}">
+                                    <span class="menu-icon"><i class="ki-outline {{ $item['icon'] }} fs-2"></i></span>
+                                    <span class="menu-title">{{ $item['label'] }}</span>
+                                </a>
+                                <div class="sidebar-hover-card">
+                                    <a href="{{ route($item['route']) }}" class="sidebar-hover-title">{{ $item['label'] }}</a>
+                                </div>
+                            </div>
+                        @endforeach
                     @endforeach
                 </div>
             </div>
