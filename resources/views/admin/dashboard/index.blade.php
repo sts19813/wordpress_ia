@@ -410,7 +410,7 @@
             --ops-blue: #2f80ed;
             --ops-green: #20b486;
             --ops-red: #ef5a67;
-            padding: 0 20px 8px;
+            padding: 0 0 8px;
         }
 
         .ops-live-badge {
@@ -908,11 +908,46 @@
         html[data-bs-theme="dark"] .ops-destination-avatars span { border-color: var(--bs-body-bg); }
 
         @media (max-width: 767.98px) {
-            .ops-dashboard { padding-right: 16px; padding-left: 16px; }
+            .ops-dashboard { padding-right: 0; padding-left: 0; }
             .ops-status-strip { align-items: flex-start; flex-wrap: wrap; }
             .ops-status-strip .btn { width: 100%; }
             .ops-chart-legend { justify-content: flex-start; }
             .ops-kpi-value { font-size: 2rem; }
+
+            .ops-dashboard .card-header {
+                align-items: flex-start !important;
+                flex-wrap: wrap;
+                gap: .75rem;
+            }
+
+            .ops-chart {
+                grid-template-columns: repeat(7, minmax(36px, 1fr));
+                gap: .2rem;
+                padding-right: 0;
+                padding-left: 0;
+                overflow-x: hidden;
+            }
+
+            .ops-chart-day {
+                min-width: 0;
+            }
+
+            .ops-chart-values {
+                font-size: .52rem;
+            }
+
+            .ops-error-row,
+            .ops-activity-row {
+                align-items: flex-start;
+                gap: .55rem;
+            }
+
+            .ops-error-row time,
+            .ops-activity-row time {
+                max-width: 5.5rem;
+                white-space: normal !important;
+                text-align: right;
+            }
         }
     </style>
 @endpush

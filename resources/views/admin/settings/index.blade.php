@@ -12,7 +12,7 @@
 @section('content')
     <div class="notice d-flex {{ $apiKeyConfigured ? 'bg-light-success border-success' : 'bg-light-warning border-warning' }} rounded border border-dashed p-6 mb-7">
         <i class="ki-outline {{ $apiKeyConfigured ? 'ki-check-circle text-success' : 'ki-information-5 text-warning' }} fs-2tx me-4"></i>
-        <div>
+        <div class="min-w-0 flex-grow-1">
             <div class="fw-bold text-gray-900">API de OpenAI {{ $apiKeyConfigured ? 'configurada' : 'pendiente de configurar' }}</div>
             <div class="text-gray-700 fs-7 mt-1">
                 @if ($apiKeyConfigured)
@@ -54,3 +54,32 @@
         @endforeach
     </div>
 @endsection
+
+@push('styles')
+    <style>
+        @media (max-width: 767.98px) {
+            .notice {
+                align-items: flex-start;
+                padding: 1.25rem !important;
+            }
+
+            .notice code,
+            .card-body code,
+            .card-body .fw-bold {
+                overflow-wrap: anywhere;
+            }
+
+            .card-header {
+                align-items: flex-start !important;
+                flex-wrap: wrap;
+                gap: .75rem;
+                padding-top: 1.25rem;
+                padding-bottom: 1rem;
+            }
+
+            .card-toolbar {
+                margin-left: 0 !important;
+            }
+        }
+    </style>
+@endpush

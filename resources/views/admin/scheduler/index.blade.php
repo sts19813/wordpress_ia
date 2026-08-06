@@ -205,6 +205,12 @@
         }
 
         @media (max-width: 991.98px) {
+            .scheduler-sources-card .card-header,
+            .scheduler-sources-card .card-body {
+                padding-right: 1rem;
+                padding-left: 1rem;
+            }
+
             .scheduler-sources-table,
             .scheduler-sources-table tbody,
             .scheduler-sources-table tr,
@@ -241,6 +247,44 @@
             .scheduler-sources-table tbody td:last-child form,
             .scheduler-sources-table tbody td:last-child a {
                 justify-self: start;
+            }
+
+            .scheduler-task-card .card-body {
+                padding: 1rem !important;
+            }
+
+            .scheduler-task-actions {
+                width: 100%;
+            }
+
+            .nav.nav-pills {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                width: 100%;
+            }
+
+            .nav.nav-pills .nav-link {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-width: 0;
+                padding-right: .75rem;
+                padding-left: .75rem;
+            }
+        }
+
+        @media (max-width: 575.98px) {
+            .scheduler-sources-table tbody td {
+                grid-template-columns: minmax(6.5rem, 38%) minmax(0, 1fr);
+            }
+
+            .scheduler-task-actions > *,
+            .scheduler-task-actions .btn:not(.btn-icon) {
+                flex: 1 1 8rem;
+            }
+
+            .scheduler-task-actions form .btn:not(.btn-icon) {
+                width: 100%;
             }
         }
     </style>

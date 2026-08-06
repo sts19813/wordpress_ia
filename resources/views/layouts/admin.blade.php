@@ -1058,6 +1058,51 @@
                 padding-right: 16px;
             }
 
+            .app-main,
+            .app-shell,
+            .app-content,
+            #kt_app_content_container,
+            #kt_app_toolbar_container {
+                width: 100%;
+                max-width: 100vw !important;
+                min-width: 0;
+            }
+
+            .app-content,
+            #kt_app_content_container {
+                overflow-x: hidden !important;
+            }
+
+            #kt_app_content_container > *,
+            #kt_app_content_container .card,
+            #kt_app_content_container .card-header,
+            #kt_app_content_container .card-body,
+            #kt_app_content_container .card-footer,
+            #kt_app_content_container form,
+            #kt_app_content_container .row > * {
+                max-width: 100%;
+                min-width: 0;
+            }
+
+            #kt_app_content_container img,
+            #kt_app_content_container input,
+            #kt_app_content_container select,
+            #kt_app_content_container textarea {
+                max-width: 100%;
+            }
+
+            #kt_app_toolbar_container > * {
+                max-width: 100%;
+                min-width: 0;
+            }
+
+            .app-toolbar .page-heading,
+            .app-toolbar .text-muted,
+            #kt_app_content_container .form-text,
+            #kt_app_content_container code {
+                overflow-wrap: anywhere;
+            }
+
             [data-bs-theme="dark"] .mobile-app-header,
             [data-bs-theme="dark"] .mobile-app-nav {
                 background: rgba(31, 34, 52, .96);
@@ -1071,6 +1116,18 @@
             [data-bs-theme="dark"] .mobile-app-icon-button {
                 background: rgba(255, 255, 255, .1);
                 color: #d4ddf8;
+            }
+        }
+
+        @media (max-width: 575.98px) {
+            #kt_app_toolbar_container {
+                align-items: stretch !important;
+                flex-direction: column;
+            }
+
+            #kt_app_toolbar_container > .btn,
+            #kt_app_toolbar_container > a.btn {
+                width: 100%;
             }
         }
 
@@ -1141,7 +1198,8 @@
                             </div>
                         @endif
 
-                           
+                        <div id="kt_app_content" class="app-content flex-column-fluid">
+                            <div id="kt_app_content_container" class="app-container container-fluid">
                                 @if (session('status'))
                                     <div class="alert alert-success d-flex align-items-center mb-6">
                                         <i class="ki-outline ki-check-circle fs-2hx text-success me-4"></i>
@@ -1168,6 +1226,8 @@
                                 @endif
 
                                 @yield('content')
+                            </div>
+                        </div>
 
                         @include('partials.footer')
                     </div>

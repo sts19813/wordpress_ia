@@ -43,34 +43,34 @@
                         <tbody class="fw-semibold text-gray-700">
                             @foreach ($sourceSites as $sourceSite)
                                 <tr>
-                                    <td>
+                                    <td data-label="Nombre">
                                         <a href="{{ route('admin.source-sites.edit', $sourceSite) }}" class="source-site-name text-gray-900 text-hover-primary fw-bold">
                                             {{ $sourceSite->name }}
                                         </a>
                                     </td>
-                                    <td>{{ $sourceSite->company?->name ?: '—' }}</td>
-                                    <td>
+                                    <td data-label="Empresa">{{ $sourceSite->company?->name ?: '—' }}</td>
+                                    <td data-label="URL">
                                         <a href="{{ $sourceSite->url }}" target="_blank" rel="noopener noreferrer" class="source-site-url text-gray-600 text-hover-primary" title="{{ $sourceSite->url }}">
                                             {{ $sourceSite->url }}
                                         </a>
                                     </td>
-                                    <td>
+                                    <td data-label="Estado">
                                         <span class="badge {{ $statusClasses[$sourceSite->status] ?? 'badge-light' }}">{{ $sourceSite->statusLabel() }}</span>
                                     </td>
-                                    <td class="text-nowrap" data-order="{{ $sourceSite->frequency_minutes }}">
+                                    <td data-label="Frecuencia" class="text-nowrap" data-order="{{ $sourceSite->frequency_minutes }}">
                                         {{ max(1, (int) ceil($sourceSite->frequency_minutes / 60)) }} h
                                     </td>
-                                    <td class="text-nowrap" data-order="{{ $sourceSite->last_synced_at?->timestamp ?: 0 }}">
+                                    <td data-label="Última sincronización" class="text-nowrap" data-order="{{ $sourceSite->last_synced_at?->timestamp ?: 0 }}">
                                         {{ $sourceSite->last_synced_at?->format('d/m/Y H:i') ?: '—' }}
                                     </td>
-                                    <td data-order="{{ $sourceSite->active ? 1 : 0 }}">
+                                    <td data-label="Activo" data-order="{{ $sourceSite->active ? 1 : 0 }}">
                                         @if ($sourceSite->active)
                                             <span class="badge badge-light-success">Sí</span>
                                         @else
                                             <span class="badge badge-light-danger">No</span>
                                         @endif
                                     </td>
-                                    <td class="text-end">
+                                    <td data-label="Acciones" class="text-end">
                                         <div class="d-inline-flex align-items-center justify-content-end gap-2">
                                             <a href="{{ route('admin.source-scan-logs.index', ['source_site_id' => $sourceSite->id]) }}" class="btn btn-sm btn-light-info text-nowrap">
                                                 <i class="ki-outline ki-note-2 fs-4"></i>
@@ -101,7 +101,7 @@
 @push('styles')
     <style>
         .source-sites-index-page {
-            padding: 0 20px 8px;
+            padding: 0 0 8px;
         }
 
         .source-sites-table-wrap {
@@ -161,14 +161,74 @@
 
         @media (max-width: 991.98px) {
             .source-sites-table {
-                min-width: 1050px;
+                min-width: 0;
             }
         }
 
         @media (max-width: 767.98px) {
             .source-sites-index-page {
-                padding-right: 16px;
-                padding-left: 16px;
+                padding: 0;
+            }
+
+            .source-sites-index-page .card-body {
+                padding: 1rem;
+            }
+
+            .source-sites-table-wrap,
+            .source-sites-index-page .admin-datatable-wrapper {
+                overflow: hidden;
+            }
+
+            .source-sites-table,
+            .source-sites-table tbody,
+            .source-sites-table tr,
+            .source-sites-table td {
+                display: block;
+                width: 100% !important;
+            }
+
+            .source-sites-table thead {
+                display: none;
+            }
+
+            .source-sites-table tbody tr {
+                padding: .8rem 0;
+                border-bottom: 1px dashed var(--bs-gray-300);
+            }
+
+            .source-sites-table tbody tr:last-child {
+                border-bottom: 0;
+            }
+
+            .source-sites-table tbody td {
+                display: grid;
+                grid-template-columns: minmax(6.5rem, 36%) minmax(0, 1fr);
+                gap: .65rem;
+                padding: .35rem 0 !important;
+                border: 0;
+                text-align: left !important;
+                white-space: normal !important;
+                overflow-wrap: anywhere;
+            }
+
+            .source-sites-table tbody td::before {
+                content: attr(data-label);
+                color: var(--bs-gray-600);
+                font-size: .68rem;
+                font-weight: 700;
+                text-transform: uppercase;
+            }
+
+            .source-sites-table .source-site-name,
+            .source-sites-table .source-site-url {
+                max-width: 100%;
+                white-space: normal;
+                overflow-wrap: anywhere;
+            }
+
+            .source-sites-table td[data-label="Acciones"] > div {
+                flex-wrap: wrap;
+                justify-content: flex-start !important;
             }
 
             .source-sites-index-page .dataTables_filter label {

@@ -100,7 +100,7 @@
     <style>
         .quick-posts-table-page {
             min-width: 0;
-            padding: 0 20px 8px;
+            padding: 0 0 8px;
         }
 
         .quick-posts-table-page .card,
@@ -191,8 +191,8 @@
 
         @media (max-width: 767.98px) {
             .quick-posts-table-page {
-                padding-right: 16px;
-                padding-left: 16px;
+                padding-right: 0;
+                padding-left: 0;
             }
 
             .quick-posts-table-page .dataTables_filter label {

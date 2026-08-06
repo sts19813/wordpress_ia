@@ -122,7 +122,7 @@
     <style>
         .source-scan-logs-page {
             min-width: 0;
-            padding: 0 20px 8px;
+            padding: 0 0 8px;
         }
 
         .source-scan-logs-page .card,
@@ -203,8 +203,8 @@
 
         @media (max-width: 767.98px) {
             .source-scan-logs-page {
-                padding-right: 16px;
-                padding-left: 16px;
+                padding-right: 0;
+                padding-left: 0;
             }
 
             .source-scan-logs-page .dataTables_filter label {

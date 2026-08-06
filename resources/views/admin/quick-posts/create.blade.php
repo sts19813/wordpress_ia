@@ -21,19 +21,19 @@
 @endsection
 
 @section('content')
-    <div class="row justify-content-center g-7">
+    <div class="row justify-content-center g-7 quick-post-create-page">
         <div class="col-xl-8">
             <form method="POST" action="{{ route('admin.quick-posts.store') }}" id="quick-post-form">
                 @csrf
                 <div class="card card-flush">
                     <div class="card-body p-lg-10">
-                        <div class="d-flex align-items-center gap-4 mb-8">
+                        <div class="quick-post-intro d-flex align-items-center gap-4 mb-8">
                             <div class="symbol symbol-60px">
                                 <div class="symbol-label bg-light-primary">
                                     <i class="ki-outline ki-flash-circle fs-2x text-primary"></i>
                                 </div>
                             </div>
-                            <div>
+                            <div class="quick-post-intro-copy">
                                 <h2 class="fw-bold text-gray-900 mb-1">Solo necesitas la URL</h2>
                                 <div class="text-muted">Facebook, X o Instagram · la publicación debe ser visible sin iniciar sesión.</div>
                             </div>
@@ -242,6 +242,68 @@
 .quick-post-destination-icon.is-instagram { background: #c13584; }
 .quick-post-destination-icon.is-x { background: #111; }
 .quick-post-destination-icon.is-wordpress { background: #28799e; }
+
+@media (max-width: 767.98px) {
+    .quick-post-create-page {
+        --bs-gutter-y: 1rem;
+    }
+
+    .quick-post-create-page .card-body {
+        padding: 1.25rem;
+    }
+
+    .quick-post-intro {
+        align-items: flex-start !important;
+        gap: .85rem !important;
+        margin-bottom: 1.5rem !important;
+    }
+
+    .quick-post-intro .symbol {
+        width: 44px !important;
+        height: 44px !important;
+        flex: 0 0 44px;
+    }
+
+    .quick-post-intro-copy {
+        min-width: 0;
+    }
+
+    .quick-post-intro-copy h2 {
+        font-size: 1.15rem;
+    }
+
+    .quick-post-create-page .input-group,
+    .quick-post-create-page .form-select,
+    .quick-post-create-page .form-control {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .quick-post-create-page .separator {
+        margin-top: 1.5rem !important;
+        margin-bottom: 1.5rem !important;
+    }
+
+    .quick-post-create-page .notice {
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .quick-post-create-page .notice .btn,
+    .quick-post-create-page .text-nowrap.btn {
+        width: 100%;
+        white-space: normal !important;
+    }
+
+    .quick-post-create-page .card-footer {
+        flex-wrap: wrap;
+        padding: 1rem 1.25rem;
+    }
+
+    .quick-post-create-page .card-footer .btn {
+        flex: 1 1 9rem;
+    }
+}
 </style>
 @endpush
 

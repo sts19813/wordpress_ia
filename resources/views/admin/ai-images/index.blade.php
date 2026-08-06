@@ -18,7 +18,7 @@
                     @endif
                     <div class="card-body">
                         <a href="{{ $image->article ? route('admin.ai-articles.show', $image->article) : '#' }}" class="fw-bold text-gray-900 text-hover-primary">{{ $image->title ?: 'Imagen #'.$image->id }}</a>
-                        <div class="d-flex gap-2 mt-3"><span class="badge {{ $image->status === 'generated' ? 'badge-light-success' : 'badge-light-danger' }}">{{ $image->statusLabel() }}</span><span class="badge badge-light">{{ $image->resolution }}</span><span class="badge badge-light">{{ $image->quality }}</span></div>
+                        <div class="d-flex flex-wrap gap-2 mt-3"><span class="badge {{ $image->status === 'generated' ? 'badge-light-success' : 'badge-light-danger' }}">{{ $image->statusLabel() }}</span><span class="badge badge-light">{{ $image->resolution }}</span><span class="badge badge-light">{{ $image->quality }}</span></div>
                         @if ($image->generation_error)<div class="text-danger fs-7 mt-3">{{ $image->generation_error }}</div>@endif
                     </div>
                 </div>

@@ -118,7 +118,7 @@
     <style>
         .ai-articles-index-page {
             min-width: 0;
-            padding: 0 20px 8px;
+            padding: 0 0 8px;
         }
 
         .ai-articles-index-page .card,
@@ -193,8 +193,8 @@
 
         @media (max-width: 767.98px) {
             .ai-articles-index-page {
-                padding-right: 16px;
-                padding-left: 16px;
+                padding-right: 0;
+                padding-left: 0;
             }
 
             .ai-articles-index-page .dataTables_filter label {

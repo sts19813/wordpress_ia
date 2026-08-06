@@ -128,7 +128,7 @@
 @push('styles')
     <style>
         .news-index-page {
-            padding: 0 20px 8px;
+            padding: 0 0 8px;
         }
 
         .news-index-page .card {
@@ -182,8 +182,8 @@
 
         @media (max-width: 767.98px) {
             .news-index-page {
-                padding-right: 16px;
-                padding-left: 16px;
+                padding-right: 0;
+                padding-left: 0;
             }
 
             .news-index-page .dataTables_filter label {
