@@ -795,11 +795,19 @@
 
         @media (max-width: 991.98px) {
             .app-sidebar {
-                width: var(--admin-sidebar-width);
+                width: 88%;
+                max-width: 350px;
+                border-radius: 0 22px 22px 0;
+                box-shadow: 18px 0 48px rgba(10, 16, 35, .28);
             }
 
             .app-main {
                 margin-left: 0;
+            }
+
+            .app-sidebar-wrapper {
+                border-radius: inherit;
+                overflow: hidden;
             }
 
             .sidebar-brand-link {
@@ -814,7 +822,119 @@
             }
 
             .sidebar-shell {
-                padding-bottom: max(18px, env(safe-area-inset-bottom));
+                padding: 12px 10px max(12px, env(safe-area-inset-bottom));
+            }
+
+            .sidebar-brand {
+                min-height: 50px;
+                margin-bottom: 8px;
+                padding: 0 4px;
+            }
+
+            .sidebar-brand-toggle {
+                width: 38px;
+                height: 38px;
+                border-radius: 12px;
+            }
+
+            .sidebar-brand-mark {
+                width: 38px;
+                height: 38px;
+            }
+
+            .sidebar-brand-wordmark {
+                font-size: .96rem;
+            }
+
+            .sidebar-scroll {
+                padding: 0 2px 6px 0;
+            }
+
+            .app-sidebar-menu-primary > .menu-item {
+                margin-bottom: 4px;
+            }
+
+            .app-sidebar-menu-primary .menu-link {
+                min-height: 43px;
+                border-radius: 12px;
+                padding: 0 12px;
+            }
+
+            .app-sidebar-menu-primary > .menu-item > .menu-link .menu-title {
+                font-size: .92rem;
+            }
+
+            .app-sidebar-menu-primary .menu-icon {
+                margin-right: 10px !important;
+            }
+
+            .app-sidebar-menu-primary .menu-sub {
+                padding: 4px 4px 3px 36px;
+            }
+
+            .app-sidebar-menu-primary .menu-sub .menu-item {
+                margin-bottom: 2px;
+            }
+
+            .app-sidebar-menu-primary .menu-sub .menu-link {
+                min-height: 36px;
+                padding: 5px 10px;
+                line-height: 1.25;
+            }
+
+            .app-sidebar-menu-primary .menu-sub .menu-link .menu-title {
+                color: rgba(210, 220, 243, .74) !important;
+                font-size: .82rem;
+                font-weight: 600;
+            }
+
+            .app-sidebar-menu-primary .menu-sub .menu-link:hover,
+            .app-sidebar-menu-primary .menu-sub .menu-link.active {
+                background: rgba(52, 163, 255, .18) !important;
+                color: #fff !important;
+            }
+
+            .app-sidebar-menu-primary .menu-sub .menu-link:hover .menu-title,
+            .app-sidebar-menu-primary .menu-sub .menu-link.active .menu-title {
+                color: #fff !important;
+            }
+
+            .app-sidebar-menu-primary .menu-sub .menu-link.active .bullet {
+                background: #72baff !important;
+            }
+
+            .app-sidebar-footer {
+                padding-top: 8px;
+            }
+
+            .sidebar-user-card {
+                min-height: 62px;
+                gap: 9px;
+                padding: 8px 9px;
+                border-radius: 16px;
+            }
+
+            .sidebar-user-menu-trigger {
+                width: 38px;
+                height: 38px;
+            }
+
+            .sidebar-user-name {
+                font-size: .82rem;
+            }
+
+            .sidebar-user-email {
+                font-size: .69rem;
+            }
+
+            .sidebar-user-actions {
+                gap: 5px !important;
+            }
+
+            .sidebar-user-action {
+                width: 30px;
+                height: 30px;
+                border-radius: 9px;
             }
 
             .mobile-app-header {

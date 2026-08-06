@@ -53,6 +53,7 @@ class SidebarNavigationTest extends TestCase
             ->assertSee('mobile-app-header', false)
             ->assertSee('mobile-app-nav', false)
             ->assertSee('data-kt-drawer-toggle=".kt-app-sidebar-mobile-toggle"', false)
+            ->assertSee('data-kt-drawer-width="88%"', false)
             ->assertSee('Abrir menú principal')
             ->assertSee('Abrir todos los módulos')
             ->assertSee(route('admin.quick-posts.create'), false);
