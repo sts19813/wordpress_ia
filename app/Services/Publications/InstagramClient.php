@@ -39,6 +39,15 @@ class InstagramClient
             ->throw();
     }
 
+    public function containerStatus(WordPressSite $profile, string $creationId): Response
+    {
+        return $this->request($profile)
+            ->get($this->graphEndpoint($profile, $creationId), [
+                'fields' => 'status_code',
+            ])
+            ->throw();
+    }
+
     public function mediaDetails(WordPressSite $profile, string $mediaId): Response
     {
         return $this->request($profile)

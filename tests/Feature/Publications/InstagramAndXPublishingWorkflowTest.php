@@ -7,11 +7,13 @@ use App\Models\AiImage;
 use App\Models\Publication;
 use App\Models\User;
 use App\Models\WordPressSite;
+use App\Services\PublicationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Sleep;
 use Tests\TestCase;
 
 class InstagramAndXPublishingWorkflowTest extends TestCase
@@ -94,6 +96,10 @@ class InstagramAndXPublishingWorkflowTest extends TestCase
                 return Http::response(['id' => 'container-123']);
             }
 
+            if (str_contains($request->url(), '/container-123')) {
+                return Http::response(['status_code' => 'FINISHED']);
+            }
+
             if (str_contains($request->url(), '/180000000000001')) {
                 return Http::response([
                     'id' => '180000000000001',
@@ -136,6 +142,72 @@ class InstagramAndXPublishingWorkflowTest extends TestCase
         Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/media')
             && str_contains((string) $request['caption'], 'Artículo para redes'));
         $this->assertSame($image->id, $publication->ai_image_id);
+    }
+
+    public function test_instagram_waits_for_media_and_retries_when_meta_reports_it_is_not_ready(): void
+    {
+        Storage::fake('local');
+        Sleep::fake();
+        $statusChecks = 0;
+        $publishAttempts = 0;
+        Http::fake(function (Request $request) use (&$statusChecks, &$publishAttempts) {
+            if (str_ends_with($request->url(), '/media_publish')) {
+                $publishAttempts++;
+
+                if ($publishAttempts === 1) {
+                    return Http::response([
+                        'error' => [
+                            'message' => 'Media ID is not available',
+                            'code' => 9007,
+                            'error_subcode' => 2207027,
+                            'error_user_msg' => 'El archivo multimedia no está listo para publicar; espera un momento',
+                        ],
+                    ], 400);
+                }
+
+                return Http::response(['id' => '180000000000002']);
+            }
+
+            if (str_ends_with($request->url(), '/media')) {
+                return Http::response(['id' => 'container-456']);
+            }
+
+            if (str_contains($request->url(), '/container-456')) {
+                $statusChecks++;
+
+                return Http::response([
+                    'status_code' => $statusChecks === 1 ? 'IN_PROGRESS' : 'FINISHED',
+                ]);
+            }
+
+            if (str_contains($request->url(), '/180000000000002')) {
+                return Http::response([
+                    'id' => '180000000000002',
+                    'permalink' => 'https://www.instagram.com/p/READY456/',
+                ]);
+            }
+
+            return Http::response([], 404);
+        });
+        $user = User::factory()->create();
+        $profile = $this->profile($user, [
+            'type' => WordPressSite::TYPE_INSTAGRAM,
+            'name' => 'Instagram con procesamiento',
+            'instagram_account_id' => '17841400000000000',
+            'instagram_access_token' => 'instagram-secret',
+            'instagram_api_version' => 'v24.0',
+        ]);
+        [$article, $image] = $this->articleWithImage($user);
+
+        $publication = app(PublicationService::class)
+            ->publishNow($profile, $article, $image);
+
+        $this->assertSame(Publication::STATUS_PUBLISHED, $publication->status);
+        $this->assertSame('https://www.instagram.com/p/READY456/', $publication->remote_url);
+        $this->assertSame(3, $statusChecks);
+        $this->assertSame(2, $publishAttempts);
+        Sleep::assertSleptTimes(2);
+        Sleep::fake(false);
     }
 
     public function test_article_can_be_published_to_x_with_a_user_access_token(): void

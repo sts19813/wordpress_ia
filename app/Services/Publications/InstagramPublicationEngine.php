@@ -7,12 +7,18 @@ use App\Models\AiImage;
 use App\Models\Publication;
 use App\Models\WordPressSite;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Sleep;
 use RuntimeException;
 use Throwable;
 
 class InstagramPublicationEngine
 {
+    private const CONTAINER_STATUS_ATTEMPTS = 12;
+
+    private const MEDIA_PUBLISH_ATTEMPTS = 3;
+
     public function __construct(
         private readonly InstagramClient $client,
         private readonly InstagramMediaUrl $mediaUrl,
@@ -36,7 +42,8 @@ class InstagramPublicationEngine
                 throw new RuntimeException('Instagram no devolvió el identificador del contenido.');
             }
 
-            $published = $this->client->publishContainer($profile, $creationId);
+            $containerStatus = $this->waitForContainer($profile, $creationId);
+            $published = $this->publishReadyContainer($profile, $creationId);
             $mediaId = (string) $published->json('id');
 
             if ($mediaId === '') {
@@ -53,9 +60,11 @@ class InstagramPublicationEngine
                     'platform' => WordPressSite::TYPE_INSTAGRAM,
                     'caption' => $caption,
                     'image_url' => $imageUrl,
+                    'creation_id' => $creationId,
                 ],
                 'full_response' => [
                     'container' => $container->json(),
+                    'container_status' => $containerStatus->json(),
                     'published' => $published->json(),
                     'media' => $details->json(),
                 ],
@@ -67,6 +76,57 @@ class InstagramPublicationEngine
         } catch (Throwable $exception) {
             return $this->recordFailure($publication, $exception, 'Instagram rechazó la publicación.');
         }
+    }
+
+    private function waitForContainer(WordPressSite $profile, string $creationId): Response
+    {
+        for ($attempt = 1; $attempt <= self::CONTAINER_STATUS_ATTEMPTS; $attempt++) {
+            $status = $this->client->containerStatus($profile, $creationId);
+            $statusCode = strtoupper(trim((string) $status->json('status_code')));
+
+            if ($statusCode === 'FINISHED') {
+                return $status;
+            }
+
+            if (in_array($statusCode, ['ERROR', 'EXPIRED'], true)) {
+                throw new RuntimeException("Instagram no pudo procesar la imagen ({$statusCode}).");
+            }
+
+            if ($attempt < self::CONTAINER_STATUS_ATTEMPTS) {
+                Sleep::for(min(5, $attempt))->seconds();
+            }
+        }
+
+        throw new RuntimeException('Instagram tardó demasiado en preparar la imagen. Intenta publicar nuevamente.');
+    }
+
+    private function publishReadyContainer(WordPressSite $profile, string $creationId): Response
+    {
+        for ($attempt = 1; $attempt <= self::MEDIA_PUBLISH_ATTEMPTS; $attempt++) {
+            try {
+                return $this->client->publishContainer($profile, $creationId);
+            } catch (RequestException $exception) {
+                if (! $this->mediaIsNotReady($exception) || $attempt === self::MEDIA_PUBLISH_ATTEMPTS) {
+                    throw $exception;
+                }
+
+                Sleep::for(5)->seconds();
+                $this->waitForContainer($profile, $creationId);
+            }
+        }
+
+        throw new RuntimeException('Instagram no confirmó la publicación del contenido.');
+    }
+
+    private function mediaIsNotReady(RequestException $exception): bool
+    {
+        $response = $exception->response?->json() ?: [];
+        $message = mb_strtolower((string) data_get($response, 'error.message'));
+        $userMessage = mb_strtolower((string) data_get($response, 'error.error_user_msg'));
+
+        return (int) data_get($response, 'error.error_subcode') === 2207027
+            || str_contains($message, 'media id is not available')
+            || str_contains($userMessage, 'no está listo');
     }
 
     private function publication(WordPressSite $profile, AiArticle $article, ?AiImage $image): Publication
