@@ -30,7 +30,9 @@ Route::get('/', function () {
         : redirect()->route('login');
 });
 
-Route::get('medios-publicacion/{aiImage}/imagen.jpg', PublicationMediaController::class)
+Route::get('medios-publicacion/{aiImage}/{expires}/{token}/imagen.jpg', PublicationMediaController::class)
+    ->whereNumber('expires')
+    ->where('token', '[a-f0-9]{64}')
     ->name('publication-media.show');
 
 Route::middleware('guest')->group(function () {

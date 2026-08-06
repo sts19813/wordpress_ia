@@ -132,7 +132,7 @@ class InstagramAndXPublishingWorkflowTest extends TestCase
         $this->assertIsArray($imageSize);
         $this->assertGreaterThanOrEqual(0.8, $imageSize[0] / $imageSize[1]);
         $this->assertLessThanOrEqual(1.91, $imageSize[0] / $imageSize[1]);
-        $this->get(preg_replace('/token=[^&]+/', 'token=invalid', $mediaUrlBehindProxy))->assertForbidden();
+        $this->get(preg_replace('#/[a-f0-9]{64}/imagen\.jpg$#', '/'.str_repeat('0', 64).'/imagen.jpg', $mediaUrlBehindProxy))->assertForbidden();
         Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/media')
             && str_contains((string) $request['caption'], 'Artículo para redes'));
         $this->assertSame($image->id, $publication->ai_image_id);

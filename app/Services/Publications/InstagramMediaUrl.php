@@ -4,7 +4,6 @@ namespace App\Services\Publications;
 
 use App\Models\AiImage;
 use DateTimeInterface;
-use Illuminate\Http\Request;
 use RuntimeException;
 
 class InstagramMediaUrl
@@ -12,25 +11,18 @@ class InstagramMediaUrl
     public function temporary(AiImage $image, DateTimeInterface $expiration): string
     {
         $expires = $expiration->getTimestamp();
-        $path = route('publication-media.show', ['aiImage' => $image->id], absolute: false);
-        $query = http_build_query([
+        $path = route('publication-media.show', [
+            'aiImage' => $image->id,
             'expires' => $expires,
             'token' => $this->token($image->id, $expires),
-        ], encoding_type: PHP_QUERY_RFC3986);
+        ], absolute: false);
 
-        return rtrim((string) config('app.url'), '/').$path.'?'.$query;
+        return rtrim((string) config('app.url'), '/').$path;
     }
 
-    public function isValid(Request $request, AiImage $image): bool
+    public function isValid(AiImage $image, string $expires, string $token): bool
     {
-        $expires = $request->query('expires');
-        $token = $request->query('token');
-
-        if (! is_string($expires) || ! ctype_digit($expires) || (int) $expires < now()->timestamp) {
-            return false;
-        }
-
-        if (! is_string($token) || $token === '') {
+        if (! ctype_digit($expires) || (int) $expires < now()->timestamp) {
             return false;
         }
 
