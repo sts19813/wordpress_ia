@@ -37,6 +37,8 @@ class SidebarNavigationTest extends TestCase
             ])
             ->assertSee('data-kt-menu-trigger="click"', false)
             ->assertSee('menu-sub-accordion', false)
+            ->assertSee('--admin-sidebar-submenu-text: #f1f5ff;', false)
+            ->assertSee('--admin-sidebar-selected: #075fd1;', false)
             ->assertSee(route('admin.quick-posts.index'), false)
             ->assertSee(route('admin.ai-articles.index'), false)
             ->assertSee(route('admin.publications.index'), false)
