@@ -51,7 +51,7 @@
     data-kt-drawer-name="app-sidebar"
     data-kt-drawer-activate="{default: true, lg: false}"
     data-kt-drawer-overlay="true"
-    data-kt-drawer-width="88%"
+    data-kt-drawer-width="92%"
     data-kt-drawer-direction="start"
     data-kt-drawer-toggle=".kt-app-sidebar-mobile-toggle">
 
