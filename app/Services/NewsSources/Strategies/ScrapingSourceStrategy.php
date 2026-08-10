@@ -73,7 +73,7 @@ class ScrapingSourceStrategy implements SourceStrategyInterface
                     'autor' => $this->nodeText($xpath, './/*[@rel="author"] | .//*[contains(@class, "author")]', $node) ?: $this->meta($xpath, 'author', 'name'),
                     'fecha' => $this->nodeAttribute($xpath, './/time[@datetime]', 'datetime', $node) ?: $this->meta($xpath, 'article:published_time'),
                     'imagen' => $this->absoluteUrl($this->nodeAttribute($xpath, './/img[@src]', 'src', $node) ?: $this->meta($xpath, 'og:image'), $sourceSite->url),
-                    'url' => $this->absoluteUrl($this->nodeAttribute($xpath, './/a[@href]', 'href', $node) ?: $this->meta($xpath, 'og:url') ?: $sourceSite->url, $sourceSite->url),
+                    'url' => $this->absoluteUrl($this->articleUrl($xpath, $node) ?: $this->meta($xpath, 'og:url') ?: $sourceSite->url, $sourceSite->url),
                     'categorias' => $this->meta($xpath, 'article:section') ? [$this->meta($xpath, 'article:section')] : [],
                     'tags' => $this->meta($xpath, 'keywords', 'name'),
                     'contenido_html' => $this->innerHtml($node),
@@ -107,6 +107,20 @@ class ScrapingSourceStrategy implements SourceStrategyInterface
         }
 
         return $node->getAttribute($attribute) ?: null;
+    }
+
+    private function articleUrl(DOMXPath $xpath, DOMElement $node): ?string
+    {
+        if (strtolower($node->tagName) === 'a' && $node->hasAttribute('href')) {
+            return $node->getAttribute('href') ?: null;
+        }
+
+        return $this->nodeAttribute(
+            $xpath,
+            './/a[@href][.//h1 or .//h2 or .//h3]',
+            'href',
+            $node,
+        ) ?: $this->nodeAttribute($xpath, './/a[@href]', 'href', $node);
     }
 
     private function paragraphText(DOMXPath $xpath, DOMNode $context): ?string

@@ -231,6 +231,64 @@ class SourceManagerTest extends TestCase
         $this->assertSame(['wordpress', 'ia'], $items->first()['tags']);
     }
 
+    public function test_scraping_strategy_uses_the_candidate_anchor_as_the_article_url(): void
+    {
+        $html = <<<'HTML'
+        <html>
+            <body>
+                <main>
+                    <a class="news-card" href="/nacional/2026/8/10/nota-proceso-123.html">
+                        <img src="/nota-proceso.jpg">
+                        <h2>Nota detectada dentro del enlace</h2>
+                    </a>
+                </main>
+            </body>
+        </html>
+        HTML;
+
+        $items = app(ScrapingSourceStrategy::class)->parse($html, new SourceSite([
+            'name' => 'Proceso',
+            'url' => 'https://www.proceso.com.mx/',
+            'type' => SourceSite::TYPE_HTML,
+            'language' => 'es',
+        ]));
+
+        $this->assertCount(1, $items);
+        $this->assertSame('Nota detectada dentro del enlace', $items->first()['titulo']);
+        $this->assertSame(
+            'https://www.proceso.com.mx/nacional/2026/8/10/nota-proceso-123.html',
+            $items->first()['url'],
+        );
+    }
+
+    public function test_scraping_strategy_prefers_the_link_that_contains_the_headline(): void
+    {
+        $html = <<<'HTML'
+        <html>
+            <body>
+                <article>
+                    <a href="/nacional">Nacional</a>
+                    <a href="/nacional/2026/8/10/nota-principal-456.html">
+                        <h2>Encabezado de la nota principal</h2>
+                    </a>
+                </article>
+            </body>
+        </html>
+        HTML;
+
+        $items = app(ScrapingSourceStrategy::class)->parse($html, new SourceSite([
+            'name' => 'Medio HTML',
+            'url' => 'https://example.com/',
+            'type' => SourceSite::TYPE_HTML,
+            'language' => 'es',
+        ]));
+
+        $this->assertSame(
+            'https://example.com/nacional/2026/8/10/nota-principal-456.html',
+            $items->first()['url'],
+        );
+    }
+
     public function test_json_feed_strategy_parses_items(): void
     {
         $items = app(JsonFeedSourceStrategy::class)->parse([
