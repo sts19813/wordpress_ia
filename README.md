@@ -34,6 +34,13 @@ php artisan test
 
 When a change is completed by more than one contributor, record every participant with a valid `Co-authored-by` trailer in the commit message.
 
+Leave a blank line before the trailer and use an email associated with the contributor's GitHub account:
+
+```bash
+git commit -m "Describe the shared change" \
+  -m "Co-authored-by: ContributorName <contributor@example.com>"
+```
+
 ## Learning Laravel
 
 Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
