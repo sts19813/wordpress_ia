@@ -21,6 +21,19 @@ Laravel is a web application framework with expressive, elegant syntax. We belie
 
 Laravel is accessible, powerful, and provides tools required for large, robust applications.
 
+## Project collaboration
+
+Changes to WordPress IA are developed in focused branches and merged through pull requests. Keep each commit limited to one purpose so reviews and deployments remain easy to verify.
+
+Before opening a pull request, run the project checks:
+
+```bash
+vendor/bin/pint --test
+php artisan test
+```
+
+When a change is completed by more than one contributor, record every participant with a valid `Co-authored-by` trailer in the commit message.
+
 ## Learning Laravel
 
 Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
