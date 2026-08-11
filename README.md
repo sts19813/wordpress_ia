@@ -41,6 +41,10 @@ git commit -m "Describe the shared change" \
   -m "Co-authored-by: ContributorName <contributor@example.com>"
 ```
 
+For shared pull requests, each contributor should commit their own portion from an account with access to the repository.
+
+Review the combined branch before merging it into the default branch.
+
 ## Learning Laravel
 
 Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
