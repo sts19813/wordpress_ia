@@ -1,10 +1,14 @@
 @php
     $mobileNavigation = [
-        ['label' => 'Inicio', 'route' => 'admin.dashboard', 'active' => 'admin.dashboard', 'icon' => 'ki-home-2'],
-        ['label' => 'Noticias', 'route' => 'admin.news.index', 'active' => 'admin.news.*', 'icon' => 'ki-document'],
-        ['label' => 'Crear', 'route' => 'admin.quick-posts.create', 'active' => 'admin.quick-posts.*', 'icon' => 'ki-flash-circle'],
-        ['label' => 'IA', 'route' => 'admin.ai-articles.index', 'active' => 'admin.ai-articles.*', 'icon' => 'ki-abstract-26'],
+        ['label' => 'Inicio', 'route' => 'admin.dashboard', 'active' => 'admin.dashboard', 'icon' => 'ki-home-2', 'permission' => null],
+        ['label' => 'Noticias', 'route' => 'admin.news.index', 'active' => 'admin.news.*', 'icon' => 'ki-document', 'permission' => 'contenido.gestionar'],
+        ['label' => 'Crear', 'route' => 'admin.quick-posts.create', 'active' => 'admin.quick-posts.*', 'icon' => 'ki-flash-circle', 'permission' => 'contenido.gestionar'],
+        ['label' => 'IA', 'route' => 'admin.ai-articles.index', 'active' => 'admin.ai-articles.*', 'icon' => 'ki-abstract-26', 'permission' => 'ia.gestionar'],
     ];
+
+    $mobileNavigation = collect($mobileNavigation)
+        ->filter(fn (array $item) => ! $item['permission'] || auth()->user()->isAdmin() || auth()->user()->can($item['permission']))
+        ->values();
 @endphp
 
 <header class="mobile-app-header d-flex d-lg-none">

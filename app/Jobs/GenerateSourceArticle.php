@@ -123,7 +123,6 @@ class GenerateSourceArticle implements ShouldBeUnique, ShouldQueue
             $publicationProfiles = WordPressSite::query()
                 ->whereIn('id', $profileIds)
                 ->where('user_id', $user->id)
-                ->when($payload['company_id'] ?? null, fn ($query, $companyId) => $query->where('company_id', $companyId))
                 ->where('active', true)
                 ->where('status', WordPressSite::STATUS_ACTIVE)
                 ->get()

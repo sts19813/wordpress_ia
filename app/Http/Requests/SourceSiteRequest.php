@@ -3,11 +3,9 @@
 namespace App\Http\Requests;
 
 use App\Models\SourceSite;
-use App\Models\WordPressSite;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Validator;
 
 class SourceSiteRequest extends FormRequest
 {
@@ -138,28 +136,6 @@ class SourceSiteRequest extends FormRequest
             'publication_profile_ids' => 'perfiles de publicación',
             'publication_profile_ids.*' => 'perfil de publicación',
         ];
-    }
-
-    public function after(): array
-    {
-        return [function (Validator $validator): void {
-            $companyId = (int) $this->input('company_id');
-            $profileIds = array_map('intval', (array) $this->input('publication_profile_ids', []));
-
-            if (! $companyId || $profileIds === []) {
-                return;
-            }
-
-            $validCount = WordPressSite::query()
-                ->where('user_id', $this->ownerId())
-                ->where('company_id', $companyId)
-                ->whereIn('id', $profileIds)
-                ->count();
-
-            if ($validCount !== count(array_unique($profileIds))) {
-                $validator->errors()->add('publication_profile_ids', 'Todos los destinos deben pertenecer a la empresa seleccionada.');
-            }
-        }];
     }
 
     private function ownerId(): int

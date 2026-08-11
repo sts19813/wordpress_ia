@@ -11,8 +11,7 @@ use Laravel\Socialite\Facades\Socialite;
 use Symfony\Component\HttpFoundation\RedirectResponse as SymfonyRedirectResponse;
 use Throwable;
 
-
-//controlador para administrar la autenticacion de los usuarios con Google.
+// controlador para administrar la autenticacion de los usuarios con Google.
 class GoogleAuthController extends Controller
 {
     public function redirect(): SymfonyRedirectResponse
@@ -58,6 +57,12 @@ class GoogleAuthController extends Controller
         $user->email_verified_at ??= now();
         $user->password ??= Str::password(32);
         $user->save();
+
+        if ($user->is_active === false) {
+            return redirect()->route('login')->withErrors([
+                'email' => 'Tu cuenta está desactivada. Contacta a un administrador.',
+            ]);
+        }
 
         Auth::login($user, true);
 

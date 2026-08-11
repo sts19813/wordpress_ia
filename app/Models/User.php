@@ -11,7 +11,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Spatie\Permission\Traits\HasRoles;
 
 #[Fillable([
     'name',
@@ -22,6 +24,7 @@ use Illuminate\Support\Facades\Storage;
     'google_avatar_url',
     'email_verified_at',
     'is_admin',
+    'is_active',
 ])]
 #[Hidden(['password', 'remember_token'])]
 
@@ -29,7 +32,22 @@ use Illuminate\Support\Facades\Storage;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, HasRoles, Notifiable;
+
+    /** @var array<string, mixed> */
+    protected $attributes = [
+        'is_admin' => false,
+        'is_active' => true,
+    ];
+
+    protected static function booted(): void
+    {
+        static::created(function (User $user): void {
+            if (Schema::hasTable('roles') && ! $user->roles()->exists()) {
+                $user->assignRole($user->is_admin ? 'Administrador' : 'Operador');
+            }
+        });
+    }
 
     /**
      * Get the attributes that should be cast.
@@ -42,12 +60,15 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_admin' => 'boolean',
+            'is_active' => 'boolean',
         ];
     }
 
     public function isAdmin(): bool
     {
-        return $this->is_admin === true;
+        return $this->is_admin === true
+            || (Schema::hasTable(config('permission.table_names.roles', 'roles'))
+                && $this->hasAnyRole(['Administrador', 'Admin']));
     }
 
     /** @return Builder<Company> */

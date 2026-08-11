@@ -48,6 +48,7 @@ class SourceSiteController extends Controller
         }
 
         $wordpressSites = $request->user()->wordpressSites()
+            ->with('company:id,name')
             ->where('active', true)
             ->where('status', 'active')
             ->orderBy('name')
@@ -165,6 +166,7 @@ class SourceSiteController extends Controller
                 ->orderBy('name')
                 ->get(),
             'wordpressSites' => $owner->wordpressSites()
+                ->with('company:id,name')
                 ->where('active', true)
                 ->where('status', 'active')
                 ->orderBy('name')

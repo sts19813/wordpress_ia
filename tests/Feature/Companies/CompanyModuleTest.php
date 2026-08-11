@@ -46,7 +46,7 @@ class CompanyModuleTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_source_configuration_keeps_only_destinations_from_selected_company(): void
+    public function test_source_configuration_accepts_destinations_from_multiple_companies(): void
     {
         $user = User::factory()->create();
         $prompt = app(AiPromptProfileService::class)->ensureDefaultFor($user);
@@ -58,15 +58,12 @@ class CompanyModuleTest extends TestCase
         $payload = $this->sourcePayload($prompt->id, $company->id, [$profile->id, $otherProfile->id]);
         $this->actingAs($user)
             ->post(route('admin.source-sites.store'), $payload)
-            ->assertSessionHasErrors('publication_profile_ids');
-
-        $this->actingAs($user)
-            ->post(route('admin.source-sites.store'), $this->sourcePayload($prompt->id, $company->id, [$profile->id]))
+            ->assertSessionHasNoErrors()
             ->assertRedirect(route('admin.source-sites.index'));
 
         $source = SourceSite::query()->sole();
         $this->assertSame($company->id, $source->company_id);
-        $this->assertSame([$profile->id], $source->publication_profile_ids);
+        $this->assertSame([$profile->id, $otherProfile->id], $source->publication_profile_ids);
     }
 
     public function test_company_destinations_tab_lists_the_catalog_and_profile_actions(): void

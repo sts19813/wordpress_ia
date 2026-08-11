@@ -108,7 +108,7 @@ class CompanyController extends Controller
                 ->each(function (SourceSite $source) use ($profilesById): void {
                     $validIds = collect($source->publication_profile_ids)
                         ->map(fn ($id) => (int) $id)
-                        ->filter(fn (int $id) => $profilesById->get($id)?->company_id === $source->company_id)
+                        ->filter(fn (int $id) => $profilesById->get($id)?->company_id !== null)
                         ->unique()
                         ->values()
                         ->all();

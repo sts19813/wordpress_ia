@@ -44,6 +44,8 @@ class SourceSiteConfigurationTest extends TestCase
             ->assertSee('name="publication_profile_ids[]"', false)
             ->assertSee('multiple', false)
             ->assertSee('Seleccionar todos')
+            ->assertSee('id="save-source-button"', false)
+            ->assertDontSee('id="save-source-button" disabled', false)
             ->assertDontSee('name="status"', false)
             ->assertDontSee('name="language"', false)
             ->assertDontSee('name="priority"', false);

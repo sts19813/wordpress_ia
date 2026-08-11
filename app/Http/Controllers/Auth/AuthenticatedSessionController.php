@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
-//controlador para administrar la sesion de los usuarios.
+// controlador para administrar la sesion de los usuarios.
 class AuthenticatedSessionController extends Controller
 {
     public function create(): View
@@ -26,6 +26,14 @@ class AuthenticatedSessionController extends Controller
         if (! Auth::attempt($credentials, $request->boolean('remember'))) {
             return back()->withErrors([
                 'email' => 'El correo electrónico o la contraseña no son correctos.',
+            ])->onlyInput('email');
+        }
+
+        if ($request->user()->is_active === false) {
+            Auth::guard('web')->logout();
+
+            return back()->withErrors([
+                'email' => 'Tu cuenta está desactivada. Contacta a un administrador.',
             ])->onlyInput('email');
         }
 

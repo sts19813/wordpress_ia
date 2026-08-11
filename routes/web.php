@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\SourcePostMediaController;
 use App\Http\Controllers\Admin\SourceScanLogController;
 use App\Http\Controllers\Admin\SourceSiteController;
 use App\Http\Controllers\Admin\SystemLogController;
+use App\Http\Controllers\Admin\UserAccessController;
 use App\Http\Controllers\Admin\WordPressSiteController;
 use App\Http\Controllers\Admin\XOAuthController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
@@ -62,10 +63,10 @@ Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
     ->name('logout');
 
 Route::get('auth/x/callback', [XOAuthController::class, 'callback'])
-    ->middleware('auth')
+    ->middleware(['auth', 'active', 'system.permission:publicaciones.gestionar'])
     ->name('x-oauth.callback');
 
-Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['auth', 'active', 'system.permission'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::get('noticias', [NewsController::class, 'index'])->name('news.index');
     Route::get('post-rapido', [QuickPostController::class, 'index'])->name('quick-posts.index');
@@ -118,6 +119,15 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     Route::get('configuracion/prompts/{aiPromptProfile}/editar', [SettingController::class, 'edit'])->name('settings.prompts.edit');
     Route::put('configuracion/prompts/{aiPromptProfile}', [SettingController::class, 'update'])->name('settings.prompts.update');
     Route::delete('configuracion/prompts/{aiPromptProfile}', [SettingController::class, 'destroy'])->name('settings.prompts.destroy');
+    Route::get('usuarios', [UserAccessController::class, 'index'])->name('users.index');
+    Route::post('usuarios', [UserAccessController::class, 'storeUser'])->name('users.store');
+    Route::put('usuarios/{user}', [UserAccessController::class, 'updateUser'])->name('users.update');
+    Route::post('roles', [UserAccessController::class, 'storeRole'])->name('roles.store');
+    Route::put('roles/{role}', [UserAccessController::class, 'updateRole'])->name('roles.update');
+    Route::delete('roles/{role}', [UserAccessController::class, 'destroyRole'])->name('roles.destroy');
+    Route::post('permisos', [UserAccessController::class, 'storePermission'])->name('permissions.store');
+    Route::put('permisos/{permission}', [UserAccessController::class, 'updatePermission'])->name('permissions.update');
+    Route::delete('permisos/{permission}', [UserAccessController::class, 'destroyPermission'])->name('permissions.destroy');
     Route::get('cuenta', [AccountController::class, 'edit'])->name('account.edit');
     Route::patch('cuenta', [AccountController::class, 'update'])->name('account.update');
     Route::put('cuenta/contrasena', [AccountController::class, 'updatePassword'])->name('account.password.update');

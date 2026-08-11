@@ -125,8 +125,11 @@ class SourcePipelineQueueTest extends TestCase
         $user = User::factory()->create();
         $profile = app(AiPromptProfileService::class)->ensureDefaultFor($user);
         $profile->update(['generate_image' => false]);
+        $firstCompany = $user->companies()->create(['name' => 'Empresa Uno', 'active' => true]);
+        $secondCompany = $user->companies()->create(['name' => 'Empresa Dos', 'active' => true]);
         $wordpressSite = $user->wordpressSites()->create([
             'name' => 'Destino editorial',
+            'company_id' => $firstCompany->id,
             'rest_api_url' => 'https://target.test',
             'username' => 'editor',
             'application_password' => 'app-pass',
@@ -135,6 +138,7 @@ class SourcePipelineQueueTest extends TestCase
         ]);
         $secondWordpressSite = $user->wordpressSites()->create([
             'name' => 'Destino secundario',
+            'company_id' => $secondCompany->id,
             'rest_api_url' => 'https://second-target.test',
             'username' => 'editor',
             'application_password' => 'app-pass',
@@ -142,6 +146,7 @@ class SourcePipelineQueueTest extends TestCase
             'active' => true,
         ]);
         $sourceSite = $this->sourceSite($user, $profile->id, [
+            'company_id' => $firstCompany->id,
             'wordpress_site_id' => $wordpressSite->id,
             'publication_profile_ids' => [$wordpressSite->id, $secondWordpressSite->id],
             'auto_publish' => true,
