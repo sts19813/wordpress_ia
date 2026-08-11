@@ -29,13 +29,13 @@ class PublicationController extends Controller
 
         return view('admin.publications.index', [
             'publications' => $publications,
-            'sites' => $request->user()->wordpressSites()->latest()->get(),
+            'sites' => $request->user()->accessibleWordPressSites()->latest()->get(),
         ]);
     }
 
     public function publish(PublicationRequest $request, AiArticle $aiArticle): RedirectResponse
     {
-        $activeProfiles = $request->user()->wordpressSites()
+        $activeProfiles = $request->user()->accessibleWordPressSites()
             ->when($aiArticle->company_id, fn ($query, $companyId) => $query->where('company_id', $companyId))
             ->where('active', true)
             ->where('status', 'active')

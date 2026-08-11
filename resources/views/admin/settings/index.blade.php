@@ -29,7 +29,7 @@
             <div class="col-xl-6">
                 <div class="card card-flush h-100">
                     <div class="card-header align-items-center">
-                        <div class="card-title"><div><h3 class="fw-bold mb-1">{{ $profile->name }}</h3>@if ($profile->is_default)<span class="badge badge-light-success">Predeterminado</span>@endif</div></div>
+                        <div class="card-title"><div><h3 class="fw-bold mb-1">{{ $profile->name }}</h3>@if ($profile->is_default)<span class="badge badge-light-success">Predeterminado</span>@endif @if (auth()->user()->isAdmin())<span class="badge badge-light-primary">{{ $profile->user?->name }} · {{ $profile->user?->email }}</span>@endif</div></div>
                         <div class="card-toolbar d-flex gap-2">
                             <a href="{{ route('admin.settings.prompts.edit', $profile) }}" class="btn btn-icon btn-light-primary btn-sm"><i class="ki-outline ki-pencil fs-3"></i></a>
                             @if (! $profile->articles()->exists())

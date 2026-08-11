@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\SourceSite;
+use App\Models\WordPressSite;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -46,6 +47,8 @@ class SourceSiteRequest extends FormRequest
      */
     public function rules(): array
     {
+        $ownerId = $this->ownerId();
+
         return [
             'name' => ['required', 'string', 'max:255'],
             'url' => ['required', 'url', 'max:2048'],
@@ -79,12 +82,12 @@ class SourceSiteRequest extends FormRequest
                 'nullable',
                 'required_if:auto_generate,1',
                 'integer',
-                Rule::exists('ai_prompt_profiles', 'id')->where('user_id', $this->user()->id),
+                Rule::exists('ai_prompt_profiles', 'id')->where('user_id', $ownerId),
             ],
             'company_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('companies', 'id')->where('user_id', $this->user()->id),
+                Rule::exists('companies', 'id')->where('user_id', $ownerId),
             ],
             'publication_profile_ids' => [
                 'nullable',
@@ -95,7 +98,7 @@ class SourceSiteRequest extends FormRequest
                 'integer',
                 'distinct',
                 Rule::exists('wordpress_sites', 'id')->where(fn ($query) => $query
-                    ->where('user_id', $this->user()->id)
+                    ->where('user_id', $ownerId)
                     ->where('active', true)
                     ->where('status', 'active')),
             ],
@@ -147,7 +150,8 @@ class SourceSiteRequest extends FormRequest
                 return;
             }
 
-            $validCount = $this->user()->wordpressSites()
+            $validCount = WordPressSite::query()
+                ->where('user_id', $this->ownerId())
                 ->where('company_id', $companyId)
                 ->whereIn('id', $profileIds)
                 ->count();
@@ -156,6 +160,17 @@ class SourceSiteRequest extends FormRequest
                 $validator->errors()->add('publication_profile_ids', 'Todos los destinos deben pertenecer a la empresa seleccionada.');
             }
         }];
+    }
+
+    private function ownerId(): int
+    {
+        $sourceSite = $this->route('sourceSite');
+
+        if ($this->user()->isAdmin() && $sourceSite instanceof SourceSite && $sourceSite->automation_user_id) {
+            return (int) $sourceSite->automation_user_id;
+        }
+
+        return (int) $this->user()->id;
     }
 
     /**

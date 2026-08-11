@@ -40,6 +40,9 @@ class WordPressSiteRequest extends FormRequest
     {
         $isCreating = ! $this->route('wordpressSite');
         $storedProfile = $this->route('wordpressSite');
+        $ownerId = $storedProfile instanceof WordPressSite
+            ? $storedProfile->user_id
+            : $this->user()->id;
         $isWordPress = $this->input('type') === WordPressSite::TYPE_WORDPRESS;
         $isFacebook = $this->input('type') === WordPressSite::TYPE_FACEBOOK_PAGE;
         $isInstagram = $this->input('type') === WordPressSite::TYPE_INSTAGRAM;
@@ -60,7 +63,7 @@ class WordPressSiteRequest extends FormRequest
             'company_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('companies', 'id')->where('user_id', $this->user()->id),
+                Rule::exists('companies', 'id')->where('user_id', $ownerId),
             ],
             'name' => ['required', 'string', 'max:255'],
             'type' => ['required', Rule::in(array_keys(WordPressSite::typeOptions()))],

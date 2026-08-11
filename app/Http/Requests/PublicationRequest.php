@@ -23,7 +23,7 @@ class PublicationRequest extends FormRequest
                 'integer',
                 'distinct',
                 Rule::exists('wordpress_sites', 'id')->where(fn ($query) => $query
-                    ->where('user_id', $this->user()->id)
+                    ->when(! $this->user()->isAdmin(), fn ($scopedQuery) => $scopedQuery->where('user_id', $this->user()->id))
                     ->where('active', true)
                     ->where('status', 'active')),
             ],

@@ -100,7 +100,7 @@ class AiArticleController extends Controller
         return view('admin.ai-articles.show', [
             'article' => $aiArticle,
             'sourcePosts' => $aiArticle->sourcePosts()->load('sourceSite:id,name'),
-            'publicationProfiles' => $request->user()->wordpressSites()
+            'publicationProfiles' => $request->user()->accessibleWordPressSites()
                 ->when($aiArticle->company_id, fn ($query, $companyId) => $query->where('company_id', $companyId))
                 ->where('active', true)
                 ->where('status', 'active')

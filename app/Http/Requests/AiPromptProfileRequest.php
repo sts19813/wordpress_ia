@@ -24,9 +24,10 @@ class AiPromptProfileRequest extends FormRequest
     public function rules(): array
     {
         $profile = $this->route('aiPromptProfile');
+        $ownerId = $profile instanceof AiPromptProfile ? $profile->user_id : $this->user()?->id;
 
         return [
-            'name' => ['required', 'string', 'max:255', Rule::unique('ai_prompt_profiles')->where('user_id', $this->user()?->id)->ignore($profile)],
+            'name' => ['required', 'string', 'max:255', Rule::unique('ai_prompt_profiles')->where('user_id', $ownerId)->ignore($profile)],
             'system_prompt' => ['required', 'string', 'min:50', 'max:20000'],
             'model' => ['required', Rule::in(array_keys(AiPromptProfile::textModelOptions()))],
             'temperature' => ['required', 'numeric', 'min:0', 'max:2'],

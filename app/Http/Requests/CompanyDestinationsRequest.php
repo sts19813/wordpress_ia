@@ -27,11 +27,14 @@ class CompanyDestinationsRequest extends FormRequest
 
     public function rules(): array
     {
+        /** @var Company $company */
+        $company = $this->route('company');
+
         return [
             'publication_profile_ids' => ['present', 'array'],
             'publication_profile_ids.*' => [
                 'integer',
-                Rule::exists('wordpress_sites', 'id')->where('user_id', $this->user()->id),
+                Rule::exists('wordpress_sites', 'id')->where('user_id', $company->user_id),
             ],
         ];
     }

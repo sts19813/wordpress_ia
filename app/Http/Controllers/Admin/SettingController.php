@@ -21,7 +21,11 @@ class SettingController extends Controller
         $this->profiles->ensureDefaultFor($request->user());
 
         return view('admin.settings.index', [
-            'profiles' => $request->user()->aiPromptProfiles()->orderByDesc('is_default')->orderBy('name')->get(),
+            'profiles' => $request->user()->accessibleAiPromptProfiles()
+                ->with('user:id,name,email')
+                ->orderByDesc('is_default')
+                ->orderBy('name')
+                ->get(),
             'apiKeyConfigured' => filled(config('services.openai.api_key')),
         ]);
     }

@@ -6,6 +6,7 @@ namespace App\Models;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -20,6 +21,7 @@ use Illuminate\Support\Facades\Storage;
     'google_id',
     'google_avatar_url',
     'email_verified_at',
+    'is_admin',
 ])]
 #[Hidden(['password', 'remember_token'])]
 
@@ -39,7 +41,34 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_admin' => 'boolean',
         ];
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->is_admin === true;
+    }
+
+    /** @return Builder<Company> */
+    public function accessibleCompanies(): Builder
+    {
+        return Company::query()
+            ->when(! $this->isAdmin(), fn (Builder $query) => $query->where('user_id', $this->id));
+    }
+
+    /** @return Builder<WordPressSite> */
+    public function accessibleWordPressSites(): Builder
+    {
+        return WordPressSite::query()
+            ->when(! $this->isAdmin(), fn (Builder $query) => $query->where('user_id', $this->id));
+    }
+
+    /** @return Builder<AiPromptProfile> */
+    public function accessibleAiPromptProfiles(): Builder
+    {
+        return AiPromptProfile::query()
+            ->when(! $this->isAdmin(), fn (Builder $query) => $query->where('user_id', $this->id));
     }
 
     public function avatarUrl(): string

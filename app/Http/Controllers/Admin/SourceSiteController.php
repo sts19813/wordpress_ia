@@ -153,16 +153,18 @@ class SourceSiteController extends Controller
 
     public function edit(Request $request, SourceSite $sourceSite): View
     {
+        $owner = $sourceSite->automationUser ?: $request->user();
+
         return view('admin.source-sites.edit', [
             'sourceSite' => $sourceSite,
             'typeOptions' => SourceSite::typeOptions(),
             'authMethodOptions' => SourceSite::authMethodOptions(),
-            'promptProfiles' => $request->user()->aiPromptProfiles()->orderByDesc('is_default')->orderBy('name')->get(),
-            'companies' => $request->user()->companies()
+            'promptProfiles' => $owner->aiPromptProfiles()->orderByDesc('is_default')->orderBy('name')->get(),
+            'companies' => $owner->companies()
                 ->where(fn ($query) => $query->where('active', true)->orWhere('id', $sourceSite->company_id))
                 ->orderBy('name')
                 ->get(),
-            'wordpressSites' => $request->user()->wordpressSites()
+            'wordpressSites' => $owner->wordpressSites()
                 ->where('active', true)
                 ->where('status', 'active')
                 ->orderBy('name')
@@ -174,7 +176,7 @@ class SourceSiteController extends Controller
     {
         $this->sourceSiteService->update($sourceSite, [
             ...$request->validated(),
-            'automation_user_id' => $request->user()->id,
+            'automation_user_id' => $sourceSite->automation_user_id ?: $request->user()->id,
         ]);
 
         return redirect()

@@ -7,6 +7,11 @@ use App\Models\WordPressSite;
 
 class WordPressSitePolicy
 {
+    public function before(User $user, string $ability): ?bool
+    {
+        return $user->isAdmin() ? true : null;
+    }
+
     public function viewAny(User $user): bool
     {
         return true;

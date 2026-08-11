@@ -20,13 +20,14 @@ class CompanyController extends Controller
         Gate::authorize('viewAny', Company::class);
 
         return view('admin.companies.index', [
-            'companies' => $request->user()->companies()
+            'companies' => $request->user()->accessibleCompanies()
+                ->with('user:id,name,email')
                 ->withCount(['publicationProfiles', 'sourceSites'])
                 ->with(['publicationProfiles' => fn ($query) => $query->orderBy('type')->orderBy('name')])
                 ->orderBy('name')
                 ->get(),
-            'profileCount' => $request->user()->wordpressSites()->count(),
-            'unassignedProfileCount' => $request->user()->wordpressSites()->whereNull('company_id')->count(),
+            'profileCount' => $request->user()->accessibleWordPressSites()->count(),
+            'unassignedProfileCount' => $request->user()->accessibleWordPressSites()->whereNull('company_id')->count(),
         ]);
     }
 
@@ -51,11 +52,11 @@ class CompanyController extends Controller
     {
         Gate::authorize('update', $company);
 
-        $company->loadCount(['publicationProfiles', 'sourceSites']);
+        $company->loadMissing('user')->loadCount(['publicationProfiles', 'sourceSites']);
 
         return view('admin.companies.edit', [
             'company' => $company,
-            'publicationProfiles' => $request->user()->wordpressSites()
+            'publicationProfiles' => $company->user->wordpressSites()
                 ->with('company:id,name')
                 ->withCount('publications')
                 ->orderBy('type')
@@ -76,9 +77,10 @@ class CompanyController extends Controller
     public function updateDestinations(CompanyDestinationsRequest $request, Company $company): RedirectResponse
     {
         $selectedIds = $request->validated('publication_profile_ids');
+        $company->loadMissing('user');
 
-        DB::transaction(function () use ($request, $company, $selectedIds): void {
-            $profiles = $request->user()->wordpressSites()->lockForUpdate()->get(['id', 'company_id']);
+        DB::transaction(function () use ($company, $selectedIds): void {
+            $profiles = $company->user->wordpressSites()->lockForUpdate()->get(['id', 'company_id']);
             $selectedLookup = array_fill_keys($selectedIds, true);
 
             foreach ($profiles as $profile) {
@@ -95,12 +97,12 @@ class CompanyController extends Controller
                 }
             }
 
-            $profilesById = $request->user()->wordpressSites()
+            $profilesById = $company->user->wordpressSites()
                 ->get(['id', 'company_id'])
                 ->keyBy('id');
 
             SourceSite::query()
-                ->where('automation_user_id', $request->user()->id)
+                ->where('automation_user_id', $company->user_id)
                 ->whereNotNull('publication_profile_ids')
                 ->get()
                 ->each(function (SourceSite $source) use ($profilesById): void {

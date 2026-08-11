@@ -7,7 +7,7 @@
         <div>
             <a href="{{ route('admin.publications.index') }}" class="text-muted text-hover-primary fw-semibold d-inline-flex align-items-center mb-3"><i class="ki-outline ki-left fs-4 me-1"></i>Publicaciones</a>
             <h1 class="page-heading text-gray-900 fw-bold fs-2 my-0">Perfiles de publicación</h1>
-            <div class="text-muted fw-semibold fs-7 pt-1">Tu catálogo central de WordPress, Facebook, Instagram y X.</div>
+            <div class="text-muted fw-semibold fs-7 pt-1">{{ auth()->user()->isAdmin() ? 'Catálogo global de WordPress, Facebook, Instagram y X.' : 'Tu catálogo central de WordPress, Facebook, Instagram y X.' }}</div>
         </div>
         <div class="d-flex flex-wrap gap-2">
             <a href="{{ route('admin.companies.index') }}" class="btn btn-light-primary"><i class="ki-outline ki-briefcase fs-2"></i>Administrar por empresa</a>
@@ -94,6 +94,9 @@
                                                 <a href="{{ route('admin.wordpress-sites.edit', $site) }}" class="fw-bold fs-5 text-gray-900 text-hover-primary">{{ $site->name }}</a>
                                                 <div class="text-muted text-truncate mw-300px">{{ $site->destinationLabel() ?: 'Destino sin identificar' }}</div>
                                                 <span class="badge badge-light-primary mt-1">{{ $site->typeLabel() }}</span>
+                                                @if (auth()->user()->isAdmin())
+                                                    <div class="text-primary fs-8 mt-1"><i class="ki-outline ki-user me-1"></i>{{ $site->user?->name }} · {{ $site->user?->email }}</div>
+                                                @endif
                                             </div>
                                         </div>
                                     </td>

@@ -25,12 +25,12 @@ class WordPressSiteController extends Controller
         Gate::authorize('viewAny', WordPressSite::class);
 
         return view('admin.wordpress-sites.index', [
-            'sites' => $request->user()->wordpressSites()
-                ->with('company:id,name')
+            'sites' => $request->user()->accessibleWordPressSites()
+                ->with(['company:id,name', 'user:id,name,email'])
                 ->withCount('publications')
                 ->latest()
                 ->get(),
-            'companies' => $request->user()->companies()->orderBy('name')->get(['id', 'name']),
+            'companies' => $request->user()->accessibleCompanies()->orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -262,7 +262,7 @@ class WordPressSiteController extends Controller
         $companyId = (int) $request->input('return_company_id', $request->query('return_company'));
 
         return $companyId > 0
-            ? $request->user()->companies()->find($companyId)
+            ? $request->user()->accessibleCompanies()->find($companyId)
             : null;
     }
 

@@ -9,6 +9,9 @@
             <div class="d-flex flex-wrap align-items-center gap-3">
                 <h1 class="page-heading text-gray-900 fw-bold fs-2 my-0">{{ $company->name }}</h1>
                 <span class="badge {{ $company->active ? 'badge-light-success' : 'badge-light-warning' }}">{{ $company->active ? 'Activa' : 'Pausada' }}</span>
+                @if (auth()->user()->isAdmin())
+                    <span class="badge badge-light-primary"><i class="ki-outline ki-user me-1"></i>{{ $company->user?->name }} · {{ $company->user?->email }}</span>
+                @endif
             </div>
             <div class="text-muted fw-semibold fs-7 pt-1">Configura la empresa y decide qué destinos de tu catálogo puede utilizar.</div>
         </div>

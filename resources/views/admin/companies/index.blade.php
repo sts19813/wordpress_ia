@@ -6,7 +6,7 @@
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-4 w-100">
         <div>
             <h1 class="page-heading text-gray-900 fw-bold fs-2 my-0">Empresas</h1>
-            <div class="text-muted fw-semibold fs-7 pt-1">Organiza tus marcas y controla sus destinos de publicación desde un solo lugar.</div>
+            <div class="text-muted fw-semibold fs-7 pt-1">{{ auth()->user()->isAdmin() ? 'Consulta y administra todas las empresas registradas en el sistema.' : 'Organiza tus marcas y controla sus destinos de publicación desde un solo lugar.' }}</div>
         </div>
         <div class="d-flex flex-wrap gap-2">
             <a href="{{ route('admin.wordpress-sites.index') }}" class="btn btn-light-primary"><i class="ki-outline ki-send fs-2"></i>Catálogo de perfiles</a>
@@ -73,13 +73,16 @@
                         <thead><tr class="text-start text-muted fw-bold fs-7 text-uppercase gs-0"><th>Empresa</th><th>Destinos relacionados</th><th>Uso</th><th class="text-end">Acciones</th></tr></thead>
                         <tbody class="fw-semibold text-gray-700" data-company-list>
                             @foreach ($companies as $company)
-                                <tr data-company-row data-search="{{ str($company->name.' '.$company->description.' '.$company->publicationProfiles->pluck('name')->join(' '))->lower() }}">
+                                <tr data-company-row data-search="{{ str($company->name.' '.$company->description.' '.$company->publicationProfiles->pluck('name')->join(' ').' '.$company->user?->name.' '.$company->user?->email)->lower() }}">
                                     <td class="min-w-225px">
                                         <div class="d-flex align-items-center gap-3">
                                             <div class="symbol symbol-45px"><div class="symbol-label bg-light-primary fw-bold text-primary">{{ str($company->name)->substr(0, 2)->upper() }}</div></div>
                                             <div>
                                                 <a href="{{ route('admin.companies.edit', $company) }}" class="fw-bold fs-5 text-gray-900 text-hover-primary">{{ $company->name }}</a>
                                                 <div class="text-muted fs-8 mw-300px text-truncate">{{ $company->description ?: 'Sin descripción' }}</div>
+                                                @if (auth()->user()->isAdmin())
+                                                    <div class="text-primary fs-8 mt-1"><i class="ki-outline ki-user me-1"></i>{{ $company->user?->name }} · {{ $company->user?->email }}</div>
+                                                @endif
                                             </div>
                                         </div>
                                     </td>
