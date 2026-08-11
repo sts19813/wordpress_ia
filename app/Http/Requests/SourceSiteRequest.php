@@ -85,7 +85,7 @@ class SourceSiteRequest extends FormRequest
             'company_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('companies', 'id')->where('user_id', $ownerId),
+                Rule::exists('companies', 'id'),
             ],
             'publication_profile_ids' => [
                 'nullable',
@@ -96,7 +96,6 @@ class SourceSiteRequest extends FormRequest
                 'integer',
                 'distinct',
                 Rule::exists('wordpress_sites', 'id')->where(fn ($query) => $query
-                    ->where('user_id', $ownerId)
                     ->where('active', true)
                     ->where('status', 'active')),
             ],

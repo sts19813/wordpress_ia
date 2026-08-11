@@ -18,9 +18,8 @@ class SourceDiscoveryService
      */
     public function detect(SourceSite $sourceSite): array
     {
-        $response = $this->requestFor($sourceSite)->get($sourceSite->url)->throw();
-        $body = $response->body();
-        $contentType = strtolower((string) $response->header('Content-Type', ''));
+        $body = $this->sourceDocument($sourceSite);
+        $contentType = preg_match('/<html|<!doctype/i', $body) ? 'text/html' : '';
         $capabilities = [];
 
         if ($this->looksLikeJsonFeed($body, $contentType)) {

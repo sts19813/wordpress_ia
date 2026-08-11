@@ -48,8 +48,7 @@ class ArticleContentExtractor
         }
 
         try {
-            $response = $this->requestFor($sourceSite)->get($url)->throw();
-            $rawHtml = $response->body();
+            $rawHtml = $this->sourceDocument($sourceSite, $url);
 
             if (! preg_match('/<html|<!doctype|<article|<main/i', $rawHtml)) {
                 return [

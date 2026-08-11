@@ -31,10 +31,7 @@ class ScrapingSourceStrategy implements SourceStrategyInterface
 
     public function fetch(SourceSite $sourceSite): mixed
     {
-        return $this->requestFor($sourceSite)
-            ->get($sourceSite->url)
-            ->throw()
-            ->body();
+        return $this->sourceDocument($sourceSite);
     }
 
     public function parse(mixed $payload, SourceSite $sourceSite): Collection
@@ -52,6 +49,7 @@ class ScrapingSourceStrategy implements SourceStrategyInterface
         if (! $nodes || $nodes->length === 0) {
             $nodes = $xpath->query(
                 '//main//a[.//h1 or .//h2 or .//h3]'
+                .' | //main//h1/a[@href] | //main//h2/a[@href] | //main//h3/a[@href]'
                 .' | //a[contains(concat(" ", normalize-space(@class), " "), " post ")]'
                 .' | //a[contains(concat(" ", normalize-space(@class), " "), " article ")]'
                 .' | //a[contains(concat(" ", normalize-space(@class), " "), " story ")]'
@@ -68,7 +66,9 @@ class ScrapingSourceStrategy implements SourceStrategyInterface
             ->filter(fn (mixed $node) => $node instanceof DOMElement)
             ->map(function (DOMElement $node) use ($xpath, $sourceSite, $documentFallback): array {
                 $normalized = $this->normalizeItem([
-                    'titulo' => $this->nodeText($xpath, './/h1 | .//h2 | .//h3', $node) ?: $this->meta($xpath, 'og:title') ?: $this->documentTitle($xpath),
+                    'titulo' => strtolower($node->tagName) === 'a'
+                        ? str($node->textContent)->squish()->toString()
+                        : ($this->nodeText($xpath, './/h1 | .//h2 | .//h3', $node) ?: $this->meta($xpath, 'og:title') ?: $this->documentTitle($xpath)),
                     'contenido' => $this->paragraphText($xpath, $node) ?: $node->textContent,
                     'autor' => $this->nodeText($xpath, './/*[@rel="author"] | .//*[contains(@class, "author")]', $node) ?: $this->meta($xpath, 'author', 'name'),
                     'fecha' => $this->nodeAttribute($xpath, './/time[@datetime]', 'datetime', $node) ?: $this->meta($xpath, 'article:published_time'),

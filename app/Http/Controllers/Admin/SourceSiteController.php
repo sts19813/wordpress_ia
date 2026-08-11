@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SourceSiteRequest;
+use App\Models\Company;
 use App\Models\SourceSite;
 use App\Models\SystemLog;
+use App\Models\WordPressSite;
 use App\Repositories\SourceSiteRepository;
 use App\Services\AiPromptProfileService;
 use App\Services\NewsSources\SourceSiteTester;
@@ -37,7 +39,7 @@ class SourceSiteController extends Controller
     public function create(Request $request): View
     {
         $defaultProfile = $this->promptProfiles->ensureDefaultFor($request->user());
-        $companies = $request->user()->companies()->where('active', true)->orderBy('name')->get();
+        $companies = Company::query()->where('active', true)->orderBy('name')->get();
 
         if ($companies->isEmpty()) {
             $companies = collect([$request->user()->companies()->create([
@@ -47,7 +49,7 @@ class SourceSiteController extends Controller
             ])]);
         }
 
-        $wordpressSites = $request->user()->wordpressSites()
+        $wordpressSites = WordPressSite::query()
             ->with('company:id,name')
             ->where('active', true)
             ->where('status', 'active')
@@ -161,11 +163,11 @@ class SourceSiteController extends Controller
             'typeOptions' => SourceSite::typeOptions(),
             'authMethodOptions' => SourceSite::authMethodOptions(),
             'promptProfiles' => $owner->aiPromptProfiles()->orderByDesc('is_default')->orderBy('name')->get(),
-            'companies' => $owner->companies()
+            'companies' => Company::query()
                 ->where(fn ($query) => $query->where('active', true)->orWhere('id', $sourceSite->company_id))
                 ->orderBy('name')
                 ->get(),
-            'wordpressSites' => $owner->wordpressSites()
+            'wordpressSites' => WordPressSite::query()
                 ->with('company:id,name')
                 ->where('active', true)
                 ->where('status', 'active')

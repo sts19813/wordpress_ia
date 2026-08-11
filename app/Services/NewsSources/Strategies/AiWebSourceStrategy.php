@@ -32,10 +32,7 @@ class AiWebSourceStrategy implements SourceStrategyInterface
 
     public function fetch(SourceSite $sourceSite): mixed
     {
-        return $this->requestFor($sourceSite)
-            ->get($sourceSite->url)
-            ->throw()
-            ->body();
+        return $this->sourceDocument($sourceSite);
     }
 
     public function parse(mixed $payload, SourceSite $sourceSite): Collection

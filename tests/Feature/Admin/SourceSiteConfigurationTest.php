@@ -231,6 +231,119 @@ class SourceSiteConfigurationTest extends TestCase
         $this->assertStringContainsString('Contenido completo', (string) $response->json('post.content'));
     }
 
+    public function test_automatic_connection_uses_reader_fallback_for_a_cloudflare_challenge(): void
+    {
+        $articleUrl = 'https://blocked-news.test/novedades/nota-reciente-123.html';
+        $paragraph = str_repeat('La información confirmada forma parte del contenido completo de la publicación. ', 5);
+
+        Http::fake(function (Request $request) use ($articleUrl, $paragraph) {
+            return match ($request->url()) {
+                'https://blocked-news.test/novedades/' => Http::response(
+                    '<!doctype html><html><title>Just a moment...</title><body><div class="cf-chl-token">Cloudflare</div></body></html>',
+                    403,
+                    ['Content-Type' => 'text/html'],
+                ),
+                'https://r.jina.ai/https://blocked-news.test/novedades/' => Http::response(
+                    "Title: Noticias recientes\n\n## [Nota reciente obtenida correctamente]({$articleUrl})",
+                    200,
+                    ['Content-Type' => 'text/plain'],
+                ),
+                $articleUrl => Http::response(
+                    '<!doctype html><html><title>Just a moment...</title><body>Cloudflare Ray ID</body></html>',
+                    403,
+                    ['Content-Type' => 'text/html'],
+                ),
+                'https://r.jina.ai/'.$articleUrl => Http::response(
+                    "Title: Nota reciente obtenida correctamente\n\n{$paragraph}\n\n{$paragraph}\n\n{$paragraph}",
+                    200,
+                    ['Content-Type' => 'text/plain'],
+                ),
+                default => Http::response('Not found', 404),
+            };
+        });
+
+        $response = $this->actingAs(User::factory()->create())
+            ->postJson(route('admin.source-sites.test'), [
+                'name' => 'Medio protegido',
+                'url' => 'https://blocked-news.test/novedades/',
+                'type' => SourceSite::TYPE_AUTO,
+                'auth_method' => SourceSite::AUTH_NONE,
+            ]);
+
+        $response->assertOk()
+            ->assertJsonPath('tested_type', SourceSite::TYPE_HTML)
+            ->assertJsonPath('post.title', 'Nota reciente obtenida correctamente')
+            ->assertJsonPath('post.url', $articleUrl)
+            ->assertJsonPath('post.has_full_content', true);
+
+        Http::assertSent(fn (Request $request) => $request->url() === 'https://r.jina.ai/'.$articleUrl);
+    }
+
+    public function test_edit_form_can_select_companies_and_destinations_from_different_owners(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        $owner = User::factory()->create();
+        $otherOwner = User::factory()->create();
+        $ownerCompany = $owner->companies()->create(['name' => 'Empresa propietaria', 'active' => true]);
+        $otherCompany = $otherOwner->companies()->create(['name' => 'Empresa destino global', 'active' => true]);
+        $promptProfile = app(AiPromptProfileService::class)->ensureDefaultFor($owner);
+        $otherDestination = $otherOwner->wordpressSites()->create([
+            'company_id' => $otherCompany->id,
+            'name' => 'Destino global visible',
+            'rest_api_url' => 'https://global-destination.test',
+            'username' => 'editor',
+            'application_password' => 'secret',
+            'status' => WordPressSite::STATUS_ACTIVE,
+            'active' => true,
+        ]);
+        $sourceSite = SourceSite::query()->create([
+            'automation_user_id' => $owner->id,
+            'company_id' => $ownerCompany->id,
+            'ai_prompt_profile_id' => $promptProfile->id,
+            'name' => 'Fuente editable',
+            'url' => 'https://source.test',
+            'type' => SourceSite::TYPE_AUTO,
+            'status' => SourceSite::STATUS_ACTIVE,
+            'frequency_minutes' => 60,
+            'auth_method' => SourceSite::AUTH_NONE,
+            'daily_limit' => 20,
+            'max_posts_per_scan' => 20,
+            'max_generations_per_scan' => 5,
+            'active' => true,
+            'auto_generate' => true,
+            'auto_publish' => false,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.source-sites.edit', $sourceSite))
+            ->assertOk()
+            ->assertSee($ownerCompany->name)
+            ->assertSee($otherCompany->name)
+            ->assertSee($otherDestination->name);
+
+        $this->actingAs($admin)
+            ->put(route('admin.source-sites.update', $sourceSite), [
+                'name' => $sourceSite->name,
+                'url' => $sourceSite->url,
+                'type' => SourceSite::TYPE_AUTO,
+                'frequency_hours' => 1,
+                'auth_method' => SourceSite::AUTH_NONE,
+                'daily_limit' => 20,
+                'max_posts_per_scan' => 20,
+                'max_generations_per_scan' => 5,
+                'ai_prompt_profile_id' => $promptProfile->id,
+                'company_id' => $otherCompany->id,
+                'publication_profile_ids' => [$otherDestination->id],
+                'auto_generate' => '1',
+                'auto_publish' => '1',
+                'active' => '1',
+            ])
+            ->assertRedirect(route('admin.source-sites.index'));
+
+        $this->assertSame($otherCompany->id, $sourceSite->fresh()->company_id);
+        $this->assertSame([$otherDestination->id], $sourceSite->fresh()->publication_profile_ids);
+    }
+
     private function rss(): string
     {
         return <<<'XML'
