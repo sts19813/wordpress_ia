@@ -34,7 +34,7 @@
                                 <th class="min-w-150px">Empresa</th>
                                 <th class="min-w-240px">URL</th>
                                 <th class="min-w-105px">Estado</th>
-                                <th class="min-w-100px">Frecuencia</th>
+                                <th class="min-w-180px">Objetivo diario</th>
                                 <th class="min-w-135px">Última sincronización</th>
                                 <th class="min-w-80px">Activo</th>
                                 <th class="text-end min-w-260px no-sort no-search">Acciones</th>
@@ -57,8 +57,8 @@
                                     <td data-label="Estado">
                                         <span class="badge {{ $statusClasses[$sourceSite->status] ?? 'badge-light' }}">{{ $sourceSite->statusLabel() }}</span>
                                     </td>
-                                    <td data-label="Frecuencia" class="text-nowrap" data-order="{{ $sourceSite->frequency_minutes }}">
-                                        {{ max(1, (int) ceil($sourceSite->frequency_minutes / 60)) }} h
+                                    <td data-label="Objetivo diario" class="text-nowrap" data-order="{{ collect($sourceSite->normalizedPublicationSchedules())->sum('daily_target') }}">
+                                        {{ $sourceSite->publicationScheduleSummary() }}
                                     </td>
                                     <td data-label="Última sincronización" class="text-nowrap" data-order="{{ $sourceSite->last_synced_at?->timestamp ?: 0 }}">
                                         {{ $sourceSite->last_synced_at?->format('d/m/Y H:i') ?: '—' }}

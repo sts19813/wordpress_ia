@@ -51,6 +51,7 @@ class SourceSite extends Model
         'ai_prompt_profile_id',
         'wordpress_site_id',
         'publication_profile_ids',
+        'publication_schedules',
         'auto_generate',
         'auto_publish',
         'url',
@@ -92,6 +93,7 @@ class SourceSite extends Model
             'filter_topics' => 'array',
             'excluded_topics' => 'array',
             'publication_profile_ids' => 'array',
+            'publication_schedules' => 'array',
             'api_key' => 'encrypted',
             'password' => 'encrypted',
             'last_synced_at' => 'datetime',
@@ -192,6 +194,12 @@ class SourceSite extends Model
      */
     public function selectedPublicationProfileIds(): array
     {
+        $scheduledProfileIds = array_keys($this->normalizedPublicationSchedules());
+
+        if ($scheduledProfileIds !== []) {
+            return array_map('intval', $scheduledProfileIds);
+        }
+
         $profileIds = array_values(array_unique(array_filter(array_map(
             'intval',
             $this->publication_profile_ids ?: [],
@@ -202,6 +210,60 @@ class SourceSite extends Model
         }
 
         return $profileIds;
+    }
+
+    /**
+     * @return array<int, array{daily_target: int, priority_time: string}>
+     */
+    public function normalizedPublicationSchedules(): array
+    {
+        $schedules = collect($this->publication_schedules ?: [])
+            ->mapWithKeys(function (mixed $schedule, mixed $profileId): array {
+                $profileId = (int) $profileId;
+
+                if ($profileId < 1 || ! is_array($schedule)) {
+                    return [];
+                }
+
+                $time = (string) ($schedule['priority_time'] ?? '08:00');
+
+                return [$profileId => [
+                    'daily_target' => min(100, max(1, (int) ($schedule['daily_target'] ?? 1))),
+                    'priority_time' => preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $time) ? $time : '08:00',
+                ]];
+            })
+            ->all();
+
+        if ($schedules !== []) {
+            return $schedules;
+        }
+
+        $legacyProfileIds = array_values(array_unique(array_filter(array_map(
+            'intval',
+            $this->publication_profile_ids ?: array_filter([$this->wordpress_site_id]),
+        ))));
+
+        return collect($legacyProfileIds)->mapWithKeys(fn (int $profileId) => [$profileId => [
+            'daily_target' => max(1, (int) ($this->max_generations_per_scan ?: 5)),
+            'priority_time' => '00:00',
+        ]])->all();
+    }
+
+    public function publicationScheduleSummary(): string
+    {
+        $schedules = $this->normalizedPublicationSchedules();
+
+        if ($schedules === []) {
+            return 'Sin destinos';
+        }
+
+        $targets = collect($schedules)->pluck('daily_target');
+        $targetLabel = $targets->min() === $targets->max()
+            ? $targets->first().' por destino'
+            : $targets->min().'–'.$targets->max().' por destino';
+        $earliest = collect($schedules)->min('priority_time');
+
+        return count($schedules).' destino(s) · '.$targetLabel.'/día desde '.$earliest;
     }
 
     public function scheduledTasks(): HasMany

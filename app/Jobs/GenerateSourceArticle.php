@@ -118,12 +118,14 @@ class GenerateSourceArticle implements ShouldBeUnique, ShouldQueue
             }
 
             $sourceSite = SourceSite::query()->find($this->sourceSiteId);
-            $profileIds = array_values(array_unique(array_filter(array_map(
+            $configuredProfileIds = $sourceSite?->selectedPublicationProfileIds() ?? [];
+            $allocatedProfileIds = array_values(array_unique(array_filter(array_map(
                 'intval',
-                $sourceSite?->selectedPublicationProfileIds()
-                    ?? $payload['publication_profile_ids']
-                    ?? array_values(array_filter([$payload['wordpress_site_id'] ?? null])),
+                $payload['publication_profile_ids'] ?? [],
             ))));
+            $profileIds = $allocatedProfileIds === []
+                ? $configuredProfileIds
+                : array_values(array_intersect($allocatedProfileIds, $configuredProfileIds));
             $publicationProfiles = WordPressSite::query()
                 ->whereIn('id', $profileIds)
                 ->where('active', true)

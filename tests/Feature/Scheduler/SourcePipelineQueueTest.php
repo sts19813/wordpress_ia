@@ -12,7 +12,9 @@ use App\Models\SourceSite;
 use App\Models\User;
 use App\Models\WordPressSite;
 use App\Services\AiPromptProfileService;
+use App\Services\SourcePublicationPlanner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -36,7 +38,7 @@ class SourcePipelineQueueTest extends TestCase
         $task = Scheduler::query()->sole();
         $this->assertSame(Scheduler::TYPE_SOURCE_SCAN, $task->type);
         $this->assertSame($site->id, $task->source_site_id);
-        $this->assertTrue($site->fresh()->next_scan_at->isAfter(now()->addHours(23)));
+        $this->assertTrue($site->fresh()->next_scan_at->isAfter(now()->addMinutes(50)));
         Queue::assertPushedOn('source-pipeline', ScanSourceSite::class);
 
         $this->artisan('sources:scan-due')->assertSuccessful();
@@ -59,7 +61,7 @@ class SourcePipelineQueueTest extends TestCase
             ->assertOk()
             ->assertSee('Próximas consultas de sitios fuente')
             ->assertSee('Forbes programado')
-            ->assertSee('24h / 20 por consulta')
+            ->assertSee('Sin destinos')
             ->assertSee($site->next_scan_at->format('d/m/y H:i'))
             ->assertSee('IA · Guarda borrador')
             ->assertSee('Consultar')
@@ -243,9 +245,22 @@ class SourcePipelineQueueTest extends TestCase
         Queue::fake();
         $user = User::factory()->create();
         $profile = app(AiPromptProfileService::class)->ensureDefaultFor($user);
+        $destination = $user->wordpressSites()->create([
+            'name' => 'Destino con cupo',
+            'rest_api_url' => 'https://destination.test',
+            'username' => 'editor',
+            'application_password' => 'app-pass',
+            'status' => WordPressSite::STATUS_ACTIVE,
+            'active' => true,
+        ]);
         $sourceSite = $this->sourceSite($user, $profile->id, [
             'max_posts_per_scan' => 3,
             'max_generations_per_scan' => 1,
+            'publication_profile_ids' => [$destination->id],
+            'publication_schedules' => [
+                $destination->id => ['daily_target' => 1, 'priority_time' => '00:00'],
+            ],
+            'auto_publish' => true,
         ]);
         $posts = collect(range(1, 3))->map(fn (int $number) => [
             'title' => ['rendered' => "Nota económica {$number}"],
@@ -269,8 +284,42 @@ class SourcePipelineQueueTest extends TestCase
         $this->assertSame(1, Scheduler::query()->where('type', Scheduler::TYPE_SOURCE_ARTICLE)->count());
         $this->assertSame(2, $scanTask->fresh()->payload['generation_skipped']);
         $this->assertTrue(collect($scanTask->fresh()->events)->contains(
-            fn (array $event) => str_contains($event['message'], 'excedieron el máximo de 1'),
+            fn (array $event) => str_contains($event['message'], 'alcanzaron su cantidad diaria'),
         ));
+    }
+
+    public function test_daily_destination_targets_allocate_every_generated_article_to_available_profiles(): void
+    {
+        Carbon::setTestNow('2026-08-12 09:00:00');
+        $user = User::factory()->create();
+        $profile = app(AiPromptProfileService::class)->ensureDefaultFor($user);
+        $destinations = collect(['Destino A', 'Destino B'])->map(fn (string $name) => $user->wordpressSites()->create([
+            'name' => $name,
+            'rest_api_url' => 'https://'.str($name)->slug().'.test',
+            'username' => 'editor',
+            'application_password' => 'app-pass',
+            'status' => WordPressSite::STATUS_ACTIVE,
+            'active' => true,
+        ]));
+        $site = $this->sourceSite($user, $profile->id, [
+            'publication_profile_ids' => $destinations->pluck('id')->all(),
+            'publication_schedules' => [
+                $destinations[0]->id => ['daily_target' => 2, 'priority_time' => '08:00'],
+                $destinations[1]->id => ['daily_target' => 4, 'priority_time' => '09:00'],
+            ],
+            'auto_publish' => true,
+        ]);
+
+        $planner = app(SourcePublicationPlanner::class);
+        $this->assertSame(4, $planner->generationCapacity($site));
+        $this->assertSame([
+            [$destinations[0]->id, $destinations[1]->id],
+            [$destinations[0]->id, $destinations[1]->id],
+            [$destinations[1]->id],
+            [$destinations[1]->id],
+        ], $planner->allocate($site, 4));
+
+        Carbon::setTestNow();
     }
 
     private function sourceSite(User $user, int $profileId, array $overrides = []): SourceSite

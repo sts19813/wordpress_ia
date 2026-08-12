@@ -36,7 +36,7 @@
                 <thead>
                     <tr class="text-start text-gray-500 fw-bold fs-8 text-uppercase">
                         <th>Sitio fuente</th>
-                        <th>Frecuencia</th>
+                        <th>Objetivo diario</th>
                         <th>Próxima consulta</th>
                         <th>Automatización</th>
                         <th class="text-end">Acción</th>
@@ -47,7 +47,6 @@
                         @php
                             $activeTask = $activeSourceTasks->get($sourceSite->id);
                             $isDue = $sourceSite->active && $sourceSite->next_scan_at?->lte(now());
-                            $frequencyHours = max(1, (int) ceil($sourceSite->frequency_minutes / 60));
                             $publicationProfileCount = count($sourceSite->selectedPublicationProfileIds());
                             $automation = ! $sourceSite->auto_generate
                                 ? 'Solo obtener notas'
@@ -63,8 +62,8 @@
                                     {{ $sourceSite->name }}
                                 </a>
                             </td>
-                            <td data-label="Frecuencia" class="text-nowrap">
-                                {{ $frequencyHours }}h / {{ $sourceSite->max_posts_per_scan }} por consulta
+                            <td data-label="Objetivo diario" class="text-nowrap">
+                                {{ $sourceSite->publicationScheduleSummary() }}
                             </td>
                             <td data-label="Próxima consulta" class="text-nowrap">
                                 @if (! $sourceSite->active)

@@ -65,15 +65,15 @@ class SourceImportService
     /**
      * @return array{fetched: int, created: int, duplicates: int, discarded: int, created_post_ids: array<int, int>, consultation_limit: int, error: ?string, daily_limit_reached: bool}
      */
-    public function importSource(SourceSite $sourceSite): array
+    public function importSource(SourceSite $sourceSite, ?int $requestedLimit = null): array
     {
         try {
-            $dailyLimit = (int) ($sourceSite->daily_limit ?: 20);
+            $dailyLimit = $requestedLimit ?: (int) ($sourceSite->daily_limit ?: 20);
             $maxPerScan = min(
                 $dailyLimit,
                 max(1, (int) ($sourceSite->max_posts_per_scan ?: 20)),
             );
-            $scannedToday = SourceScanLog::query()
+            $scannedToday = $requestedLimit ? 0 : SourceScanLog::query()
                 ->where('source_site_id', $sourceSite->id)
                 ->whereDate('scanned_at', today())
                 ->count();

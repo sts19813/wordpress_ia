@@ -86,7 +86,7 @@ class SourcePipelineService
             $site->forceFill([
                 'automation_user_id' => $userId,
                 'last_queued_at' => now(),
-                'next_scan_at' => now()->addMinutes(max(1, (int) $site->frequency_minutes)),
+                'next_scan_at' => now()->addHour(),
             ])->save();
             $created = true;
 
@@ -105,7 +105,7 @@ class SourcePipelineService
      * @param  array<int, int>  $sourcePostIds
      * @return Collection<int, Scheduler>
      */
-    public function enqueueArticles(Scheduler $parent, array $sourcePostIds): Collection
+    public function enqueueArticles(Scheduler $parent, array $sourcePostIds, array $publicationAllocations = []): Collection
     {
         $parent->loadMissing('sourceSite');
         $payload = $parent->payload ?: [];
@@ -119,7 +119,11 @@ class SourcePipelineService
             ->where('source_site_id', $parent->source_site_id)
             ->where('status', SourcePost::STATUS_FETCHED)
             ->get()
-            ->map(function (SourcePost $post) use ($parent, $payload): Scheduler {
+            ->values()
+            ->map(function (SourcePost $post, int $index) use ($parent, $payload, $publicationAllocations): Scheduler {
+                $publicationProfileIds = $publicationAllocations[$index]
+                    ?? $payload['publication_profile_ids']
+                    ?? array_values(array_filter([$payload['wordpress_site_id'] ?? null]));
                 $task = Scheduler::query()->create([
                     'parent_id' => $parent->id,
                     'user_id' => $parent->user_id,
@@ -135,9 +139,8 @@ class SourcePipelineService
                         'profile_id' => $payload['profile_id'] ?? null,
                         'company_id' => $payload['company_id'] ?? null,
                         'wordpress_site_id' => $payload['wordpress_site_id'] ?? null,
-                        'publication_profile_ids' => $payload['publication_profile_ids']
-                            ?? array_values(array_filter([$payload['wordpress_site_id'] ?? null])),
-                        'auto_publish' => (bool) ($payload['auto_publish'] ?? false),
+                        'publication_profile_ids' => $publicationProfileIds,
+                        'auto_publish' => $publicationProfileIds !== [],
                         'filter_reason' => $post->filter_reason,
                         'matched_topics' => $post->matched_topics ?: [],
                     ],

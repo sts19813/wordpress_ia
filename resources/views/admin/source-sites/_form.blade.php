@@ -17,9 +17,13 @@
         return is_array($value) ? implode("\n", $value) : $value;
     };
     $filterErrors = $errors->hasAny(['filter_topics', 'filter_topics.*', 'excluded_topics', 'excluded_topics.*', 'filter_instructions']);
-    $advancedErrors = $errors->hasAny(['daily_limit', 'max_posts_per_scan', 'active', 'auth_method', 'api_key', 'username', 'password', 'custom_headers', 'cookies']);
-    $automationErrors = $errors->hasAny(['auto_generate', 'auto_publish', 'ai_prompt_profile_id', 'company_id', 'publication_profile_ids', 'publication_profile_ids.*', 'max_generations_per_scan']);
+    $advancedErrors = $errors->hasAny(['active', 'auth_method', 'api_key', 'username', 'password', 'custom_headers', 'cookies']);
+    $automationErrors = $errors->hasAny(['ai_prompt_profile_id', 'company_id']);
     $selectedPublicationProfileIds = array_map('intval', old('publication_profile_ids', $sourceSite->selectedPublicationProfileIds()));
+    $publicationSchedules = old('publication_schedules', $sourceSite->normalizedPublicationSchedules());
+    if ($publicationSchedules === [] && $selectedPublicationProfileIds !== []) {
+        $publicationSchedules = collect($selectedPublicationProfileIds)->mapWithKeys(fn ($id) => [$id => ['daily_target' => 5, 'priority_time' => '08:00']])->all();
+    }
     $selectedCompanyId = (int) old('company_id', $sourceSite->company_id ?: ($companies->count() === 1 ? $companies->first()->id : 0));
     $activeTab = $automationErrors ? 'automation' : ($advancedErrors ? 'advanced' : ($filterErrors ? 'filters' : 'basic'));
 @endphp
@@ -76,7 +80,7 @@
                             <div class="form-text">Puedes pegar la portada; la prueba intentará encontrar el mejor formato disponible.</div>
                             @error('url')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
-                        <div class="col-lg-8">
+                        <div class="col-12">
                             <label class="form-label required">Tipo de conexión</label>
                             <select name="type" id="source-type" class="form-select form-select-solid @error('type') is-invalid @enderror">
                                 @foreach ($typeOptions as $value => $label)
@@ -94,13 +98,49 @@
                             </div>
                             @error('type')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
-                        <div class="col-lg-4">
-                            <label class="form-label required">Frecuencia de consulta</label>
-                            <div class="input-group input-group-solid">
-                                <input type="number" name="frequency_hours" value="{{ old('frequency_hours', max(1, (int) ceil(($sourceSite->frequency_minutes ?: 60) / 60))) }}" class="form-control @error('frequency_hours') is-invalid @enderror" min="1" max="168" step="1" required>
-                                <span class="input-group-text">horas</span>
+                        <div class="col-12">
+                            <div class="d-flex align-items-center justify-content-between gap-3 mb-4">
+                                <div>
+                                    <label class="form-label required mb-1">Publicación diaria por destino</label>
+                                    <div class="text-muted fs-7">Selecciona cada destino, cuántos posts deseas publicar al día y desde qué hora debe tener prioridad.</div>
+                                </div>
                             </div>
-                            @error('frequency_hours')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                            <div class="row g-4" id="publication-schedule-list">
+                                @forelse ($wordpressSites as $wordpressSite)
+                                    @php
+                                        $schedule = $publicationSchedules[$wordpressSite->id] ?? $publicationSchedules[(string) $wordpressSite->id] ?? [];
+                                        $enabled = in_array($wordpressSite->id, $selectedPublicationProfileIds, true) || $schedule !== [];
+                                    @endphp
+                                    <div class="col-xl-6">
+                                        <div class="border border-dashed rounded p-5 h-100 publication-schedule-card {{ $enabled ? 'border-primary bg-light-primary' : '' }}">
+                                            <div class="form-check form-check-custom form-check-solid mb-4">
+                                                <input type="hidden" name="publication_schedules[{{ $wordpressSite->id }}][enabled]" value="0">
+                                                <input class="form-check-input publication-schedule-toggle" type="checkbox" name="publication_schedules[{{ $wordpressSite->id }}][enabled]" value="1" id="publication-profile-{{ $wordpressSite->id }}" @checked($enabled)>
+                                                <label class="form-check-label fw-bold text-gray-900" for="publication-profile-{{ $wordpressSite->id }}">
+                                                    {{ $wordpressSite->company?->name ?: 'Sin empresa' }} · {{ $wordpressSite->name }}
+                                                    <span class="text-muted fw-semibold d-block fs-8">{{ $wordpressSite->typeLabel() }}</span>
+                                                </label>
+                                            </div>
+                                            <div class="row g-3 publication-schedule-fields">
+                                                <div class="col-sm-6">
+                                                    <label class="form-label fs-8">Posts deseados por día</label>
+                                                    <input type="number" name="publication_schedules[{{ $wordpressSite->id }}][daily_target]" value="{{ $schedule['daily_target'] ?? 5 }}" class="form-control form-control-solid" min="1" max="100">
+                                                </div>
+                                                <div class="col-sm-6">
+                                                    <label class="form-label fs-8">Prioridad a partir de</label>
+                                                    <input type="time" name="publication_schedules[{{ $wordpressSite->id }}][priority_time]" value="{{ $schedule['priority_time'] ?? '08:00' }}" class="form-control form-control-solid">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @empty
+                                    <div class="col-12"><div class="notice bg-light-warning rounded p-5">Primero crea un perfil de publicación activo.</div></div>
+                                @endforelse
+                            </div>
+                            <div class="form-text mt-4">El sistema consultará la fuente desde esas horas hasta cumplir los cupos. Cada artículo generado se enviará inmediatamente a los destinos que aún tengan cupo.</div>
+                            @error('publication_schedules')<div class="text-danger fs-7 mt-2">{{ $message }}</div>@enderror
+                            @error('publication_schedules.*.daily_target')<div class="text-danger fs-7 mt-2">{{ $message }}</div>@enderror
+                            @error('publication_schedules.*.priority_time')<div class="text-danger fs-7 mt-2">{{ $message }}</div>@enderror
                         </div>
                     </div>
                 </div>
@@ -172,58 +212,9 @@
                             @error('ai_prompt_profile_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-12">
-                            <div class="d-flex align-items-center justify-content-between gap-3">
-                                <label class="form-label mb-0">Destinos de publicación automática</label>
-                                @if ($wordpressSites->isNotEmpty())
-                                    <button type="button" class="btn btn-sm btn-light-primary py-1 px-3" id="select-all-publication-profiles">
-                                        Seleccionar todos
-                                    </button>
-                                @endif
+                            <div class="notice bg-light-success border border-success border-dashed rounded p-5">
+                                La generación y publicación son automáticas. Sólo se generan artículos cuando uno o más destinos tienen cupo diario disponible.
                             </div>
-                            <select
-                                name="publication_profile_ids[]"
-                                id="publication-profile-ids"
-                                class="form-select form-select-solid @error('publication_profile_ids') is-invalid @enderror @error('publication_profile_ids.*') is-invalid @enderror"
-                                multiple
-                                data-placeholder="Solo guardar como borrador"
-                            >
-                                @foreach ($wordpressSites->groupBy(fn ($profile) => $profile->company?->name ?: 'Sin empresa') as $companyName => $companyProfiles)
-                                    <optgroup label="{{ $companyName }}">
-                                        @foreach ($companyProfiles as $wordpressSite)
-                                            <option value="{{ $wordpressSite->id }}" @selected(in_array($wordpressSite->id, $selectedPublicationProfileIds, true))>{{ $companyName }} · {{ $wordpressSite->typeLabel() }} · {{ $wordpressSite->name }}</option>
-                                        @endforeach
-                                    </optgroup>
-                                @endforeach
-                            </select>
-                            <div class="form-text">Busca y combina destinos activos de distintas empresas. Al elegir destinos se activa la publicación; sin selección, la nota quedará como borrador.</div>
-                            @error('publication_profile_ids')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                            @error('publication_profile_ids.*')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-                        <div class="col-lg-6">
-                            <label class="form-label required">Máximo de artículos generados por consulta</label>
-                            <input type="number" name="max_generations_per_scan" value="{{ old('max_generations_per_scan', $sourceSite->max_generations_per_scan ?: 5) }}" class="form-control form-control-solid @error('max_generations_per_scan') is-invalid @enderror" min="1" max="1000" required>
-                            <div class="form-text">Solo esta cantidad de notas nuevas aceptadas generará y publicará automáticamente. Las demás permanecerán disponibles en Noticias.</div>
-                            @error('max_generations_per_scan')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-                        <div class="col-lg-6">
-                            <label class="form-check form-switch form-check-custom form-check-solid">
-                                <input type="hidden" name="auto_generate" value="0">
-                                <input class="form-check-input" type="checkbox" name="auto_generate" value="1" @checked((bool) old('auto_generate', $sourceSite->auto_generate ?? true))>
-                                <span class="form-check-label">
-                                    <span class="fw-bold text-gray-800 d-block">Generar artículo con IA</span>
-                                    <span class="text-muted fs-8">Solo para notas nuevas que hayan aprobado los filtros.</span>
-                                </span>
-                            </label>
-                        </div>
-                        <div class="col-lg-6">
-                            <label class="form-check form-switch form-check-custom form-check-solid">
-                                <input type="hidden" name="auto_publish" value="0">
-                                <input class="form-check-input" type="checkbox" name="auto_publish" value="1" @checked((bool) old('auto_publish', $sourceSite->auto_publish ?? false))>
-                                <span class="form-check-label">
-                                    <span class="fw-bold text-gray-800 d-block">Publicar automáticamente</span>
-                                    <span class="text-muted fs-8">Si está desactivado, el artículo queda como borrador para revisión.</span>
-                                </span>
-                            </label>
                         </div>
                     </div>
                 </div>
@@ -280,22 +271,9 @@
                         </div>
                     </div>
 
-                    <div class="separator separator-dashed mb-9"></div>
                     <div class="row g-7">
-                        <div class="col-lg-4">
-                            <label class="form-label required">Límite de posts escaneados al día</label>
-                            <input type="number" name="daily_limit" value="{{ old('daily_limit', $sourceSite->daily_limit ?: 20) }}" class="form-control form-control-solid @error('daily_limit') is-invalid @enderror" min="1" max="10000" required>
-                            <div class="form-text">Incluye notas aceptadas, descartadas, duplicadas y elementos no interpretables. El conteo se reinicia cada día.</div>
-                            @error('daily_limit')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-                        <div class="col-lg-4">
-                            <label class="form-label required">Máximo de posts por consulta</label>
-                            <input type="number" name="max_posts_per_scan" value="{{ old('max_posts_per_scan', $sourceSite->max_posts_per_scan ?: 20) }}" class="form-control form-control-solid @error('max_posts_per_scan') is-invalid @enderror" min="1" max="1000" required>
-                            <div class="form-text">Limita cuántos elementos se descargan y evalúan cada vez que se ejecuta la fuente. Nunca supera el saldo diario.</div>
-                            @error('max_posts_per_scan')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-                        <div class="col-lg-4 d-flex align-items-center">
-                            <label class="form-check form-switch form-check-custom form-check-solid mt-lg-8">
+                        <div class="col-12">
+                            <label class="form-check form-switch form-check-custom form-check-solid">
                                 <input type="hidden" name="active" value="0">
                                 <input class="form-check-input" type="checkbox" name="active" value="1" @checked((bool) old('active', $sourceSite->active))>
                                 <span class="form-check-label fw-semibold text-gray-700">Sitio activo para escaneos programados</span>
@@ -375,43 +353,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const typeSelect = document.getElementById('source-type');
     const typeHelp = document.getElementById('source-type-help');
     const aiNotice = document.getElementById('ai-connection-notice');
-    const publicationProfiles = document.getElementById('publication-profile-ids');
-    const selectAllPublicationProfiles = document.getElementById('select-all-publication-profiles');
-    const autoPublishToggle = form.querySelector('input[type="checkbox"][name="auto_publish"]');
     let lastRecommendation = null;
 
-    const syncAutoPublishWithDestinations = () => {
-        if (autoPublishToggle && publicationProfiles) {
-            autoPublishToggle.checked = publicationProfiles.selectedOptions.length > 0;
-        }
-    };
-
-    let publicationProfilesSelect = null;
-    const initializePublicationProfiles = () => {
-        if (!publicationProfiles || !window.jQuery?.fn?.select2) return;
-        publicationProfilesSelect = window.jQuery(publicationProfiles).select2({
-            placeholder: publicationProfiles.dataset.placeholder,
-            width: '100%',
-            closeOnSelect: false,
-        });
-        publicationProfilesSelect.on('select2:select select2:unselect', syncAutoPublishWithDestinations);
-    };
-
-    if (publicationProfiles && window.jQuery?.fn?.select2) {
-        initializePublicationProfiles();
-
-        selectAllPublicationProfiles?.addEventListener('click', () => {
-            const allProfileIds = Array.from(publicationProfiles.options).map(option => option.value);
-            publicationProfilesSelect.val(allProfileIds).trigger('change');
-            syncAutoPublishWithDestinations();
-        });
-    } else {
-        publicationProfiles?.addEventListener('change', syncAutoPublishWithDestinations);
-        selectAllPublicationProfiles?.addEventListener('click', () => {
-            Array.from(publicationProfiles?.options || []).forEach(option => { option.selected = true; });
-            syncAutoPublishWithDestinations();
-        });
-    }
+    form.querySelectorAll('.publication-schedule-toggle').forEach(toggle => {
+        const syncCard = () => {
+            const card = toggle.closest('.publication-schedule-card');
+            card.classList.toggle('border-primary', toggle.checked);
+            card.classList.toggle('bg-light-primary', toggle.checked);
+            card.querySelectorAll('.publication-schedule-fields input').forEach(input => { input.disabled = !toggle.checked; });
+        };
+        toggle.addEventListener('change', syncCard);
+        syncCard();
+    });
 
     const typeDescriptions = {
         auto: 'Probará primero los conectores convencionales y usará IA automáticamente si ninguno localiza publicaciones.',

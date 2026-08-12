@@ -6,6 +6,7 @@ use App\Models\Scheduler;
 use App\Services\NewsSources\SourceImportService;
 use App\Services\SchedulerService;
 use App\Services\SourcePipelineService;
+use App\Services\SourcePublicationPlanner;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -46,6 +47,7 @@ class ScanSourceSite implements ShouldBeUnique, ShouldQueue
     public function handle(
         SourceImportService $imports,
         SourcePipelineService $pipeline,
+        SourcePublicationPlanner $publicationPlanner,
         SchedulerService $scheduler,
     ): void {
         $task = Scheduler::query()->with('sourceSite')->findOrFail($this->taskId);
@@ -66,7 +68,21 @@ class ScanSourceSite implements ShouldBeUnique, ShouldQueue
                 throw new RuntimeException('El sitio fuente ya no está disponible.');
             }
 
-            $result = $imports->importSource($task->sourceSite);
+            $generationCapacity = $publicationPlanner->generationCapacity($task->sourceSite);
+
+            if ($generationCapacity === 0) {
+                $task->sourceSite->forceFill([
+                    'next_scan_at' => $publicationPlanner->nextScanAt($task->sourceSite),
+                ])->save();
+                $scheduler->completed($task, 'Los destinos ya cumplieron su cantidad diaria o todavía no llega su hora de prioridad. No se consumieron tokens de IA.');
+
+                return;
+            }
+
+            $result = $imports->importSource(
+                $task->sourceSite,
+                min(100, max(20, $generationCapacity * 5)),
+            );
 
             if ($result['error']) {
                 throw new RuntimeException($result['error']);
@@ -79,21 +95,21 @@ class ScanSourceSite implements ShouldBeUnique, ShouldQueue
                 "{$result['fetched']} de {$result['consultation_limit']} posibles revisadas, {$result['created']} nuevas, {$result['discarded']} descartadas y {$result['duplicates']} duplicadas.",
             );
 
-            $generationLimit = max(1, (int) ($task->sourceSite->max_generations_per_scan ?: 5));
             $autoGenerate = (bool) data_get($task->payload, 'auto_generate', true);
             $generationPostIds = $autoGenerate
-                ? collect($result['created_post_ids'])->take($generationLimit)->values()->all()
+                ? collect($result['created_post_ids'])->take($generationCapacity)->values()->all()
                 : [];
             $generationSkipped = $autoGenerate
                 ? max(0, count($result['created_post_ids']) - count($generationPostIds))
                 : 0;
-            $articleTasks = $pipeline->enqueueArticles($task->fresh(), $generationPostIds);
+            $allocations = $publicationPlanner->allocate($task->sourceSite, count($generationPostIds));
+            $articleTasks = $pipeline->enqueueArticles($task->fresh(), $generationPostIds, $allocations);
 
             if ($generationSkipped > 0) {
                 $scheduler->addEvent(
                     $task,
                     'warning',
-                    "{$generationSkipped} nota(s) aceptadas excedieron el máximo de {$generationLimit} generaciones por consulta. Quedaron guardadas en Noticias para generación manual.",
+                    "{$generationSkipped} nota(s) aceptadas quedaron en Noticias porque los destinos alcanzaron su cantidad diaria. No consumieron tokens de generación.",
                 );
             }
 
@@ -102,10 +118,14 @@ class ScanSourceSite implements ShouldBeUnique, ShouldQueue
                     ...($task->payload ?: []),
                     'scan_result' => $result,
                     'article_task_ids' => $articleTasks->pluck('id')->all(),
-                    'generation_limit' => $generationLimit,
+                    'generation_limit' => $generationCapacity,
                     'generation_skipped' => $generationSkipped,
                 ],
             ]);
+
+            $task->sourceSite->forceFill([
+                'next_scan_at' => $publicationPlanner->nextScanAt($task->sourceSite),
+            ])->save();
 
             $message = $articleTasks->isEmpty()
                 ? 'La consulta terminó y no hay notas nuevas que requieran generación.'

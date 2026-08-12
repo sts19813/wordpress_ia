@@ -35,15 +35,14 @@ class SourceSiteConfigurationTest extends TestCase
             ->assertSee('Filtros inteligentes')
             ->assertSee('Avanzado')
             ->assertSee('Probar y traer la nota más reciente')
-            ->assertSee('Frecuencia de consulta')
-            ->assertSee('horas')
+            ->assertSee('Publicación diaria por destino')
+            ->assertSee('Posts deseados por día')
+            ->assertSee('Prioridad a partir de')
             ->assertSee('Navegación y extracción con IA')
-            ->assertSee('Límite de posts escaneados al día')
-            ->assertSee('Máximo de posts por consulta')
-            ->assertSee('Máximo de artículos generados por consulta')
-            ->assertSee('name="publication_profile_ids[]"', false)
-            ->assertSee('multiple', false)
-            ->assertSee('Seleccionar todos')
+            ->assertDontSee('Límite de posts escaneados al día')
+            ->assertDontSee('Máximo de posts por consulta')
+            ->assertDontSee('Máximo de artículos generados por consulta')
+            ->assertSee('name="publication_schedules[', false)
             ->assertSee('id="save-source-button"', false)
             ->assertDontSee('id="save-source-button" disabled', false)
             ->assertDontSee('name="status"', false)
@@ -77,9 +76,11 @@ class SourceSiteConfigurationTest extends TestCase
                 'max_posts_per_scan' => 12,
                 'max_generations_per_scan' => 4,
                 'ai_prompt_profile_id' => $promptProfile->id,
-                'publication_profile_ids' => $publicationProfiles->pluck('id')->all(),
-                'auto_generate' => '1',
-                'auto_publish' => '1',
+                'publication_schedules' => $publicationProfiles->mapWithKeys(fn ($destination) => [$destination->id => [
+                    'enabled' => '1',
+                    'daily_target' => 4,
+                    'priority_time' => '07:30',
+                ]])->all(),
                 'active' => '1',
             ]);
 
@@ -87,8 +88,47 @@ class SourceSiteConfigurationTest extends TestCase
         $sourceSite = SourceSite::query()->sole();
 
         $this->assertSame($publicationProfiles->pluck('id')->all(), $sourceSite->publication_profile_ids);
+        $this->assertSame(4, $sourceSite->publication_schedules[$publicationProfiles->first()->id]['daily_target']);
+        $this->assertSame('07:30', $sourceSite->publication_schedules[$publicationProfiles->last()->id]['priority_time']);
         $this->assertSame($publicationProfiles->first()->id, $sourceSite->wordpress_site_id);
         $this->assertTrue($sourceSite->auto_publish);
+    }
+
+    public function test_it_validates_and_stores_a_daily_target_and_priority_time_for_each_destination(): void
+    {
+        $user = User::factory()->create();
+        $promptProfile = app(AiPromptProfileService::class)->ensureDefaultFor($user);
+        $destination = $user->wordpressSites()->create([
+            'name' => 'Destino diario',
+            'rest_api_url' => 'https://daily.test',
+            'username' => 'editor',
+            'application_password' => 'app-pass',
+            'status' => WordPressSite::STATUS_ACTIVE,
+            'active' => true,
+        ]);
+
+        $payload = [
+            'name' => 'Medio diario',
+            'url' => 'https://source.test',
+            'type' => SourceSite::TYPE_AUTO,
+            'auth_method' => SourceSite::AUTH_NONE,
+            'ai_prompt_profile_id' => $promptProfile->id,
+            'active' => '1',
+            'publication_schedules' => [
+                $destination->id => ['enabled' => '1', 'daily_target' => 7, 'priority_time' => '06:45'],
+            ],
+        ];
+
+        $this->actingAs($user)->post(route('admin.source-sites.store'), $payload)->assertRedirect();
+
+        $source = SourceSite::query()->sole();
+        $this->assertSame([
+            $destination->id => ['daily_target' => 7, 'priority_time' => '06:45'],
+        ], $source->publication_schedules);
+        $this->assertSame([$destination->id], $source->selectedPublicationProfileIds());
+        $this->assertTrue($source->auto_generate);
+        $this->assertTrue($source->auto_publish);
+        $this->assertSame(7, $source->max_generations_per_scan);
     }
 
     public function test_it_stores_hours_and_topic_filters(): void
@@ -117,11 +157,11 @@ class SourceSiteConfigurationTest extends TestCase
         $response->assertRedirect(route('admin.source-sites.index'));
         $sourceSite = SourceSite::query()->firstOrFail();
 
-        $this->assertSame(180, $sourceSite->frequency_minutes);
+        $this->assertSame(60, $sourceSite->frequency_minutes);
         $this->assertSame(['Política', 'Economía'], $sourceSite->filter_topics);
         $this->assertSame(['Tecnología', 'Deportes'], $sourceSite->excluded_topics);
-        $this->assertSame(12, $sourceSite->max_posts_per_scan);
-        $this->assertSame(4, $sourceSite->max_generations_per_scan);
+        $this->assertSame(20, $sourceSite->max_posts_per_scan);
+        $this->assertSame(1, $sourceSite->max_generations_per_scan);
     }
 
     public function test_it_tests_a_source_before_saving_and_returns_the_latest_full_post(): void

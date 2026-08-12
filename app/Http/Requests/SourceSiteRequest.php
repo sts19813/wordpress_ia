@@ -16,11 +16,32 @@ class SourceSiteRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $frequencyHours = $this->input('frequency_hours');
         $sourceSite = $this->route('sourceSite');
+        $publicationSchedulesInput = (array) $this->input('publication_schedules', []);
+
+        if ($publicationSchedulesInput === [] && $this->filled('publication_profile_ids')) {
+            $legacyDailyTarget = max(1, (int) $this->input('max_generations_per_scan', 5));
+            $publicationSchedulesInput = collect((array) $this->input('publication_profile_ids'))
+                ->mapWithKeys(fn (mixed $profileId) => [(int) $profileId => [
+                    'enabled' => true,
+                    'daily_target' => $legacyDailyTarget,
+                    'priority_time' => '00:00',
+                ]])
+                ->all();
+        }
+
+        $publicationSchedules = collect($publicationSchedulesInput)
+            ->filter(fn (mixed $schedule) => is_array($schedule) && filter_var($schedule['enabled'] ?? false, FILTER_VALIDATE_BOOL))
+            ->mapWithKeys(fn (array $schedule, mixed $profileId) => [(int) $profileId => [
+                'daily_target' => (int) ($schedule['daily_target'] ?? 1),
+                'priority_time' => (string) ($schedule['priority_time'] ?? '08:00'),
+            ]])
+            ->all();
+        $publicationProfileIds = array_map('intval', array_keys($publicationSchedules));
+        $dailyTarget = max([1, ...array_column($publicationSchedules, 'daily_target')]);
 
         $this->merge(array_filter([
-            'frequency_minutes' => filled($frequencyHours) ? ((int) $frequencyHours * 60) : null,
+            'frequency_minutes' => 60,
             'filter_topics' => $this->topicList($this->input('filter_topics')),
             'excluded_topics' => $this->topicList($this->input('excluded_topics')),
             'status' => $this->input('status', $sourceSite?->status ?: SourceSite::STATUS_PENDING),
@@ -28,15 +49,14 @@ class SourceSiteRequest extends FormRequest
             'priority' => $this->input('priority', $sourceSite?->priority ?: 5),
             'auth_method' => $this->input('auth_method', $sourceSite?->auth_method ?: SourceSite::AUTH_NONE),
             'active' => $this->has('active') ? $this->boolean('active') : ($sourceSite?->active ?? true),
-            'auto_generate' => $this->has('auto_generate') ? $this->boolean('auto_generate') : ($sourceSite?->auto_generate ?? true),
-            'auto_publish' => $this->has('auto_publish') ? $this->boolean('auto_publish') : ($sourceSite?->auto_publish ?? false),
+            'auto_generate' => $publicationSchedules !== [],
+            'auto_publish' => $publicationSchedules !== [],
             'company_id' => filled($this->input('company_id')) ? (int) $this->input('company_id') : null,
-            'publication_profile_ids' => array_values(array_unique(array_filter(array_map(
-                'intval',
-                (array) $this->input('publication_profile_ids', []),
-            )))),
-            'max_posts_per_scan' => $this->input('max_posts_per_scan', $sourceSite?->max_posts_per_scan ?: 20),
-            'max_generations_per_scan' => $this->input('max_generations_per_scan', $sourceSite?->max_generations_per_scan ?: 5),
+            'publication_profile_ids' => $publicationProfileIds,
+            'publication_schedules' => $publicationSchedules,
+            'daily_limit' => max(50, $dailyTarget * 10),
+            'max_posts_per_scan' => min(100, max(20, $dailyTarget * 5)),
+            'max_generations_per_scan' => $dailyTarget,
         ], fn (mixed $value) => $value !== null));
     }
 
@@ -50,8 +70,7 @@ class SourceSiteRequest extends FormRequest
             'url' => ['required', 'url', 'max:2048'],
             'type' => ['required', Rule::in(array_keys(SourceSite::typeOptions()))],
             'status' => ['required', Rule::in(array_keys(SourceSite::statusOptions()))],
-            'frequency_hours' => ['required', 'integer', 'min:1', 'max:168'],
-            'frequency_minutes' => ['required', 'integer', 'min:60', 'max:10080'],
+            'frequency_minutes' => ['required', 'integer', 'min:60', 'max:60'],
             'category' => ['nullable', 'string', 'max:120'],
             'filter_topics' => ['nullable', 'array', 'max:30'],
             'filter_topics.*' => ['string', 'max:120'],
@@ -68,8 +87,8 @@ class SourceSiteRequest extends FormRequest
             'cookies' => ['nullable', 'json'],
             'auth_method' => ['required', Rule::in(array_keys(SourceSite::authMethodOptions()))],
             'daily_limit' => ['required', 'integer', 'min:1', 'max:10000'],
-            'max_posts_per_scan' => ['required', 'integer', 'min:1', 'max:1000', 'lte:daily_limit'],
-            'max_generations_per_scan' => ['required', 'integer', 'min:1', 'max:1000', 'lte:max_posts_per_scan'],
+            'max_posts_per_scan' => ['required', 'integer', 'min:1', 'max:1000'],
+            'max_generations_per_scan' => ['required', 'integer', 'min:1', 'max:1000'],
             'last_synced_at' => ['nullable', 'date'],
             'active' => ['boolean'],
             'auto_generate' => ['boolean'],
@@ -85,11 +104,7 @@ class SourceSiteRequest extends FormRequest
                 'integer',
                 Rule::exists('companies', 'id'),
             ],
-            'publication_profile_ids' => [
-                'nullable',
-                'required_if:auto_publish,1',
-                'array',
-            ],
+            'publication_profile_ids' => ['nullable', 'array'],
             'publication_profile_ids.*' => [
                 'integer',
                 'distinct',
@@ -97,6 +112,9 @@ class SourceSiteRequest extends FormRequest
                     ->where('active', true)
                     ->where('status', 'active')),
             ],
+            'publication_schedules' => ['nullable', 'array'],
+            'publication_schedules.*.daily_target' => ['required', 'integer', 'min:1', 'max:100'],
+            'publication_schedules.*.priority_time' => ['required', 'date_format:H:i'],
         ];
     }
 
@@ -108,7 +126,6 @@ class SourceSiteRequest extends FormRequest
             'type' => 'tipo',
             'status' => 'estado',
             'frequency_minutes' => 'frecuencia de consulta',
-            'frequency_hours' => 'frecuencia de consulta',
             'filter_topics' => 'temas aceptados',
             'excluded_topics' => 'temas excluidos',
             'filter_instructions' => 'instrucciones del filtro',
@@ -132,6 +149,9 @@ class SourceSiteRequest extends FormRequest
             'company_id' => 'empresa',
             'publication_profile_ids' => 'perfiles de publicación',
             'publication_profile_ids.*' => 'perfil de publicación',
+            'publication_schedules' => 'programación de publicación',
+            'publication_schedules.*.daily_target' => 'posts deseados al día',
+            'publication_schedules.*.priority_time' => 'hora de prioridad',
         ];
     }
 

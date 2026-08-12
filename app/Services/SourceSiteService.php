@@ -6,6 +6,8 @@ use App\Models\SourceSite;
 
 class SourceSiteService
 {
+    public function __construct(private readonly SourcePublicationPlanner $publicationPlanner) {}
+
     /**
      * @param  array<string, mixed>  $data
      */
@@ -13,7 +15,7 @@ class SourceSiteService
     {
         $sourceSite = SourceSite::query()->create($this->normalizePayload($data));
         $sourceSite->forceFill([
-            'next_scan_at' => $sourceSite->active ? now() : null,
+            'next_scan_at' => $sourceSite->active ? $this->publicationPlanner->firstScanAt($sourceSite) : null,
         ])->save();
 
         return $sourceSite->fresh();
@@ -24,18 +26,13 @@ class SourceSiteService
      */
     public function update(SourceSite $sourceSite, array $data): SourceSite
     {
-        $frequencyChanged = isset($data['frequency_minutes'])
-            && (int) $data['frequency_minutes'] !== (int) $sourceSite->frequency_minutes;
         $wasInactive = ! $sourceSite->active;
         $sourceSite->update($this->normalizePayload($data, true));
 
         if (! $sourceSite->active) {
             $sourceSite->forceFill(['next_scan_at' => null])->save();
-        } elseif ($frequencyChanged || $wasInactive || ! $sourceSite->next_scan_at) {
-            $nextScanAt = $sourceSite->last_synced_at
-                ? $sourceSite->last_synced_at->copy()->addMinutes($sourceSite->frequency_minutes)
-                : now();
-            $sourceSite->forceFill(['next_scan_at' => $nextScanAt])->save();
+        } elseif ($wasInactive || array_key_exists('publication_schedules', $data) || ! $sourceSite->next_scan_at) {
+            $sourceSite->forceFill(['next_scan_at' => $this->publicationPlanner->firstScanAt($sourceSite)])->save();
         }
 
         return $sourceSite->fresh();
@@ -61,6 +58,15 @@ class SourceSiteService
             ))));
             // Keep the original column synchronized for older integrations.
             $data['wordpress_site_id'] = $data['publication_profile_ids'][0] ?? null;
+        }
+
+        if (array_key_exists('publication_schedules', $data)) {
+            $data['publication_schedules'] = collect((array) $data['publication_schedules'])
+                ->mapWithKeys(fn (mixed $schedule, mixed $profileId) => [(int) $profileId => [
+                    'daily_target' => min(100, max(1, (int) data_get($schedule, 'daily_target', 1))),
+                    'priority_time' => (string) data_get($schedule, 'priority_time', '08:00'),
+                ]])
+                ->all();
         }
 
         foreach (['custom_headers', 'cookies'] as $jsonField) {
