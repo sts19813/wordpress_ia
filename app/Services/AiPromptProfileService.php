@@ -97,7 +97,7 @@ class AiPromptProfileService
             'image_model' => AiPromptProfile::normalizeImageModel(config('services.openai.image_model')),
             'image_size' => '1536x1024',
             'image_quality' => 'high',
-            'image_style' => 'Fotoperiodismo editorial realista, apariencia de cámara profesional, luz natural, composición espontánea y creíble, texturas auténticas, colores sobrios, anatomía correcta, sin texto, sin logotipos, sin estética de ilustración, render 3D ni apariencia artificial.',
+            'image_style' => 'Fotoperiodismo realista, cámara profesional, luz natural, composición espontánea, texturas auténticas, colores sobrios y anatomía correcta; sin texto, logotipos, ilustración, render 3D ni apariencia artificial.',
             'is_default' => $isDefault,
         ];
     }

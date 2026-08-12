@@ -10,9 +10,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('source_sites', function (Blueprint $table) {
-            $table->json('publication_schedules')->nullable()->after('publication_profile_ids');
-        });
+        if (! Schema::hasColumn('source_sites', 'publication_schedules')) {
+            Schema::table('source_sites', function (Blueprint $table) {
+                $table->json('publication_schedules')->nullable()->after('publication_profile_ids');
+            });
+        }
 
         DB::table('source_sites')->orderBy('id')->each(function (object $site): void {
             $profileIds = json_decode((string) ($site->publication_profile_ids ?: '[]'), true) ?: [];
@@ -45,7 +47,7 @@ return new class extends Migration
             'image_model' => AiPromptProfile::DEFAULT_IMAGE_MODEL,
             'image_size' => '1536x1024',
             'image_quality' => 'high',
-            'image_style' => 'Fotoperiodismo editorial realista, apariencia de cámara profesional, luz natural, composición espontánea y creíble, texturas auténticas, colores sobrios, anatomía correcta, sin texto, sin logotipos, sin estética de ilustración, render 3D ni apariencia artificial.',
+            'image_style' => 'Fotoperiodismo realista, cámara profesional, luz natural, composición espontánea, texturas auténticas, colores sobrios y anatomía correcta; sin texto, logotipos, ilustración, render 3D ni apariencia artificial.',
         ]);
     }
 
