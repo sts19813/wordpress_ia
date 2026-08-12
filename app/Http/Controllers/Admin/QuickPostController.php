@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\QuickPostRequest;
+use App\Models\AiPromptProfile;
 use App\Models\SourcePost;
 use App\Services\AiPromptProfileService;
 use App\Services\SchedulerService;
@@ -43,8 +44,7 @@ class QuickPostController extends Controller
             ->get();
 
         return view('admin.quick-posts.create', [
-            'profiles' => $request->user()
-                ->aiPromptProfiles()
+            'profiles' => AiPromptProfile::query()
                 ->orderByDesc('is_default')
                 ->orderBy('name')
                 ->get(),
@@ -60,9 +60,7 @@ class QuickPostController extends Controller
 
     public function store(QuickPostRequest $request): RedirectResponse
     {
-        $profile = $request->user()
-            ->aiPromptProfiles()
-            ->findOrFail($request->validated('ai_prompt_profile_id'));
+        $profile = AiPromptProfile::query()->findOrFail($request->validated('ai_prompt_profile_id'));
         $task = $this->scheduler->createQuickPostTask(
             $request->user(),
             $profile,

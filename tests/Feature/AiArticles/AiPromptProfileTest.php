@@ -12,29 +12,42 @@ class AiPromptProfileTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_configuration_page_creates_a_default_editable_profile(): void
+    public function test_configuration_page_creates_two_global_profiles_visible_to_every_user(): void
     {
         $user = User::factory()->create();
+        $otherUser = User::factory()->create();
 
         $this->actingAs($user)->get(route('admin.settings.index'))
             ->assertOk()
             ->assertSee('Editorial general')
+            ->assertSee('Redes Sociales')
+            ->assertSee('2 perfiles globales para todo el sistema')
+            ->assertDontSee('Nuevo perfil')
             ->assertSee('Perfiles de system prompt');
 
-        $profile = AiPromptProfile::query()->sole();
-        $this->assertTrue($profile->is_default);
-        $this->assertSame($user->id, $profile->user_id);
+        $this->actingAs($otherUser)->get(route('admin.settings.index'))
+            ->assertOk()
+            ->assertSee('Editorial general')
+            ->assertSee('Redes Sociales');
+
+        $this->assertDatabaseCount('ai_prompt_profiles', 2);
+        $this->assertNull(AiPromptProfile::where('name', 'Editorial general')->sole()->user_id);
+        $this->assertNull(AiPromptProfile::where('name', 'Redes Sociales')->sole()->user_id);
     }
 
-    public function test_user_cannot_edit_another_users_profile(): void
+    public function test_only_an_administrator_can_edit_a_global_profile(): void
     {
-        $owner = User::factory()->create();
-        $otherUser = User::factory()->create();
-        $profile = app(AiPromptProfileService::class)->ensureDefaultFor($owner);
+        $admin = User::factory()->create(['is_admin' => true]);
+        $operator = User::factory()->create();
+        $profile = app(AiPromptProfileService::class)->ensureDefaultFor($operator);
 
-        $this->actingAs($otherUser)
+        $this->actingAs($operator)
             ->get(route('admin.settings.prompts.edit', $profile))
             ->assertForbidden();
+
+        $this->actingAs($admin)
+            ->get(route('admin.settings.prompts.edit', $profile))
+            ->assertOk();
     }
 
     public function test_invalid_gpt_image_2_alias_is_normalized_and_not_offered(): void
@@ -58,15 +71,15 @@ class AiPromptProfileTest extends TestCase
 
     public function test_profile_can_use_the_very_short_content_length(): void
     {
-        $user = User::factory()->create();
-        $profile = app(AiPromptProfileService::class)->ensureDefaultFor($user)->fresh();
+        $admin = User::factory()->create(['is_admin' => true]);
+        $profile = app(AiPromptProfileService::class)->ensureDefaultFor($admin)->fresh();
 
-        $this->actingAs($user)
+        $this->actingAs($admin)
             ->get(route('admin.settings.prompts.edit', $profile))
             ->assertOk()
             ->assertSee('Muy corto (150–200 palabras)');
 
-        $this->actingAs($user)
+        $this->actingAs($admin)
             ->put(route('admin.settings.prompts.update', $profile), [
                 'name' => $profile->name,
                 'system_prompt' => $profile->system_prompt,

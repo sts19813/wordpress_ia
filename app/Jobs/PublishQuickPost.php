@@ -93,9 +93,8 @@ class PublishQuickPost implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $profiles = $user->wordpressSites()
+        $profiles = WordPressSite::query()
             ->whereIn('id', $profileIds)
-            ->when($task->payload['company_id'] ?? null, fn ($query, $companyId) => $query->where('company_id', $companyId))
             ->where('active', true)
             ->where('status', WordPressSite::STATUS_ACTIVE)
             ->get()

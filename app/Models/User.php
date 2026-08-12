@@ -88,8 +88,7 @@ class User extends Authenticatable
     /** @return Builder<AiPromptProfile> */
     public function accessibleAiPromptProfiles(): Builder
     {
-        return AiPromptProfile::query()
-            ->when(! $this->isAdmin(), fn (Builder $query) => $query->where('user_id', $this->id));
+        return AiPromptProfile::query();
     }
 
     public function avatarUrl(): string

@@ -108,6 +108,34 @@ class FacebookPublishingWorkflowTest extends TestCase
         $this->assertSame(WordPressSite::STATUS_ACTIVE, $profile->status);
     }
 
+    public function test_api_access_blocked_is_reported_as_an_app_restriction(): void
+    {
+        Http::fake([
+            'graph.facebook.com/v24.0/me*' => Http::response([
+                'error' => [
+                    'message' => 'API access blocked.',
+                    'type' => 'OAuthException',
+                    'code' => 200,
+                ],
+            ], 403),
+        ]);
+
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->post(route('admin.wordpress-sites.store'), [
+            'type' => WordPressSite::TYPE_FACEBOOK_PAGE,
+            'name' => 'Facebook bloqueado',
+            'facebook_page_id' => '123456789',
+            'facebook_access_token' => 'blocked-token',
+            'facebook_api_version' => 'v24.0',
+            'active' => '1',
+        ])->assertSessionHas('warning', fn (string $message): bool => str_contains($message, 'Meta bloqueó el acceso API'));
+
+        $this->assertSame(WordPressSite::STATUS_ERROR, WordPressSite::query()->sole()->status);
+        $this->assertStringContainsString('aplicación asociada al token', WordPressSite::query()->sole()->connection_error);
+        Http::assertSentCount(1);
+    }
+
     public function test_article_can_be_published_to_a_facebook_page(): void
     {
         Http::fake([

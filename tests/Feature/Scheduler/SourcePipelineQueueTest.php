@@ -125,6 +125,7 @@ class SourcePipelineQueueTest extends TestCase
         $user = User::factory()->create();
         $profile = app(AiPromptProfileService::class)->ensureDefaultFor($user);
         $profile->update(['generate_image' => false]);
+        $destinationOwner = User::factory()->create();
         $firstCompany = $user->companies()->create(['name' => 'Empresa Uno', 'active' => true]);
         $secondCompany = $user->companies()->create(['name' => 'Empresa Dos', 'active' => true]);
         $wordpressSite = $user->wordpressSites()->create([
@@ -136,7 +137,7 @@ class SourcePipelineQueueTest extends TestCase
             'status' => WordPressSite::STATUS_ACTIVE,
             'active' => true,
         ]);
-        $secondWordpressSite = $user->wordpressSites()->create([
+        $secondWordpressSite = $destinationOwner->wordpressSites()->create([
             'name' => 'Destino secundario',
             'company_id' => $secondCompany->id,
             'rest_api_url' => 'https://second-target.test',
@@ -204,6 +205,13 @@ class SourcePipelineQueueTest extends TestCase
         $this->assertSame(1, SourcePost::query()->count());
         $this->assertTrue(SourcePost::query()->sole()->filter_applies);
         Queue::assertPushed(GenerateSourceArticle::class);
+
+        $articleTask->update(['payload' => [
+            ...$articleTask->payload,
+            'publication_profile_ids' => [],
+            'wordpress_site_id' => null,
+            'company_id' => null,
+        ]]);
 
         app()->call([new GenerateSourceArticle($articleTask->id, $sourceSite->id), 'handle']);
 

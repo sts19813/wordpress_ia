@@ -8,6 +8,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AiPromptProfile extends Model
 {
+    public const SYSTEM_EDITORIAL_NAME = 'Editorial general';
+
+    public const SYSTEM_SOCIAL_NAME = 'Redes Sociales';
+
     public const DEFAULT_TEXT_MODEL = 'gpt-4.1-mini';
 
     public const DEFAULT_IMAGE_MODEL = 'gpt-image-2';

@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\AiArticle;
 use App\Models\AiImage;
+use App\Models\AiPromptProfile;
 use App\Models\Scheduler;
 use App\Services\AiArticleService;
 use App\Services\SchedulerService;
@@ -85,7 +86,7 @@ class GenerateAiImage implements ShouldBeUnique, ShouldQueue
 
         $attempt = max(1, $this->attempts());
         $scheduler->running($task, 'Generando la imagen principal', 80, $attempt);
-        $profile = $task->user?->aiPromptProfiles()->findOrFail($task->payload['profile_id'] ?? null);
+        $profile = AiPromptProfile::query()->findOrFail($task->payload['profile_id'] ?? null);
         $image = $articles->generateMainImage($article, $profile);
 
         if ($image->status === AiImage::STATUS_FAILED) {

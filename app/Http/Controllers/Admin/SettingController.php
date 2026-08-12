@@ -18,11 +18,10 @@ class SettingController extends Controller
     public function index(Request $request): View
     {
         Gate::authorize('viewAny', AiPromptProfile::class);
-        $this->profiles->ensureDefaultFor($request->user());
+        $this->profiles->ensureSystemProfiles();
 
         return view('admin.settings.index', [
-            'profiles' => $request->user()->accessibleAiPromptProfiles()
-                ->with('user:id,name,email')
+            'profiles' => AiPromptProfile::query()
                 ->orderByDesc('is_default')
                 ->orderBy('name')
                 ->get(),
@@ -80,7 +79,6 @@ class SettingController extends Controller
     public function destroy(AiPromptProfile $aiPromptProfile): RedirectResponse
     {
         Gate::authorize('delete', $aiPromptProfile);
-        abort_if($aiPromptProfile->articles()->exists(), 422, 'Este perfil ya fue utilizado y debe conservarse como referencia.');
         $this->profiles->delete($aiPromptProfile);
 
         return redirect()->route('admin.settings.index')->with('status', 'Perfil eliminado.');

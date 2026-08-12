@@ -106,22 +106,22 @@ class QuickPostWorkflowTest extends TestCase
             ->assertDontSee('Posts, fotos e hilos públicos');
     }
 
-    public function test_quick_post_cannot_use_another_users_profile(): void
+    public function test_quick_post_can_use_the_same_global_profile_for_every_user(): void
     {
         Queue::fake();
         $user = User::factory()->create();
         $otherUser = User::factory()->create();
-        $otherProfile = app(AiPromptProfileService::class)->ensureDefaultFor($otherUser);
+        $globalProfile = app(AiPromptProfileService::class)->ensureDefaultFor($otherUser);
 
         $this->actingAs($user)
             ->post(route('admin.quick-posts.store'), [
                 'url' => 'https://x.com/openai/status/123456',
-                'ai_prompt_profile_id' => $otherProfile->id,
+                'ai_prompt_profile_id' => $globalProfile->id,
                 'image_mode' => 'original',
             ])
-            ->assertSessionHasErrors('ai_prompt_profile_id');
+            ->assertSessionHasNoErrors();
 
-        $this->assertDatabaseCount('schedulers', 0);
+        $this->assertDatabaseCount('schedulers', 1);
     }
 
     public function test_quick_post_cannot_use_an_unavailable_publication_profile(): void

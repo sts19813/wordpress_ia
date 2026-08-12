@@ -45,8 +45,6 @@ class SourceSiteRequest extends FormRequest
      */
     public function rules(): array
     {
-        $ownerId = $this->ownerId();
-
         return [
             'name' => ['required', 'string', 'max:255'],
             'url' => ['required', 'url', 'max:2048'],
@@ -80,7 +78,7 @@ class SourceSiteRequest extends FormRequest
                 'nullable',
                 'required_if:auto_generate,1',
                 'integer',
-                Rule::exists('ai_prompt_profiles', 'id')->where('user_id', $ownerId),
+                Rule::exists('ai_prompt_profiles', 'id'),
             ],
             'company_id' => [
                 'nullable',
@@ -135,17 +133,6 @@ class SourceSiteRequest extends FormRequest
             'publication_profile_ids' => 'perfiles de publicación',
             'publication_profile_ids.*' => 'perfil de publicación',
         ];
-    }
-
-    private function ownerId(): int
-    {
-        $sourceSite = $this->route('sourceSite');
-
-        if ($this->user()->isAdmin() && $sourceSite instanceof SourceSite && $sourceSite->automation_user_id) {
-            return (int) $sourceSite->automation_user_id;
-        }
-
-        return (int) $this->user()->id;
     }
 
     /**

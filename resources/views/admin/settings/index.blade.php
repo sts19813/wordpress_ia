@@ -5,7 +5,7 @@
 @section('toolbar')
     <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-4 w-100">
         <div><h1 class="page-heading text-gray-900 fw-bold fs-3 my-0">Configuración IA</h1><div class="text-muted fw-semibold fs-7 pt-1">Perfiles de system prompt, redacción, extensión e imagen.</div></div>
-        <a href="{{ route('admin.settings.prompts.create') }}" class="btn btn-primary"><i class="ki-outline ki-plus fs-2"></i>Nuevo perfil</a>
+        <span class="badge badge-light-primary fs-7">2 perfiles globales para todo el sistema</span>
     </div>
 @endsection
 
@@ -29,13 +29,10 @@
             <div class="col-xl-6">
                 <div class="card card-flush h-100">
                     <div class="card-header align-items-center">
-                        <div class="card-title"><div><h3 class="fw-bold mb-1">{{ $profile->name }}</h3>@if ($profile->is_default)<span class="badge badge-light-success">Predeterminado</span>@endif @if (auth()->user()->isAdmin())<span class="badge badge-light-primary">{{ $profile->user?->name }} · {{ $profile->user?->email }}</span>@endif</div></div>
+                        <div class="card-title"><div><h3 class="fw-bold mb-1">{{ $profile->name }}</h3>@if ($profile->is_default)<span class="badge badge-light-success">Predeterminado</span>@endif <span class="badge badge-light-primary">Global</span></div></div>
                         <div class="card-toolbar d-flex gap-2">
-                            <a href="{{ route('admin.settings.prompts.edit', $profile) }}" class="btn btn-icon btn-light-primary btn-sm"><i class="ki-outline ki-pencil fs-3"></i></a>
-                            @if (! $profile->articles()->exists())
-                                <form method="POST" action="{{ route('admin.settings.prompts.destroy', $profile) }}" data-confirm-delete data-confirm-title="Eliminar perfil" data-confirm-text="El perfil {{ $profile->name }} se eliminará.">
-                                    @csrf @method('DELETE')<button class="btn btn-icon btn-light-danger btn-sm"><i class="ki-outline ki-trash fs-3"></i></button>
-                                </form>
+                            @can('update', $profile)
+                                <a href="{{ route('admin.settings.prompts.edit', $profile) }}" class="btn btn-icon btn-light-primary btn-sm"><i class="ki-outline ki-pencil fs-3"></i></a>
                             @endif
                         </div>
                     </div>

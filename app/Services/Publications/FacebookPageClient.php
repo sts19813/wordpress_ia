@@ -77,6 +77,7 @@ class FacebookPageClient
                 'fields' => 'id,name,category',
                 'access_token' => $providedToken,
             ]);
+        $this->guardApiAccess($identity);
 
         if ($identity->successful() && filled($identity->json('category'))) {
             $identityPageId = (string) $identity->json('id');
@@ -93,12 +94,13 @@ class FacebookPageClient
             ];
         }
 
-        $accounts = $this->request()
+        $accountsResponse = $this->request()
             ->get($this->graphEndpoint($profile, 'me/accounts'), [
                 'fields' => 'id,name,tasks,access_token',
                 'access_token' => $providedToken,
-            ])
-            ->throw()
+            ]);
+        $this->guardApiAccess($accountsResponse);
+        $accounts = $accountsResponse->throw()
             ->collect('data')
             ->filter(fn (mixed $page): bool => is_array($page)
                 && filled($page['id'] ?? null)
@@ -140,6 +142,17 @@ class FacebookPageClient
         return Http::timeout(90)
             ->connectTimeout(15)
             ->acceptJson();
+    }
+
+    private function guardApiAccess(Response $response): void
+    {
+        if (strtolower((string) $response->json('error.message')) !== 'api access blocked.') {
+            return;
+        }
+
+        throw new RuntimeException(
+            'Meta bloqueó el acceso API para la aplicación asociada al token. Revisa en Meta Developers que la app esté activa y sin restricciones, y que la cuenta o el negocio no tengan una verificación pendiente. Generar otro token de la misma app no elimina este bloqueo.',
+        );
     }
 
     private function endpoint(WordPressSite $profile, ?string $edge = null, ?string $pageId = null): string

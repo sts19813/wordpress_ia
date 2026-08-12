@@ -16,7 +16,7 @@
                 <div class="card card-flush mb-7">
                     <div class="card-header"><div class="card-title"><h3 class="fw-bold mb-0">Instrucciones editoriales</h3></div></div>
                     <div class="card-body">
-                        <div class="mb-6"><label class="form-label required">Nombre del perfil</label><input name="name" class="form-control form-control-solid" value="{{ old('name', $profile->name) }}" required placeholder="Ej. Noticias tecnológicas"></div>
+                        <div class="mb-6"><label class="form-label required">Nombre del perfil global</label><input type="hidden" name="name" value="{{ $profile->name }}"><input class="form-control form-control-solid" value="{{ $profile->name }}" disabled></div>
                         <div><label class="form-label required">System prompt</label><textarea name="system_prompt" rows="18" class="form-control form-control-solid font-monospace" required>{{ old('system_prompt', $profile->system_prompt) }}</textarea><div class="form-text">Define identidad, reglas, rigor y límites. La estructura JSON se aplica por separado desde la API.</div></div>
                     </div>
                 </div>
@@ -69,7 +69,10 @@
                     </div>
                 </div>
 
-                <div class="card card-flush mb-7"><div class="card-body"><label class="form-check form-switch form-check-custom form-check-solid"><input type="checkbox" name="is_default" value="1" class="form-check-input" @checked(old('is_default', $profile->is_default))><span class="form-check-label fw-semibold">Usar como perfil predeterminado</span></label></div></div>
+                <input type="hidden" name="is_default" value="{{ $profile->is_default ? 1 : 0 }}">
+                <div class="notice bg-light-primary border border-primary border-dashed rounded p-5 mb-7 text-gray-700 fs-7">
+                    Este perfil es global y está disponible para todos los usuarios, empresas y fuentes del sistema.
+                </div>
                 <button class="btn btn-primary w-100" type="submit"><i class="ki-outline ki-check fs-2"></i>{{ $editing ? 'Guardar cambios' : 'Crear perfil' }}</button>
             </div>
         </div>

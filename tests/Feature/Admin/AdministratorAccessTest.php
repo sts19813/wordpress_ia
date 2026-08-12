@@ -49,7 +49,8 @@ class AdministratorAccessTest extends TestCase
             ->get(route('admin.settings.index'))
             ->assertOk()
             ->assertSee($profile->name)
-            ->assertSee($owner->email);
+            ->assertSee('Redes Sociales')
+            ->assertDontSee($owner->email);
 
         $this->actingAs($regularUser)
             ->get(route('admin.companies.index'))
@@ -61,6 +62,8 @@ class AdministratorAccessTest extends TestCase
 
         $this->actingAs($regularUser)
             ->get(route('admin.settings.index'))
+            ->assertSee($profile->name)
+            ->assertSee('Redes Sociales')
             ->assertDontSee($owner->email);
     }
 

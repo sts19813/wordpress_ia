@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\AiArticle;
+use App\Models\AiPromptProfile;
 use App\Models\Scheduler;
 use App\Models\SourcePost;
 use App\Services\AiArticleService;
@@ -91,7 +92,7 @@ class GenerateAiArticle implements ShouldBeUnique, ShouldQueue
         }
 
         $payload = $task->payload ?: [];
-        $profile = $task->user?->aiPromptProfiles()->findOrFail($payload['profile_id'] ?? null);
+        $profile = AiPromptProfile::query()->findOrFail($payload['profile_id'] ?? null);
 
         if ($task->article && array_key_exists('company_id', $payload)) {
             $task->article->update(['company_id' => $payload['company_id']]);

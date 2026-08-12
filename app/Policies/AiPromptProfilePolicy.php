@@ -9,7 +9,7 @@ class AiPromptProfilePolicy
 {
     public function before(User $user, string $ability): ?bool
     {
-        return $user->isAdmin() ? true : null;
+        return null;
     }
 
     public function viewAny(User $user): bool
@@ -19,21 +19,21 @@ class AiPromptProfilePolicy
 
     public function create(User $user): bool
     {
-        return true;
+        return false;
     }
 
     public function view(User $user, AiPromptProfile $profile): bool
     {
-        return $profile->user_id === $user->id;
+        return true;
     }
 
     public function update(User $user, AiPromptProfile $profile): bool
     {
-        return $this->view($user, $profile);
+        return $user->isAdmin();
     }
 
     public function delete(User $user, AiPromptProfile $profile): bool
     {
-        return $this->view($user, $profile);
+        return false;
     }
 }

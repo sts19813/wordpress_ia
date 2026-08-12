@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\AiArticleGenerateRequest;
 use App\Http\Requests\AiArticleUpdateRequest;
 use App\Models\AiArticle;
+use App\Models\AiPromptProfile;
 use App\Models\SourcePost;
 use App\Services\AiPromptProfileService;
 use App\Services\SchedulerService;
@@ -48,7 +49,7 @@ class AiArticleController extends Controller
                 ->latest('published_at')
                 ->limit(200)
                 ->get(),
-            'profiles' => $request->user()->aiPromptProfiles()->orderByDesc('is_default')->orderBy('name')->get(),
+            'profiles' => AiPromptProfile::query()->orderByDesc('is_default')->orderBy('name')->get(),
             'selectedIds' => $selectedIds,
         ]);
     }
@@ -57,7 +58,7 @@ class AiArticleController extends Controller
     {
         Gate::authorize('create', AiArticle::class);
         $validated = $request->validated();
-        $profile = $request->user()->aiPromptProfiles()->findOrFail($validated['ai_prompt_profile_id']);
+        $profile = AiPromptProfile::query()->findOrFail($validated['ai_prompt_profile_id']);
         $sourcePosts = SourcePost::query()
             ->whereIn('id', $validated['source_post_ids'])
             ->where('status', SourcePost::STATUS_FETCHED)

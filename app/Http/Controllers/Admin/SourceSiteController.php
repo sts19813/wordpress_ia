@@ -82,7 +82,7 @@ class SourceSiteController extends Controller
             ]),
             'typeOptions' => SourceSite::typeOptions(),
             'authMethodOptions' => SourceSite::authMethodOptions(),
-            'promptProfiles' => $request->user()->aiPromptProfiles()->orderByDesc('is_default')->orderBy('name')->get(),
+            'promptProfiles' => $this->promptProfiles->ensureSystemProfiles(),
             'companies' => $companies,
             'wordpressSites' => $wordpressSites,
         ]);
@@ -156,13 +156,11 @@ class SourceSiteController extends Controller
 
     public function edit(Request $request, SourceSite $sourceSite): View
     {
-        $owner = $sourceSite->automationUser ?: $request->user();
-
         return view('admin.source-sites.edit', [
             'sourceSite' => $sourceSite,
             'typeOptions' => SourceSite::typeOptions(),
             'authMethodOptions' => SourceSite::authMethodOptions(),
-            'promptProfiles' => $owner->aiPromptProfiles()->orderByDesc('is_default')->orderBy('name')->get(),
+            'promptProfiles' => $this->promptProfiles->ensureSystemProfiles(),
             'companies' => Company::query()
                 ->where(fn ($query) => $query->where('active', true)->orWhere('id', $sourceSite->company_id))
                 ->orderBy('name')

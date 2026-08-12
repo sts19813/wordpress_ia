@@ -3,8 +3,10 @@
 namespace App\Jobs;
 
 use App\Models\AiArticle;
+use App\Models\AiPromptProfile;
 use App\Models\Publication;
 use App\Models\Scheduler;
+use App\Models\SourceSite;
 use App\Models\WordPressSite;
 use App\Services\AiArticleService;
 use App\Services\PublicationService;
@@ -63,7 +65,7 @@ class GenerateSourceArticle implements ShouldBeUnique, ShouldQueue
             $payload = $task->payload ?: [];
             $user = $task->user;
             $sourcePost = $task->sourcePost;
-            $profile = $user?->aiPromptProfiles()->find($payload['profile_id'] ?? null);
+            $profile = AiPromptProfile::query()->find($payload['profile_id'] ?? null);
 
             if (! $user || ! $profile) {
                 throw new RuntimeException('Configura un usuario y un perfil IA para automatizar esta fuente.');
@@ -115,21 +117,31 @@ class GenerateSourceArticle implements ShouldBeUnique, ShouldQueue
                 return;
             }
 
+            $sourceSite = SourceSite::query()->find($this->sourceSiteId);
             $profileIds = array_values(array_unique(array_filter(array_map(
                 'intval',
-                $payload['publication_profile_ids']
+                $sourceSite?->selectedPublicationProfileIds()
+                    ?? $payload['publication_profile_ids']
                     ?? array_values(array_filter([$payload['wordpress_site_id'] ?? null])),
             ))));
             $publicationProfiles = WordPressSite::query()
                 ->whereIn('id', $profileIds)
-                ->where('user_id', $user->id)
                 ->where('active', true)
                 ->where('status', WordPressSite::STATUS_ACTIVE)
                 ->get()
                 ->sortBy(fn (WordPressSite $profile) => $profile->isSocial() ? 1 : 0)
                 ->values();
 
-            if ($profileIds === [] || $publicationProfiles->isEmpty()) {
+            if ($profileIds === []) {
+                $scheduler->completed(
+                    $task,
+                    'El artículo quedó guardado como borrador porque la fuente no tiene destinos de publicación seleccionados.',
+                );
+
+                return;
+            }
+
+            if ($publicationProfiles->isEmpty()) {
                 throw new RuntimeException('Los perfiles de publicación automática no están disponibles.');
             }
 
