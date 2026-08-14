@@ -62,6 +62,42 @@ class FacebookPageClient
             ->throw();
     }
 
+    public function publicationUrl(
+        WordPressSite $profile,
+        string $postId,
+        ?string $photoId = null,
+    ): ?string {
+        $credentials = $this->pageCredentials($profile);
+
+        if (filled($photoId)) {
+            $photo = $this->request()
+                ->get($this->graphEndpoint($profile, $photoId), [
+                    'fields' => 'id,link',
+                    'access_token' => $credentials['access_token'],
+                ]);
+            $this->guardApiAccess($photo);
+
+            if ($photo->successful() && filled($photo->json('link'))) {
+                return (string) $photo->json('link');
+            }
+        }
+
+        if (blank($postId)) {
+            return null;
+        }
+
+        $post = $this->request()
+            ->get($this->graphEndpoint($profile, $postId), [
+                'fields' => 'id,permalink_url',
+                'access_token' => $credentials['access_token'],
+            ]);
+        $this->guardApiAccess($post);
+
+        return $post->successful() && filled($post->json('permalink_url'))
+            ? (string) $post->json('permalink_url')
+            : null;
+    }
+
     /**
      * Accepts a Page Access Token directly. When the user pasted a User Access
      * Token, resolves the managed page and its Page Access Token via /me/accounts.
