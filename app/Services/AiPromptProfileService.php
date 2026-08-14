@@ -30,7 +30,9 @@ class AiPromptProfileService
                 'writing_style' => 'periodístico para redes sociales',
                 'content_length' => 'very_short',
                 'image_size' => '1536x1024',
-                'image_quality' => 'high',
+                'image_quality' => 'low',
+                'image_format' => 'jpeg',
+                'image_compression' => 85,
             ],
         );
 
@@ -96,7 +98,9 @@ class AiPromptProfileService
             'generate_image' => true,
             'image_model' => AiPromptProfile::normalizeImageModel(config('services.openai.image_model')),
             'image_size' => '1536x1024',
-            'image_quality' => 'high',
+            'image_quality' => 'low',
+            'image_format' => 'jpeg',
+            'image_compression' => 85,
             'image_style' => 'Fotoperiodismo realista, cámara profesional, luz natural, composición espontánea, texturas auténticas, colores sobrios y anatomía correcta; sin texto, logotipos, ilustración, render 3D ni apariencia artificial.',
             'is_default' => $isDefault,
         ];

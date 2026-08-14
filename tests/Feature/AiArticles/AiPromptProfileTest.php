@@ -95,6 +95,8 @@ class AiPromptProfileTest extends TestCase
                 'image_model' => $profile->image_model,
                 'image_size' => $profile->image_size,
                 'image_quality' => $profile->image_quality,
+                'image_format' => $profile->image_format,
+                'image_compression' => $profile->image_compression,
                 'image_style' => $profile->image_style,
                 'is_default' => '1',
             ])

@@ -39,6 +39,8 @@ class AiDraftWorkflowTest extends TestCase
             'image_model' => 'gpt-image-1.5',
             'image_size' => '1536x1024',
             'image_quality' => 'medium',
+            'image_format' => 'jpeg',
+            'image_compression' => 85,
             'image_style' => 'fotografía editorial sin texto',
             'is_default' => true,
         ]);
@@ -76,6 +78,8 @@ class AiDraftWorkflowTest extends TestCase
                 'data' => [['b64_json' => base64_encode('fake-png')]],
                 'size' => '1536x1024',
                 'quality' => 'medium',
+                'output_format' => 'jpeg',
+                'usage' => ['input_tokens' => 20, 'output_tokens' => 1568, 'total_tokens' => 1588],
             ]),
         ]);
 
@@ -95,7 +99,12 @@ class AiDraftWorkflowTest extends TestCase
         $this->assertStringNotContainsString('<script', $article->content);
         $this->assertStringContainsString('href="https://example.com/fuente"', $article->content);
         $this->assertSame(300, $article->tokens['total']);
+        $this->assertSame('0.000360', $article->cost);
         $this->assertSame(AiImage::STATUS_GENERATED, $image->status);
+        $this->assertSame(1588, $image->tokens['total']);
+        $this->assertSame('0.050276', $image->cost);
+        $this->assertSame('jpeg', $image->output_format);
+        $this->assertSame('image/jpeg', $image->mime_type);
         $this->assertStringNotContainsString(base64_encode('fake-png'), $image->full_response);
         Storage::disk('local')->assertExists($image->file_path);
 
@@ -105,7 +114,10 @@ class AiDraftWorkflowTest extends TestCase
             && str_contains($request['input'], 'Entre 150 y 200 palabras.'));
         Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/images/generations')
             && $request['model'] === 'gpt-image-1.5'
-            && $request['size'] === '1536x1024');
+            && $request['size'] === '1536x1024'
+            && $request['quality'] === 'medium'
+            && $request['output_format'] === 'jpeg'
+            && $request['output_compression'] === 85);
     }
 
     public function test_generation_failure_is_saved_for_review_instead_of_losing_the_request(): void

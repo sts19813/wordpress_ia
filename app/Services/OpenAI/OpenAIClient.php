@@ -65,11 +65,24 @@ class OpenAIClient
      */
     public function usage(array $response): array
     {
+        $input = (int) data_get($response, 'usage.input_tokens', 0);
+        $output = (int) data_get($response, 'usage.output_tokens', 0);
+        $total = (int) data_get($response, 'usage.total_tokens', $input + $output);
+
         return array_filter([
-            'input' => (int) data_get($response, 'usage.input_tokens', 0),
-            'output' => (int) data_get($response, 'usage.output_tokens', 0),
-            'total' => (int) data_get($response, 'usage.total_tokens', 0),
-        ]);
+            'input' => $input,
+            'cached_input' => (int) data_get($response, 'usage.input_tokens_details.cached_tokens', 0),
+            'output' => $output,
+            'total' => $total,
+            'input_details' => array_filter([
+                'text' => (int) data_get($response, 'usage.input_tokens_details.text_tokens', 0),
+                'image' => (int) data_get($response, 'usage.input_tokens_details.image_tokens', 0),
+            ]),
+            'output_details' => array_filter([
+                'text' => (int) data_get($response, 'usage.output_tokens_details.text_tokens', 0),
+                'image' => (int) data_get($response, 'usage.output_tokens_details.image_tokens', 0),
+            ]),
+        ], fn (mixed $value) => $value !== 0 && $value !== []);
     }
 
     /**

@@ -35,6 +35,9 @@ class AiImage extends Model
         'duration_ms',
         'resolution',
         'quality',
+        'output_format',
+        'output_compression',
+        'tokens',
         'status',
         'source_context',
         'full_response',
@@ -50,6 +53,8 @@ class AiImage extends Model
             'seed' => 'integer',
             'cost' => 'decimal:6',
             'duration_ms' => 'integer',
+            'output_compression' => 'integer',
+            'tokens' => 'array',
             'source_context' => 'array',
         ];
     }
