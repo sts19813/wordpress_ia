@@ -63,10 +63,20 @@ class FacebookPublicationEngine
                 )
                 : $this->client->publishPost($profile, $message, $link);
             $remoteKey = (string) ($response->json('post_id') ?: $response->json('id'));
+            $photoId = $hasLocalImage ? trim((string) $response->json('id')) : null;
+            $remoteUrl = $photoId
+                ? 'https://www.facebook.com/photo.php?fbid='.$photoId
+                : ($remoteKey !== '' ? 'https://www.facebook.com/'.$remoteKey : null);
+
+            try {
+                $remoteUrl = $this->client->publicationUrl($profile, $remoteKey, $photoId) ?: $remoteUrl;
+            } catch (Throwable) {
+                // La publicación ya existe; una consulta de permalink no debe marcarla como fallida.
+            }
 
             $publication->update([
                 'remote_post_key' => $remoteKey,
-                'remote_url' => $remoteKey !== '' ? 'https://www.facebook.com/'.$remoteKey : null,
+                'remote_url' => $remoteUrl,
                 'status' => Publication::STATUS_PUBLISHED,
                 'last_action' => $hasLocalImage ? 'publish_facebook_photo' : 'publish_facebook_post',
                 'full_response' => $response->json(),

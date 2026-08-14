@@ -147,6 +147,10 @@ class FacebookPublishingWorkflowTest extends TestCase
             'graph.facebook.com/v24.0/123456789/feed' => Http::response([
                 'id' => '123456789_987654321',
             ], 200),
+            'graph.facebook.com/v24.0/123456789_987654321*' => Http::response([
+                'id' => '123456789_987654321',
+                'permalink_url' => 'https://www.facebook.com/NoticiasDemo/posts/987654321',
+            ], 200),
         ]);
 
         $user = User::factory()->create();
@@ -160,7 +164,7 @@ class FacebookPublishingWorkflowTest extends TestCase
         $this->assertSame($profile->id, $publication->wordpress_site_id);
         $this->assertSame(Publication::STATUS_PUBLISHED, $publication->status);
         $this->assertSame('123456789_987654321', $publication->remote_post_key);
-        $this->assertSame('https://www.facebook.com/123456789_987654321', $publication->remote_url);
+        $this->assertSame('https://www.facebook.com/NoticiasDemo/posts/987654321', $publication->remote_url);
 
         Http::assertSent(fn (Request $request) => $request->url() === 'https://graph.facebook.com/v24.0/123456789/feed'
             && str_contains((string) $request['message'], 'Título para Facebook')
@@ -209,6 +213,10 @@ class FacebookPublishingWorkflowTest extends TestCase
                 'id' => '555',
                 'post_id' => '123456789_987654321',
             ], 200),
+            'graph.facebook.com/v24.0/555*' => Http::response([
+                'id' => '555',
+                'link' => 'https://www.facebook.com/photo.php?fbid=555&set=a.111&type=3',
+            ], 200),
         ]);
 
         $user = User::factory()->create();
@@ -230,6 +238,7 @@ class FacebookPublishingWorkflowTest extends TestCase
         $this->assertDatabaseHas('publications', [
             'status' => Publication::STATUS_PUBLISHED,
             'remote_post_key' => '123456789_987654321',
+            'remote_url' => 'https://www.facebook.com/photo.php?fbid=555&set=a.111&type=3',
             'last_action' => 'publish_facebook_photo',
         ]);
         Http::assertSent(fn (Request $request) => $request->url() === 'https://graph.facebook.com/v24.0/123456789/photos');
