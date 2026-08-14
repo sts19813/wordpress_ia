@@ -86,6 +86,9 @@ class ArticleContentExtractorTest extends TestCase
                     <head>
                         <meta property="og:title" content="Título limpio de la nota">
                         <meta property="og:url" content="https://jornada.test/quintanaroo/123/nota">
+                        <script type="application/ld+json">
+                            {"@type":"NewsArticle","datePublished":"14/08/2026"}
+                        </script>
                     </head>
                     <body>
                         <div class="single-blog-content">
@@ -126,6 +129,7 @@ class ArticleContentExtractorTest extends TestCase
         ]);
 
         $this->assertSame('Título limpio de la nota', $result['titulo']);
+        $this->assertSame('2026-08-14T00:00:00-06:00', $result['fecha']);
         $this->assertStringContainsString('Primer bloque editorial', $result['contenido_html']);
         $this->assertStringContainsString('Cuarto bloque editorial', $result['contenido_html']);
         $this->assertStringNotContainsString('Nota relacionada', $result['contenido_html']);
