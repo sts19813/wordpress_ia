@@ -41,7 +41,8 @@
                             <div class="col-6"><div class="text-muted fs-7">Modelo</div><code>{{ $profile->model }}</code></div>
                             <div class="col-6"><div class="text-muted fs-7">Temperatura</div><div class="fw-bold">{{ $profile->temperature }}</div></div>
                             <div class="col-6"><div class="text-muted fs-7">Extensión</div><div class="fw-bold">{{ App\Models\AiPromptProfile::lengthOptions()[$profile->content_length] }}</div></div>
-                            <div class="col-6"><div class="text-muted fs-7">Imagen</div><div class="fw-bold">{{ $profile->generate_image ? 'Sí · '.$profile->image_quality : 'No' }}</div></div>
+                            <div class="col-6"><div class="text-muted fs-7">Imagen</div><div class="fw-bold">{{ $profile->generate_image ? 'Sí · '.$profile->image_quality.' · '.$profile->image_size : 'No' }}</div></div>
+                            <div class="col-6"><div class="text-muted fs-7">Archivo</div><div class="fw-bold">{{ $profile->generate_image ? strtoupper($profile->image_format ?: 'jpeg').' · '.($profile->image_compression ?: 85).'%' : '—' }}</div></div>
                             <div class="col-12"><div class="text-muted fs-7">Redacción</div><div class="fw-bold">{{ $profile->writing_style }} · {{ $profile->tone }}</div></div>
                         </div>
                         <div class="bg-light rounded p-4 text-gray-700 fs-7" style="white-space: pre-wrap; max-height: 150px; overflow: auto;">{{ $profile->system_prompt }}</div>

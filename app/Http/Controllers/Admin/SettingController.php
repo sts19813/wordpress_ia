@@ -47,7 +47,9 @@ class SettingController extends Controller
                 'generate_image' => true,
                 'image_model' => AiPromptProfile::normalizeImageModel(config('services.openai.image_model')),
                 'image_size' => '1536x1024',
-                'image_quality' => 'medium',
+                'image_quality' => 'low',
+                'image_format' => 'jpeg',
+                'image_compression' => 85,
                 'image_style' => 'fotografía editorial realista, composición horizontal, sin texto incrustado',
             ]),
         ]);

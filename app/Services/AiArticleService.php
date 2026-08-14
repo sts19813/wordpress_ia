@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\AiArticles\ArticleGenerationEngine;
 use App\Services\AiArticles\ArticleGenerationResult;
 use App\Services\OpenAI\OpenAIClient;
+use App\Services\OpenAI\OpenAICostCalculator;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Throwable;
@@ -20,6 +21,7 @@ class AiArticleService
         private readonly ArticleGenerationEngine $engine,
         private readonly AiImageService $images,
         private readonly OpenAIClient $client,
+        private readonly OpenAICostCalculator $costs,
     ) {}
 
     /**
@@ -73,10 +75,13 @@ class AiArticleService
 
         try {
             $response = $this->client->execute($result->request);
+            $usage = $this->client->usage($response);
+            $responseModel = (string) data_get($response, 'model', $textModel);
             $article = $this->completeGeneration($result->article, $this->client->outputText($response), [
-                'tokens' => $this->client->usage($response),
+                'tokens' => $usage,
+                'cost' => $this->costs->text($responseModel, $usage),
                 'duration_ms' => $this->elapsedMilliseconds($startedAt),
-                'model' => data_get($response, 'model', $textModel),
+                'model' => $responseModel,
                 'temperature' => $profile->temperature,
             ]);
             $article->update(['status' => AiArticle::STATUS_DRAFT]);
@@ -130,6 +135,8 @@ class AiArticleService
             'model' => $imageModel,
             'resolution' => $profile->image_size,
             'quality' => $profile->image_quality,
+            'output_format' => $profile->image_format ?: 'jpeg',
+            'output_compression' => $profile->image_compression ?: 85,
         ]);
 
         try {
@@ -140,16 +147,23 @@ class AiArticleService
                 throw new \RuntimeException('La imagen generada no tiene una codificación válida.');
             }
 
-            $path = 'ai-images/'.$article->id.'/'.Str::uuid().'.png';
+            $usage = $this->client->usage($response);
+            $format = (string) data_get($response, 'output_format', $profile->image_format ?: 'jpeg');
+            [$extension, $mimeType] = $this->imageFileType($format);
+            $path = 'ai-images/'.$article->id.'/'.Str::uuid().'.'.$extension;
             Storage::disk('local')->put($path, $binary);
 
             return $this->images->completeGeneration($result->image, $response, metrics: [
+                'tokens' => $usage,
+                'cost' => $this->costs->image($imageModel, $usage, $profile->image_size, $profile->image_quality),
                 'duration_ms' => $this->elapsedMilliseconds($startedAt),
                 'model' => $imageModel,
                 'resolution' => data_get($response, 'size', $profile->image_size),
                 'quality' => data_get($response, 'quality', $profile->image_quality),
+                'output_format' => $format,
+                'output_compression' => $profile->image_compression ?: 85,
                 'file_path' => $path,
-                'mime_type' => 'image/png',
+                'mime_type' => $mimeType,
             ]);
         } catch (Throwable $exception) {
             return $this->images->failGeneration($result->image, $exception->getMessage(), [
@@ -163,5 +177,15 @@ class AiArticleService
     private function elapsedMilliseconds(int $startedAt): int
     {
         return (int) round((hrtime(true) - $startedAt) / 1_000_000);
+    }
+
+    /** @return array{string, string} */
+    private function imageFileType(string $format): array
+    {
+        return match (strtolower($format)) {
+            'webp' => ['webp', 'image/webp'],
+            'jpeg', 'jpg' => ['jpg', 'image/jpeg'],
+            default => ['png', 'image/png'],
+        };
     }
 }

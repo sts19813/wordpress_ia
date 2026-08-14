@@ -121,6 +121,86 @@
             </div>
         </div>
 
+        <section class="mb-7" aria-labelledby="ai-usage-heading">
+            <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-2 mb-4">
+                <div>
+                    <h2 id="ai-usage-heading" class="fw-bold text-gray-900 fs-3 mb-1">Consumo de inteligencia artificial</h2>
+                    <div class="text-muted fw-semibold fs-7">Tokens reales reportados por la API y costo estimado en USD</div>
+                </div>
+                <span class="badge badge-light-primary fs-8">Incluye texto e imagen</span>
+            </div>
+
+            <div class="row g-5 mb-5">
+                <div class="col-sm-6 col-xl-3">
+                    <div class="card card-flush ops-usage-card h-100">
+                        <div class="card-body">
+                            <div class="ops-usage-icon bg-light-primary text-primary"><i class="ki-outline ki-chart-line-up-2"></i></div>
+                            <div class="ops-usage-value">{{ number_format($aiUsageToday['total_tokens']) }}</div>
+                            <div class="ops-usage-label">Tokens consumidos hoy</div>
+                            <div class="ops-usage-detail">Texto {{ number_format($aiUsageToday['text_tokens']) }} · Imagen {{ number_format($aiUsageToday['image_tokens']) }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-xl-3">
+                    <div class="card card-flush ops-usage-card h-100">
+                        <div class="card-body">
+                            <div class="ops-usage-icon bg-light-info text-info"><i class="ki-outline ki-abstract-26"></i></div>
+                            <div class="ops-usage-value">{{ number_format($aiUsageToday['average_tokens']) }}</div>
+                            <div class="ops-usage-label">Promedio por post</div>
+                            <div class="ops-usage-detail">{{ number_format($aiUsageToday['posts']) }} posts generados hoy</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-xl-3">
+                    <div class="card card-flush ops-usage-card h-100">
+                        <div class="card-body">
+                            <div class="ops-usage-icon bg-light-success text-success"><i class="ki-outline ki-dollar"></i></div>
+                            <div class="ops-usage-value">${{ number_format($aiUsageToday['total_cost'], 4) }}</div>
+                            <div class="ops-usage-label">Costo estimado hoy</div>
+                            <div class="ops-usage-detail">Texto ${{ number_format($aiUsageToday['text_cost'], 4) }} · Imagen ${{ number_format($aiUsageToday['image_cost'], 4) }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-xl-3">
+                    <div class="card card-flush ops-usage-card h-100">
+                        <div class="card-body">
+                            <div class="ops-usage-icon bg-light-warning text-warning"><i class="ki-outline ki-calculator"></i></div>
+                            <div class="ops-usage-value">${{ number_format($aiUsageToday['average_cost'], 4) }}</div>
+                            <div class="ops-usage-label">Costo promedio por post</div>
+                            <div class="ops-usage-detail">A 100 posts: ~$${{ number_format($aiUsageToday['projected_100_cost'], 2) }} por día</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card card-flush">
+                <div class="card-header align-items-center border-0 pt-4">
+                    <div class="card-title d-block">
+                        <h3 class="fw-bold text-gray-900 mb-1">Consumo diario</h3>
+                        <div class="text-muted fw-semibold fs-7">Últimos siete días · {{ number_format($aiUsageWeek['posts']) }} posts · ${{ number_format($aiUsageWeek['total_cost'], 4) }} estimados</div>
+                    </div>
+                </div>
+                <div class="card-body pt-2">
+                    <div class="ops-usage-table">
+                        <div class="ops-usage-table-header" aria-hidden="true">
+                            <span>Día</span><span>Posts</span><span>Tokens</span><span>Tokens/post</span><span>Costo</span><span>Costo/post</span>
+                        </div>
+                        @foreach ($aiUsageDaily->reverse() as $day)
+                            <div class="ops-usage-table-row">
+                                <strong class="ops-usage-day">{{ $day['date']->locale('es')->isoFormat('ddd D MMM') }}</strong>
+                                <span data-label="Posts">{{ number_format($day['posts']) }}</span>
+                                <span data-label="Tokens">{{ number_format($day['total_tokens']) }}</span>
+                                <span data-label="Tokens/post">{{ number_format($day['average_tokens']) }}</span>
+                                <span data-label="Costo">${{ number_format($day['total_cost'], 4) }}</span>
+                                <span data-label="Costo/post">${{ number_format($day['average_cost'], 4) }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                    <div class="text-muted fs-8 mt-4">Los importes son estimaciones calculadas con el uso reportado por OpenAI y sus tarifas configuradas; la factura del proveedor es la referencia final.</div>
+                </div>
+            </div>
+        </section>
+
         <div class="row g-5 g-xl-7 mb-7">
             <div class="col-xl-8">
                 <div class="card card-flush h-100">
@@ -425,6 +505,75 @@
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: .04em;
+        }
+
+        .ops-usage-card {
+            border: 1px solid rgba(47, 128, 237, .1);
+            box-shadow: 0 8px 30px rgba(31, 42, 68, .045);
+        }
+
+        .ops-usage-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            font-size: 1.35rem;
+            margin-bottom: 1.15rem;
+        }
+
+        .ops-usage-value {
+            color: var(--bs-gray-900);
+            font-size: 1.85rem;
+            line-height: 1.1;
+            font-weight: 800;
+            letter-spacing: -.035em;
+            overflow-wrap: anywhere;
+        }
+
+        .ops-usage-label {
+            color: var(--bs-gray-800);
+            font-weight: 700;
+            margin-top: .55rem;
+        }
+
+        .ops-usage-detail {
+            color: var(--bs-gray-600);
+            font-size: .78rem;
+            font-weight: 600;
+            margin-top: .45rem;
+            overflow-wrap: anywhere;
+        }
+
+        .ops-usage-table-header,
+        .ops-usage-table-row {
+            display: grid;
+            grid-template-columns: minmax(130px, 1.2fr) .65fr 1fr 1fr 1fr 1fr;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .ops-usage-table-header {
+            color: var(--bs-gray-500);
+            padding: .7rem 1rem;
+            font-size: .7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+
+        .ops-usage-table-row {
+            color: var(--bs-gray-700);
+            padding: 1rem;
+            border-top: 1px solid var(--bs-gray-200);
+            font-size: .84rem;
+            font-weight: 600;
+        }
+
+        .ops-usage-day {
+            color: var(--bs-gray-900);
+            text-transform: capitalize;
         }
 
         .ops-live-badge span {
@@ -913,6 +1062,35 @@
             .ops-status-strip .btn { width: 100%; }
             .ops-chart-legend { justify-content: flex-start; }
             .ops-kpi-value { font-size: 2rem; }
+            .ops-usage-value { font-size: 1.65rem; }
+
+            .ops-usage-table-header { display: none; }
+
+            .ops-usage-table-row {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: .8rem 1rem;
+                padding: 1rem .25rem;
+            }
+
+            .ops-usage-table-row .ops-usage-day {
+                grid-column: 1 / -1;
+                font-size: .95rem;
+            }
+
+            .ops-usage-table-row span {
+                min-width: 0;
+                overflow-wrap: anywhere;
+            }
+
+            .ops-usage-table-row span::before {
+                content: attr(data-label);
+                display: block;
+                color: var(--bs-gray-500);
+                font-size: .66rem;
+                font-weight: 700;
+                text-transform: uppercase;
+                margin-bottom: .2rem;
+            }
 
             .ops-dashboard .card-header {
                 align-items: flex-start !important;

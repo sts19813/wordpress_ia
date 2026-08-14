@@ -10,6 +10,7 @@ use App\Models\SourcePost;
 use App\Models\SourceScanLog;
 use App\Models\SourceSite;
 use App\Models\WordPressSite;
+use App\Services\AiUsageSummaryService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +19,8 @@ use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
+    public function __construct(private readonly AiUsageSummaryService $usage) {}
+
     public function __invoke(): View
     {
         $todayStart = now()->startOfDay();
@@ -109,6 +112,10 @@ class DashboardController extends Controller
             ->count();
 
         $activity = $this->activitySeries($activityStart, $tomorrowStart);
+        $aiUsageDaily = $this->usage->daily($activityStart, $tomorrowStart);
+        $aiUsageToday = $aiUsageDaily->first(fn (array $day) => $day['date']->isSameDay($todayStart))
+            ?: $aiUsageDaily->last();
+        $aiUsageWeek = $this->usage->totals($aiUsageDaily);
         $recentErrors = $this->recentErrors();
         $recentTasks = Scheduler::query()
             ->with([
@@ -161,6 +168,9 @@ class DashboardController extends Controller
             'activeDestinations' => $activeDestinations,
             'destinationErrors' => $destinationErrors,
             'activity' => $activity,
+            'aiUsageDaily' => $aiUsageDaily,
+            'aiUsageToday' => $aiUsageToday,
+            'aiUsageWeek' => $aiUsageWeek,
             'recentErrors' => $recentErrors,
             'recentTasks' => $recentTasks,
             'publishedArticles' => $publishedArticles,

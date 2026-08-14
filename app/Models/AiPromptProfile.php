@@ -45,6 +45,8 @@ PROMPT;
         'image_model',
         'image_size',
         'image_quality',
+        'image_format',
+        'image_compression',
         'image_style',
         'is_default',
     ];
@@ -55,6 +57,7 @@ PROMPT;
             'temperature' => 'decimal:2',
             'max_output_tokens' => 'integer',
             'generate_image' => 'boolean',
+            'image_compression' => 'integer',
             'is_default' => 'boolean',
         ];
     }
@@ -98,6 +101,36 @@ PROMPT;
             'gpt-image-2' => 'GPT Image 2 — recomendado, mejor calidad',
             'gpt-image-2-2026-04-21' => 'GPT Image 2 — versión fija 2026-04-21',
             'gpt-image-1.5' => 'GPT Image 1.5 — legado/deprecado, solo compatibilidad',
+        ];
+    }
+
+    /** @return array<string, string> */
+    public static function imageSizeOptions(): array
+    {
+        return [
+            '1536x1024' => 'Horizontal · 1536×1024 — recomendado para redes',
+            '1024x1024' => 'Cuadrada · 1024×1024',
+            '1024x1536' => 'Vertical · 1024×1536',
+        ];
+    }
+
+    /** @return array<string, string> */
+    public static function imageQualityOptions(): array
+    {
+        return [
+            'low' => 'Baja — económica, recomendada para publicación diaria',
+            'medium' => 'Media — mayor detalle',
+            'high' => 'Alta — máximo detalle y costo elevado',
+        ];
+    }
+
+    /** @return array<string, string> */
+    public static function imageFormatOptions(): array
+    {
+        return [
+            'jpeg' => 'JPEG — compatible y ligero',
+            'webp' => 'WebP — archivo más pequeño',
+            'png' => 'PNG — archivo más pesado, sin compresión configurable',
         ];
     }
 

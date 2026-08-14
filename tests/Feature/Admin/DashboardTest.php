@@ -60,6 +60,9 @@ class DashboardTest extends TestCase
             'excerpt' => 'El programa abre una nueva etapa para la comunidad.',
             'slug' => 'programa-apoyo-comunitario',
             'tags' => ['Comunidad', 'Apoyo'],
+            'model' => 'gpt-4.1-mini',
+            'tokens' => ['input' => 1000, 'output' => 500, 'total' => 1500],
+            'cost' => 0.0012,
             'status' => AiArticle::STATUS_DRAFT,
             'generated_at' => now()->subMinutes(20),
         ]);
@@ -69,6 +72,9 @@ class DashboardTest extends TestCase
             'prompt' => 'Comunidad reunida',
             'resolution' => '1536x1024',
             'quality' => 'medium',
+            'model' => 'gpt-image-2',
+            'tokens' => ['input' => 10, 'output' => 190, 'total' => 200],
+            'cost' => 0.005,
             'status' => AiImage::STATUS_GENERATED,
             'file_path' => 'ai-images/dashboard.png',
             'mime_type' => 'image/png',
@@ -134,7 +140,13 @@ class DashboardTest extends TestCase
             ->assertViewHas('publishedToday', 2)
             ->assertViewHas('publishedArticlesToday', 1)
             ->assertViewHas('errorsToday', 1)
+            ->assertViewHas('aiUsageToday', fn (array $usage) => $usage['total_tokens'] === 1700
+                && $usage['average_tokens'] === 1700
+                && abs($usage['total_cost'] - 0.0062) < 0.000001)
             ->assertSee('Centro de operaciones')
+            ->assertSee('Consumo de inteligencia artificial')
+            ->assertSee('1,700')
+            ->assertSee('$0.0062')
             ->assertSee('Nuevo programa de apoyo comunitario')
             ->assertSee('Portal principal')
             ->assertSee('Facebook comunidad')

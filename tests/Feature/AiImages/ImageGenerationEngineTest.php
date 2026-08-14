@@ -41,6 +41,8 @@ class ImageGenerationEngineTest extends TestCase
         $this->assertSame(123, $results[0]->image->seed);
         $this->assertSame(AiImage::TYPE_MAIN, $results[0]->image->type);
         $this->assertSame(AiImage::TYPE_OG, $results[4]->image->type);
+        $this->assertSame('jpeg', $results[0]->request->payload['output_format']);
+        $this->assertSame(85, $results[0]->request->payload['output_compression']);
     }
 
     public function test_it_completes_image_generation_with_metrics(): void

@@ -1,6 +1,17 @@
 @extends('layouts.admin')
 
-@php($editing = $profile->exists)
+@php
+    $editing = $profile->exists;
+    $imageCostCalculator = app(App\Services\OpenAI\OpenAICostCalculator::class);
+    $imageCostEstimates = [];
+    foreach (array_keys(App\Models\AiPromptProfile::imageModelOptions()) as $model) {
+        foreach (array_keys(App\Models\AiPromptProfile::imageQualityOptions()) as $quality) {
+            foreach (array_keys(App\Models\AiPromptProfile::imageSizeOptions()) as $size) {
+                $imageCostEstimates[$model][$quality][$size] = $imageCostCalculator->estimatedImageOutput($model, $size, $quality);
+            }
+        }
+    }
+@endphp
 
 @section('title', ($editing ? 'Editar' : 'Nuevo').' perfil IA | '.config('app.name'))
 
@@ -56,15 +67,49 @@
                         <label class="form-check form-switch form-check-custom form-check-solid mb-6"><input type="checkbox" name="generate_image" value="1" class="form-check-input" @checked(old('generate_image', $profile->generate_image))><span class="form-check-label fw-semibold">Generar imagen con la nota</span></label>
                         <div class="mb-5">
                             <label class="form-label">Modelo</label>
-                            <select name="image_model" class="form-select form-select-solid">
+                            <select name="image_model" id="image-model" class="form-select form-select-solid">
                                 @foreach (App\Models\AiPromptProfile::imageModelOptions() as $value => $label)
                                     <option value="{{ $value }}" @selected(old('image_model', App\Models\AiPromptProfile::normalizeImageModel($profile->image_model)) === $value)>{{ $label }}</option>
                                 @endforeach
                             </select>
-                            <div class="form-text">GPT Image 2 es la opción recomendada. La versión fija evita cambios de comportamiento del alias.</div>
+                            <div class="form-text">GPT Image 2 en calidad baja es más económico que GPT Image 1.5. La versión 1.5 está deprecada y se conserva sólo por compatibilidad.</div>
                         </div>
-                        <div class="mb-5"><label class="form-label">Resolución</label><select name="image_size" class="form-select form-select-solid">@foreach (['1024x1024' => 'Cuadrada · 1024×1024', '1024x1536' => 'Vertical · 1024×1536', '1536x1024' => 'Horizontal · 1536×1024'] as $value => $label)<option value="{{ $value }}" @selected(old('image_size', $profile->image_size) === $value)>{{ $label }}</option>@endforeach</select></div>
-                        <div class="mb-5"><label class="form-label">Calidad</label><select name="image_quality" class="form-select form-select-solid">@foreach (['low' => 'Baja', 'medium' => 'Media', 'high' => 'Alta'] as $value => $label)<option value="{{ $value }}" @selected(old('image_quality', $profile->image_quality) === $value)>{{ $label }}</option>@endforeach</select></div>
+                        <div class="mb-5">
+                            <label class="form-label">Resolución</label>
+                            <select name="image_size" id="image-size" class="form-select form-select-solid">
+                                @foreach (App\Models\AiPromptProfile::imageSizeOptions() as $value => $label)
+                                    <option value="{{ $value }}" @selected(old('image_size', $profile->image_size) === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="mb-5">
+                            <label class="form-label">Calidad</label>
+                            <select name="image_quality" id="image-quality" class="form-select form-select-solid">
+                                @foreach (App\Models\AiPromptProfile::imageQualityOptions() as $value => $label)
+                                    <option value="{{ $value }}" @selected(old('image_quality', $profile->image_quality) === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="notice bg-light-success border border-success border-dashed rounded p-4 mb-5">
+                            <div class="fw-bold text-gray-900">Costo estimado de salida</div>
+                            <div class="fs-4 fw-bold text-success mt-1" id="image-cost-per-unit">—</div>
+                            <div class="text-gray-700 fs-7 mt-1" id="image-cost-at-scale">Se agregan unos pocos tokens del prompt.</div>
+                        </div>
+                        <div class="row g-5 mb-5">
+                            <div class="col-7">
+                                <label class="form-label">Formato del archivo</label>
+                                <select name="image_format" id="image-format" class="form-select form-select-solid">
+                                    @foreach (App\Models\AiPromptProfile::imageFormatOptions() as $value => $label)
+                                        <option value="{{ $value }}" @selected(old('image_format', $profile->image_format ?: 'jpeg') === $value)>{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-5">
+                                <label class="form-label">Compresión</label>
+                                <input type="number" name="image_compression" min="40" max="100" class="form-control form-control-solid" value="{{ old('image_compression', $profile->image_compression ?: 85) }}">
+                            </div>
+                            <div class="col-12 form-text mt-2">JPEG 85 reduce almacenamiento y transferencia sin afectar el costo de generación. PNG ignora la compresión.</div>
+                        </div>
                         <div><label class="form-label">Estilo visual</label><textarea name="image_style" rows="4" class="form-control form-control-solid">{{ old('image_style', $profile->image_style) }}</textarea></div>
                     </div>
                 </div>
@@ -78,3 +123,27 @@
         </div>
     </form>
 @endsection
+
+@push('scripts')
+    <script>
+        (() => {
+            const costs = @json($imageCostEstimates);
+            const model = document.getElementById('image-model');
+            const size = document.getElementById('image-size');
+            const quality = document.getElementById('image-quality');
+            const unit = document.getElementById('image-cost-per-unit');
+            const scale = document.getElementById('image-cost-at-scale');
+
+            const refresh = () => {
+                const cost = Number(costs?.[model.value]?.[quality.value]?.[size.value] || 0);
+                unit.textContent = cost > 0 ? `$${cost.toFixed(3)} USD por imagen` : 'Costo no disponible';
+                scale.textContent = cost > 0
+                    ? `100 imágenes: ~$${(cost * 100).toFixed(2)} USD, más los tokens pequeños del prompt.`
+                    : 'Consulta el precio vigente del modelo antes de generar en volumen.';
+            };
+
+            [model, size, quality].forEach(element => element?.addEventListener('change', refresh));
+            refresh();
+        })();
+    </script>
+@endpush
