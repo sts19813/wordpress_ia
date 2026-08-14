@@ -76,16 +76,14 @@ class SourcePublicationPlanner
             return [];
         }
 
-        $remaining = $this->remainingByProfile($sourceSite, $at);
+        $profileIds = $sourceSite->selectedPublicationProfileIds();
+
+        if ($profileIds === []) {
+            return [];
+        }
 
         return collect(range(0, $articleCount - 1))
-            ->map(fn (int $index) => collect($remaining)
-                ->filter(fn (int $count) => $count > $index)
-                ->keys()
-                ->map(fn (mixed $id) => (int) $id)
-                ->values()
-                ->all())
-            ->filter()
+            ->map(fn (): array => $profileIds)
             ->values()
             ->all();
     }

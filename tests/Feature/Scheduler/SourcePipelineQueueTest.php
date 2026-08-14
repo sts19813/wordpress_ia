@@ -210,7 +210,7 @@ class SourcePipelineQueueTest extends TestCase
 
         $articleTask->update(['payload' => [
             ...$articleTask->payload,
-            'publication_profile_ids' => [],
+            'publication_profile_ids' => [$wordpressSite->id],
             'wordpress_site_id' => null,
             'company_id' => null,
         ]]);
@@ -315,8 +315,8 @@ class SourcePipelineQueueTest extends TestCase
         $this->assertSame([
             [$destinations[0]->id, $destinations[1]->id],
             [$destinations[0]->id, $destinations[1]->id],
-            [$destinations[1]->id],
-            [$destinations[1]->id],
+            [$destinations[0]->id, $destinations[1]->id],
+            [$destinations[0]->id, $destinations[1]->id],
         ], $planner->allocate($site, 4));
 
         Carbon::setTestNow();
