@@ -48,8 +48,13 @@ class ScrapingSourceStrategy implements SourceStrategyInterface
 
         if (! $nodes || $nodes->length === 0) {
             $nodes = $xpath->query(
-                '//main//a[.//h1 or .//h2 or .//h3]'
+                '//main//a[.//h1 or .//h2 or .//h3 or .//h4 or .//h5 or .//h6]'
                 .' | //main//h1/a[@href] | //main//h2/a[@href] | //main//h3/a[@href]'
+                .' | //main//h4/a[@href] | //main//h5/a[@href] | //main//h6/a[@href]'
+                .' | //main//a[@href][contains(concat(" ", normalize-space(@class), " "), " headline ")]'
+                .' | //main//a[@href][contains(@class, "-headline")]'
+                .' | //a[@href][contains(concat(" ", normalize-space(@class), " "), " headline ")]'
+                .' | //a[@href][contains(@class, "-headline")]'
                 .' | //a[contains(concat(" ", normalize-space(@class), " "), " post ")]'
                 .' | //a[contains(concat(" ", normalize-space(@class), " "), " article ")]'
                 .' | //a[contains(concat(" ", normalize-space(@class), " "), " story ")]'
