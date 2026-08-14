@@ -77,6 +77,61 @@ class ArticleContentExtractorTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_it_extracts_a_blog_content_body_built_with_leaf_divs(): void
+    {
+        Http::fake([
+            'jornada.test/quintana-roo/123/nota' => Http::response(<<<'HTML'
+                <!doctype html>
+                <html>
+                    <head>
+                        <meta property="og:title" content="Título limpio de la nota">
+                        <meta property="og:url" content="https://jornada.test/quintanaroo/123/nota">
+                    </head>
+                    <body>
+                        <div class="single-blog-content">
+                            <div class="post-meta">
+                                <p><strong>Reportera</strong></p>
+                                <p>14/08/2026 | Quintana Roo</p>
+                            </div>
+                            <p>
+                                <div>Primer bloque editorial con información verificable y suficiente sobre el acontecimiento ocurrido en Quintana Roo.</div>
+                                <div><br></div>
+                                <div>Segundo bloque editorial que aporta antecedentes, declaraciones y contexto relevante para comprender la noticia completa.</div>
+                                <div><br></div>
+                                <div>Tercer bloque editorial con las consecuencias anunciadas por las autoridades y los siguientes pasos de la investigación.</div>
+                                <div><br></div>
+                                <div>Cuarto bloque editorial que cierra la publicación con información adicional útil para las personas lectoras.</div>
+                            </p>
+                        </div>
+                        <div class="single-blog-content">
+                            <h4>Nota relacionada</h4>
+                            <p>Este texto no pertenece al artículo principal.</p>
+                        </div>
+                    </body>
+                </html>
+                HTML),
+        ]);
+
+        $result = app(ArticleContentExtractor::class)->extract(new SourceSite([
+            'name' => 'La Jornada Maya',
+            'url' => 'https://jornada.test/quintana-roo',
+            'type' => SourceSite::TYPE_HTML,
+            'language' => 'es',
+            'auth_method' => SourceSite::AUTH_NONE,
+        ]), [
+            'titulo' => 'Título desde el listado',
+            'url' => 'https://jornada.test/quintana-roo/123/nota',
+            'contenido' => '',
+            'contenido_html' => '',
+        ]);
+
+        $this->assertSame('Título limpio de la nota', $result['titulo']);
+        $this->assertStringContainsString('Primer bloque editorial', $result['contenido_html']);
+        $this->assertStringContainsString('Cuarto bloque editorial', $result['contenido_html']);
+        $this->assertStringNotContainsString('Nota relacionada', $result['contenido_html']);
+        $this->assertGreaterThan(400, mb_strlen($result['contenido']));
+    }
+
     private function sourceSite(): SourceSite
     {
         return new SourceSite([

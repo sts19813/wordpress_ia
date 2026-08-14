@@ -261,6 +261,49 @@ class SourceManagerTest extends TestCase
         );
     }
 
+    public function test_scraping_strategy_recognizes_headlines_nested_in_h4_elements(): void
+    {
+        $html = <<<'HTML'
+        <html>
+            <head>
+                <meta property="og:title" content="La Jornada Maya">
+                <meta property="og:url" content="https://www.lajornadamaya.mx">
+            </head>
+            <body>
+                <section>
+                    <div class="single-blog-content">
+                        <a href="#" class="post-tag Quintana-Roo">Sociedad</a>
+                        <h4>
+                            <a href="https://www.lajornadamaya.mx/quintana-roo/266985/cancelan-hipotecas" class="post-headline">
+                                Cancelan hipotecas del Infonavit a familias de Quintana Roo
+                            </a>
+                        </h4>
+                        <p>La medida beneficia a familias de la entidad.</p>
+                    </div>
+                </section>
+            </body>
+        </html>
+        HTML;
+
+        $items = app(ScrapingSourceStrategy::class)->parse($html, new SourceSite([
+            'name' => 'La Jornada Maya',
+            'url' => 'https://www.lajornadamaya.mx/quintana-roo',
+            'type' => SourceSite::TYPE_HTML,
+            'language' => 'es',
+        ]));
+
+        $this->assertCount(1, $items);
+        $this->assertSame(
+            'Cancelan hipotecas del Infonavit a familias de Quintana Roo',
+            $items->first()['titulo'],
+        );
+        $this->assertSame(
+            'https://www.lajornadamaya.mx/quintana-roo/266985/cancelan-hipotecas',
+            $items->first()['url'],
+        );
+        $this->assertFalse($items->first()['_html_document_fallback']);
+    }
+
     public function test_scraping_strategy_prefers_the_link_that_contains_the_headline(): void
     {
         $html = <<<'HTML'

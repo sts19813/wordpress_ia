@@ -49,6 +49,8 @@ class ArticleBodyCleaner
             ];
         }
 
+        $this->promoteLeafDivsToParagraphs($document, $xpath, $root);
+
         $unwantedNodes = $xpath->query(
             './/script | .//style | .//noscript | .//iframe | .//form | .//nav | .//aside'
             .' | .//*[contains(translate(@class, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz"), "quick_links")]'
@@ -127,6 +129,33 @@ class ArticleBodyCleaner
             'score' => mb_strlen($text) + ($paragraphs * 120) + ($headings * 80),
             'paragraphs' => $paragraphs,
         ];
+    }
+
+    /**
+     * Algunos medios antiguos publican cada párrafo dentro de un div. Los
+     * convertimos antes de sanear el HTML para no perder el cuerpo cuando
+     * también existen párrafos cortos de autor o fecha.
+     */
+    private function promoteLeafDivsToParagraphs(DOMDocument $document, DOMXPath $xpath, DOMElement $root): void
+    {
+        $divs = iterator_to_array($xpath->query('.//div', $root) ?: []);
+
+        foreach (array_reverse($divs) as $node) {
+            if (! $node instanceof DOMElement
+                || ! $node->parentNode
+                || ! $this->isLeafBlock($node)
+                || str($node->textContent)->squish()->isEmpty()) {
+                continue;
+            }
+
+            $paragraph = $document->createElement('p');
+
+            while ($node->firstChild) {
+                $paragraph->appendChild($node->firstChild);
+            }
+
+            $node->parentNode->replaceChild($paragraph, $node);
+        }
     }
 
     /**

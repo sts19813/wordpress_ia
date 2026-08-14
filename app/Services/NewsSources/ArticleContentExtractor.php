@@ -121,8 +121,8 @@ class ArticleContentExtractor
         return [
             ...$item,
             'titulo' => $this->firstFilled([
-                data_get($jsonLd, 'headline'),
                 $this->meta($xpath, 'og:title'),
+                data_get($jsonLd, 'headline'),
                 $this->meta($xpath, 'twitter:title', 'name'),
                 $this->text($xpath, '//h1'),
                 $item['titulo'] ?? null,
@@ -197,7 +197,8 @@ class ArticleContentExtractor
             .' | //*[contains(translate(@class, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz"), "entry-content")]'
             .' | //*[contains(translate(@class, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz"), "article-body")]'
             .' | //*[contains(translate(@class, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz"), "article-content")]'
-            .' | //*[contains(translate(@class, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz"), "post-content")]';
+            .' | //*[contains(translate(@class, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz"), "post-content")]'
+            .' | //*[contains(translate(@class, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz"), "blog-content")]';
 
         $explicit = collect($xpath->query($explicitQuery) ?: [])
             ->filter(fn (mixed $node) => $node instanceof DOMElement)
