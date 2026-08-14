@@ -41,6 +41,7 @@ PROMPT;
         'language',
         'audience',
         'max_output_tokens',
+        'use_source_image',
         'generate_image',
         'image_model',
         'image_size',
@@ -56,6 +57,7 @@ PROMPT;
         return [
             'temperature' => 'decimal:2',
             'max_output_tokens' => 'integer',
+            'use_source_image' => 'boolean',
             'generate_image' => 'boolean',
             'image_compression' => 'integer',
             'is_default' => 'boolean',

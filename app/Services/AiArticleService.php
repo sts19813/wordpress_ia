@@ -9,6 +9,7 @@ use App\Models\SourcePost;
 use App\Models\User;
 use App\Services\AiArticles\ArticleGenerationEngine;
 use App\Services\AiArticles\ArticleGenerationResult;
+use App\Services\AiArticles\SourcePostImageImporter;
 use App\Services\OpenAI\OpenAIClient;
 use App\Services\OpenAI\OpenAICostCalculator;
 use Illuminate\Support\Facades\Storage;
@@ -22,6 +23,7 @@ class AiArticleService
         private readonly AiImageService $images,
         private readonly OpenAIClient $client,
         private readonly OpenAICostCalculator $costs,
+        private readonly SourcePostImageImporter $sourceImages,
     ) {}
 
     /**
@@ -29,10 +31,17 @@ class AiArticleService
      */
     public function generateDraft(User $user, AiPromptProfile $profile, iterable $sourcePosts): AiArticle
     {
+        $sourcePosts = collect($sourcePosts)->values();
         $article = $this->generateTextDraft($user, $profile, $sourcePosts);
 
-        if ($article->status === AiArticle::STATUS_DRAFT && $profile->generate_image) {
-            $this->generateMainImage($article, $profile);
+        if ($article->status === AiArticle::STATUS_DRAFT) {
+            $sourceImage = $profile->use_source_image
+                ? $this->sourceImages->attach($article, $sourcePosts, $profile)
+                : null;
+
+            if ($sourceImage === null && $profile->generate_image) {
+                $this->generateMainImage($article, $profile);
+            }
         }
 
         return $article->fresh('images');

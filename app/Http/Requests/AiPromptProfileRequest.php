@@ -16,6 +16,7 @@ class AiPromptProfileRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->merge([
+            'use_source_image' => $this->boolean('use_source_image'),
             'generate_image' => $this->boolean('generate_image'),
             'is_default' => $this->boolean('is_default'),
         ]);
@@ -39,12 +40,13 @@ class AiPromptProfileRequest extends FormRequest
             'language' => ['required', 'string', 'max:10'],
             'audience' => ['required', 'string', 'max:255'],
             'max_output_tokens' => ['required', 'integer', 'min:512', 'max:32000'],
+            'use_source_image' => ['boolean'],
             'generate_image' => ['boolean'],
             'image_model' => ['required_if:generate_image,true', 'nullable', Rule::in(array_keys(AiPromptProfile::imageModelOptions()))],
-            'image_size' => ['required_if:generate_image,true', 'nullable', Rule::in(array_keys(AiPromptProfile::imageSizeOptions()))],
+            'image_size' => [Rule::requiredIf(fn (): bool => $this->boolean('generate_image') || $this->boolean('use_source_image')), 'nullable', Rule::in(array_keys(AiPromptProfile::imageSizeOptions()))],
             'image_quality' => ['required_if:generate_image,true', 'nullable', Rule::in(array_keys(AiPromptProfile::imageQualityOptions()))],
-            'image_format' => ['required_if:generate_image,true', 'nullable', Rule::in(array_keys(AiPromptProfile::imageFormatOptions()))],
-            'image_compression' => ['required_if:generate_image,true', 'nullable', 'integer', 'min:40', 'max:100'],
+            'image_format' => [Rule::requiredIf(fn (): bool => $this->boolean('generate_image') || $this->boolean('use_source_image')), 'nullable', Rule::in(array_keys(AiPromptProfile::imageFormatOptions()))],
+            'image_compression' => [Rule::requiredIf(fn (): bool => $this->boolean('generate_image') || $this->boolean('use_source_image')), 'nullable', 'integer', 'min:40', 'max:100'],
             'image_style' => ['required_if:generate_image,true', 'nullable', 'string', 'max:500'],
             'is_default' => ['boolean'],
         ];

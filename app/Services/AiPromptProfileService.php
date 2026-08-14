@@ -95,6 +95,7 @@ class AiPromptProfileService
             'language' => 'es',
             'audience' => 'público general',
             'max_output_tokens' => 4000,
+            'use_source_image' => true,
             'generate_image' => true,
             'image_model' => AiPromptProfile::normalizeImageModel(config('services.openai.image_model')),
             'image_size' => '1536x1024',

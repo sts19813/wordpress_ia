@@ -47,7 +47,9 @@ class AiPromptProfileTest extends TestCase
 
         $this->actingAs($admin)
             ->get(route('admin.settings.prompts.edit', $profile))
-            ->assertOk();
+            ->assertOk()
+            ->assertSee('Utilizar imagen del post')
+            ->assertSee('Generar imagen con IA si no hay una original');
     }
 
     public function test_invalid_gpt_image_2_alias_is_normalized_and_not_offered(): void
@@ -91,6 +93,7 @@ class AiPromptProfileTest extends TestCase
                 'language' => $profile->language,
                 'audience' => $profile->audience,
                 'max_output_tokens' => $profile->max_output_tokens,
+                'use_source_image' => '1',
                 'generate_image' => '1',
                 'image_model' => $profile->image_model,
                 'image_size' => $profile->image_size,
@@ -104,6 +107,7 @@ class AiPromptProfileTest extends TestCase
             ->assertRedirect(route('admin.settings.index'));
 
         $this->assertSame('very_short', $profile->fresh()->content_length);
+        $this->assertTrue($profile->fresh()->use_source_image);
     }
 
     public function test_article_generation_form_explains_background_queue_processing(): void

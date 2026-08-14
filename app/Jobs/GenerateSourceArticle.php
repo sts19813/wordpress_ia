@@ -90,7 +90,7 @@ class GenerateSourceArticle implements ShouldBeUnique, ShouldQueue
             if (! $article || $article->status !== AiArticle::STATUS_DRAFT) {
                 $scheduler->running(
                     $task,
-                    'Generando el artículo y su imagen con IA',
+                    'Generando el artículo y preparando su imagen',
                     50,
                     max(1, $this->attempts()),
                 );
@@ -106,7 +106,7 @@ class GenerateSourceArticle implements ShouldBeUnique, ShouldQueue
                     $task,
                     'Artículo generado; preparando publicación',
                     80,
-                    'El texto'.($profile->generate_image ? ' y la imagen principal' : '').' quedaron listos.',
+                    'El texto'.(($profile->use_source_image || $profile->generate_image) ? ' y la imagen principal' : '').' quedaron listos.',
                     'success',
                 );
             }

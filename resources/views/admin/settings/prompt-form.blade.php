@@ -64,7 +64,10 @@
                 <div class="card card-flush mb-7">
                     <div class="card-header"><div class="card-title"><h3 class="fw-bold mb-0">Imagen principal</h3></div></div>
                     <div class="card-body">
-                        <label class="form-check form-switch form-check-custom form-check-solid mb-6"><input type="checkbox" name="generate_image" value="1" class="form-check-input" @checked(old('generate_image', $profile->generate_image))><span class="form-check-label fw-semibold">Generar imagen con la nota</span></label>
+                        <label class="form-check form-switch form-check-custom form-check-solid mb-2"><input type="checkbox" name="use_source_image" value="1" class="form-check-input" @checked(old('use_source_image', $profile->use_source_image ?? true))><span class="form-check-label fw-semibold">Utilizar imagen del post</span></label>
+                        <div class="form-text mb-6">Si la nota escaneada incluye una imagen válida, se reutiliza, recorta y ajusta a la resolución configurada sin consumir generación de imágenes.</div>
+                        <label class="form-check form-switch form-check-custom form-check-solid mb-2"><input type="checkbox" name="generate_image" value="1" class="form-check-input" @checked(old('generate_image', $profile->generate_image))><span class="form-check-label fw-semibold">Generar imagen con IA si no hay una original</span></label>
+                        <div class="form-text mb-6">OpenAI sólo se utilizará cuando no exista una imagen original disponible o no sea posible descargarla.</div>
                         <div class="mb-5">
                             <label class="form-label">Modelo</label>
                             <select name="image_model" id="image-model" class="form-select form-select-solid">
@@ -93,7 +96,7 @@
                         <div class="notice bg-light-success border border-success border-dashed rounded p-4 mb-5">
                             <div class="fw-bold text-gray-900">Costo estimado de salida</div>
                             <div class="fs-4 fw-bold text-success mt-1" id="image-cost-per-unit">—</div>
-                            <div class="text-gray-700 fs-7 mt-1" id="image-cost-at-scale">Se agregan unos pocos tokens del prompt.</div>
+                            <div class="text-gray-700 fs-7 mt-1" id="image-cost-at-scale">Este costo sólo aplica cuando sea necesario generar con IA.</div>
                         </div>
                         <div class="row g-5 mb-5">
                             <div class="col-7">
@@ -138,7 +141,7 @@
                 const cost = Number(costs?.[model.value]?.[quality.value]?.[size.value] || 0);
                 unit.textContent = cost > 0 ? `$${cost.toFixed(3)} USD por imagen` : 'Costo no disponible';
                 scale.textContent = cost > 0
-                    ? `100 imágenes: ~$${(cost * 100).toFixed(2)} USD, más los tokens pequeños del prompt.`
+                    ? `100 imágenes generadas con IA: ~$${(cost * 100).toFixed(2)} USD. Las imágenes originales reutilizadas cuestan $0.`
                     : 'Consulta el precio vigente del modelo antes de generar en volumen.';
             };
 

@@ -7,6 +7,7 @@ use App\Models\AiImage;
 use App\Models\AiPromptProfile;
 use App\Models\SourcePost;
 use App\Models\User;
+use App\Services\AiArticleService;
 use App\Services\AiPromptProfileService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
@@ -35,6 +36,7 @@ class AiDraftWorkflowTest extends TestCase
             'language' => 'es',
             'audience' => 'lectores generales',
             'max_output_tokens' => 2500,
+            'use_source_image' => true,
             'generate_image' => true,
             'image_model' => 'gpt-image-1.5',
             'image_size' => '1536x1024',
@@ -141,5 +143,86 @@ class AiDraftWorkflowTest extends TestCase
         $response->assertRedirect(route('admin.ai-articles.show', $article));
         $this->assertSame(AiArticle::STATUS_FAILED, $article->status);
         $this->assertStringContainsString('OPENAI_API_KEY', $article->generation_error);
+    }
+
+    public function test_original_source_image_is_cropped_and_reused_without_calling_image_generation(): void
+    {
+        Storage::fake('local');
+        config(['services.openai.api_key' => 'test-key']);
+        $user = User::factory()->create();
+        $profile = app(AiPromptProfileService::class)->ensureDefaultFor($user)->fresh();
+        $profile->update([
+            'use_source_image' => true,
+            'generate_image' => true,
+            'image_size' => '1536x1024',
+            'image_format' => 'jpeg',
+            'image_compression' => 80,
+        ]);
+        $sourcePost = SourcePost::query()->create([
+            'title' => 'Fuente con fotografía',
+            'content' => 'Hechos de la fuente con una fotografía disponible.',
+            'url' => 'https://example.com/fuente-con-foto',
+            'image_url' => 'https://cdn.example.com/original.jpg',
+            'hash' => hash('sha256', 'source-with-original-image'),
+            'status' => SourcePost::STATUS_FETCHED,
+            'language' => 'es',
+        ]);
+        $generated = json_encode([
+            'title' => 'Una nota con imagen reutilizada',
+            'content' => '<p>Contenido nuevo.</p>',
+            'excerpt' => 'Extracto nuevo',
+            'meta_description' => 'Descripción para buscadores',
+            'slug' => 'una-nota-con-imagen-reutilizada',
+            'categories' => ['Noticias'],
+            'tags' => ['Actualidad'],
+            'seo_keywords' => ['noticia'],
+            'faqs' => [],
+            'conclusion' => 'Conclusión.',
+        ], JSON_THROW_ON_ERROR);
+
+        Http::fake([
+            '*/responses' => Http::response([
+                'model' => 'gpt-4.1-mini-2025-04-14',
+                'output' => [[
+                    'type' => 'message',
+                    'content' => [['type' => 'output_text', 'text' => $generated]],
+                ]],
+                'usage' => ['input_tokens' => 100, 'output_tokens' => 200, 'total_tokens' => 300],
+            ]),
+            'https://cdn.example.com/original.jpg' => Http::response($this->jpeg(900, 1200), 200, [
+                'Content-Type' => 'image/jpeg',
+            ]),
+            '*/images/generations' => Http::response([], 500),
+        ]);
+
+        $article = app(AiArticleService::class)->generateDraft($user, $profile->fresh(), [$sourcePost]);
+        $image = $article->images()->sole();
+
+        $this->assertSame(AiImage::STATUS_GENERATED, $image->status);
+        $this->assertSame('original', $image->model);
+        $this->assertSame('0.000000', $image->cost);
+        $this->assertSame(0, $image->tokens['total']);
+        $this->assertSame('1536x1024', $image->resolution);
+        $this->assertSame('center_crop', $image->source_context['transformation']);
+        $this->assertSame($sourcePost->id, $image->source_context['source_post_id']);
+        Storage::disk('local')->assertExists($image->file_path);
+
+        $dimensions = getimagesizefromstring(Storage::disk('local')->get($image->file_path));
+        $this->assertSame(1536, $dimensions[0]);
+        $this->assertSame(1024, $dimensions[1]);
+        Http::assertNotSent(fn (Request $request): bool => str_ends_with($request->url(), '/images/generations'));
+    }
+
+    private function jpeg(int $width, int $height): string
+    {
+        $image = imagecreatetruecolor($width, $height);
+        $color = imagecolorallocate($image, 45, 110, 180);
+        imagefill($image, 0, 0, $color);
+        ob_start();
+        imagejpeg($image, null, 85);
+        $binary = ob_get_clean();
+        imagedestroy($image);
+
+        return (string) $binary;
     }
 }
