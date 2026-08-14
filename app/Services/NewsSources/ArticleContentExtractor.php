@@ -4,6 +4,7 @@ namespace App\Services\NewsSources;
 
 use App\Models\SourceSite;
 use App\Services\NewsSources\Strategies\Concerns\BuildsSourceRequests;
+use Carbon\Carbon;
 use DOMDocument;
 use DOMElement;
 use DOMNode;
@@ -140,11 +141,11 @@ class ArticleContentExtractor
                 $this->meta($xpath, 'author', 'name'),
                 $item['autor'] ?? null,
             ]),
-            'fecha' => $this->firstFilled([
+            'fecha' => $this->normalizePublishedAt($this->firstFilled([
                 data_get($jsonLd, 'datePublished'),
                 $this->meta($xpath, 'article:published_time'),
                 $item['fecha'] ?? null,
-            ]),
+            ])),
             'imagen' => $this->absoluteUrl($this->firstFilled([
                 data_get($jsonLd, 'image.url'),
                 data_get($jsonLd, 'image.0.url'),
@@ -343,6 +344,28 @@ class ArticleContentExtractor
     private function firstFilled(array $values): mixed
     {
         return collect($values)->first(fn (mixed $value) => filled($value));
+    }
+
+    private function normalizePublishedAt(mixed $value): ?string
+    {
+        if (! is_string($value) || blank($value)) {
+            return null;
+        }
+
+        foreach (['!d/m/Y', '!d-m-Y'] as $format) {
+            try {
+                return Carbon::createFromFormat($format, trim($value), config('app.timezone'))
+                    ->toIso8601String();
+            } catch (Throwable) {
+                // Continúa con el analizador flexible para formatos ISO y RFC.
+            }
+        }
+
+        try {
+            return Carbon::parse($value)->toIso8601String();
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     private function absoluteUrl(mixed $url, string $baseUrl): ?string
