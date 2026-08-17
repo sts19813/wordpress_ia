@@ -181,7 +181,7 @@
                         <li class="mb-3">Entra al panel de tu WordPress.</li>
                         <li class="mb-3">Abre <strong>Usuarios → Perfil</strong>.</li>
                         <li class="mb-3">Busca <strong>Contraseñas de aplicación</strong>.</li>
-                        <li>Crea una llamada “WordPress IA” y copia aquí el valor.</li>
+                        <li>Crea una llamada “Pulsorsur” y copia aquí el valor.</li>
                     </ol>
                     <div class="fs-8 text-muted">La credencial se almacena cifrada y nunca vuelve a mostrarse.</div>
                 </div>

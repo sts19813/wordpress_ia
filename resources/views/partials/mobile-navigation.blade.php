@@ -17,7 +17,7 @@
     </button>
 
     <a href="{{ route('admin.dashboard') }}" class="mobile-app-brand text-decoration-none">
-        <span class="mobile-app-brand-mark">WI</span>
+        <span class="mobile-app-brand-mark">PS</span>
         <span class="mobile-app-brand-name">{{ config('app.name') }}</span>
     </a>
 
