@@ -29,34 +29,42 @@ class FacebookPageClient
         ];
     }
 
-    public function publishPost(WordPressSite $profile, string $message, ?string $link = null): Response
-    {
+    public function publishPost(
+        WordPressSite $profile,
+        string $message,
+        ?string $link = null,
+        ?string $photoId = null,
+    ): Response {
         $credentials = $this->pageCredentials($profile);
+
+        $payload = array_filter([
+            'message' => $message,
+            'link' => $link,
+            'access_token' => $credentials['access_token'],
+        ]);
+
+        if (filled($photoId)) {
+            $payload['attached_media[0]'] = json_encode(['media_fbid' => $photoId], JSON_THROW_ON_ERROR);
+        }
 
         return $this->request()
             ->asForm()
-            ->post($this->endpoint($profile, 'feed', $credentials['page_id']), array_filter([
-                'message' => $message,
-                'link' => $link,
-                'access_token' => $credentials['access_token'],
-            ]))
+            ->post($this->endpoint($profile, 'feed', $credentials['page_id']), $payload)
             ->throw();
     }
 
-    public function publishPhoto(
+    public function uploadPhoto(
         WordPressSite $profile,
         string $contents,
         string $filename,
         string $mimeType,
-        string $message,
     ): Response {
         $credentials = $this->pageCredentials($profile);
 
         return $this->request()
             ->attach('source', $contents, $filename, ['Content-Type' => $mimeType])
             ->post($this->endpoint($profile, 'photos', $credentials['page_id']), [
-                'message' => $message,
-                'published' => 'true',
+                'published' => 'false',
                 'access_token' => $credentials['access_token'],
             ])
             ->throw();
@@ -69,32 +77,32 @@ class FacebookPageClient
     ): ?string {
         $credentials = $this->pageCredentials($profile);
 
-        if (filled($photoId)) {
-            $photo = $this->request()
-                ->get($this->graphEndpoint($profile, $photoId), [
-                    'fields' => 'id,link',
+        if (filled($postId)) {
+            $post = $this->request()
+                ->get($this->graphEndpoint($profile, $postId), [
+                    'fields' => 'id,permalink_url',
                     'access_token' => $credentials['access_token'],
                 ]);
-            $this->guardApiAccess($photo);
+            $this->guardApiAccess($post);
 
-            if ($photo->successful() && filled($photo->json('link'))) {
-                return (string) $photo->json('link');
+            if ($post->successful() && filled($post->json('permalink_url'))) {
+                return (string) $post->json('permalink_url');
             }
         }
 
-        if (blank($postId)) {
+        if (blank($photoId)) {
             return null;
         }
 
-        $post = $this->request()
-            ->get($this->graphEndpoint($profile, $postId), [
-                'fields' => 'id,permalink_url',
+        $photo = $this->request()
+            ->get($this->graphEndpoint($profile, $photoId), [
+                'fields' => 'id,link',
                 'access_token' => $credentials['access_token'],
             ]);
-        $this->guardApiAccess($post);
+        $this->guardApiAccess($photo);
 
-        return $post->successful() && filled($post->json('permalink_url'))
-            ? (string) $post->json('permalink_url')
+        return $photo->successful() && filled($photo->json('link'))
+            ? (string) $photo->json('link')
             : null;
     }
 

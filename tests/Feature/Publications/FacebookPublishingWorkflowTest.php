@@ -199,7 +199,7 @@ class FacebookPublishingWorkflowTest extends TestCase
         $this->assertSame(WordPressSite::TYPE_WORDPRESS, $profile->fresh()->type);
     }
 
-    public function test_generated_image_is_uploaded_as_a_facebook_photo(): void
+    public function test_generated_image_is_attached_to_a_facebook_feed_post(): void
     {
         Storage::fake('local');
         Storage::disk('local')->put('ai-images/principal.png', 'fake-image');
@@ -211,11 +211,13 @@ class FacebookPublishingWorkflowTest extends TestCase
             ]),
             'graph.facebook.com/v24.0/123456789/photos' => Http::response([
                 'id' => '555',
-                'post_id' => '123456789_987654321',
             ], 200),
-            'graph.facebook.com/v24.0/555*' => Http::response([
-                'id' => '555',
-                'link' => 'https://www.facebook.com/photo.php?fbid=555&set=a.111&type=3',
+            'graph.facebook.com/v24.0/123456789/feed' => Http::response([
+                'id' => '123456789_987654321',
+            ], 200),
+            'graph.facebook.com/v24.0/123456789_987654321*' => Http::response([
+                'id' => '123456789_987654321',
+                'permalink_url' => 'https://www.facebook.com/NoticiasDemo/posts/987654321',
             ], 200),
         ]);
 
@@ -238,10 +240,12 @@ class FacebookPublishingWorkflowTest extends TestCase
         $this->assertDatabaseHas('publications', [
             'status' => Publication::STATUS_PUBLISHED,
             'remote_post_key' => '123456789_987654321',
-            'remote_url' => 'https://www.facebook.com/photo.php?fbid=555&set=a.111&type=3',
-            'last_action' => 'publish_facebook_photo',
+            'remote_url' => 'https://www.facebook.com/NoticiasDemo/posts/987654321',
+            'last_action' => 'publish_facebook_post_with_photo',
         ]);
         Http::assertSent(fn (Request $request) => $request->url() === 'https://graph.facebook.com/v24.0/123456789/photos');
+        Http::assertSent(fn (Request $request) => $request->url() === 'https://graph.facebook.com/v24.0/123456789/feed'
+            && $request['attached_media[0]'] === '{"media_fbid":"555"}');
     }
 
     private function facebookProfile(User $user): WordPressSite

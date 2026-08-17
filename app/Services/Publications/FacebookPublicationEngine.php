@@ -53,20 +53,26 @@ class FacebookPublicationEngine
         }
 
         try {
-            $response = $hasLocalImage
-                ? $this->client->publishPhoto(
+            $photoId = null;
+            $uploadResponse = null;
+
+            if ($hasLocalImage) {
+                $uploadResponse = $this->client->uploadPhoto(
                     $profile,
                     Storage::disk('local')->get($image->file_path),
                     basename($image->file_path),
                     $image->mime_type ?: Storage::disk('local')->mimeType($image->file_path) ?: 'image/png',
-                    $message,
-                )
-                : $this->client->publishPost($profile, $message, $link);
-            $remoteKey = (string) ($response->json('post_id') ?: $response->json('id'));
-            $photoId = $hasLocalImage ? trim((string) $response->json('id')) : null;
-            $remoteUrl = $photoId
-                ? 'https://www.facebook.com/photo.php?fbid='.$photoId
-                : ($remoteKey !== '' ? 'https://www.facebook.com/'.$remoteKey : null);
+                );
+                $photoId = trim((string) $uploadResponse->json('id'));
+
+                if ($photoId === '') {
+                    throw new \RuntimeException('Facebook no devolvió el identificador de la imagen subida.');
+                }
+            }
+
+            $response = $this->client->publishPost($profile, $message, $link, $photoId);
+            $remoteKey = (string) $response->json('id');
+            $remoteUrl = $remoteKey !== '' ? 'https://www.facebook.com/'.$remoteKey : null;
 
             try {
                 $remoteUrl = $this->client->publicationUrl($profile, $remoteKey, $photoId) ?: $remoteUrl;
@@ -78,8 +84,11 @@ class FacebookPublicationEngine
                 'remote_post_key' => $remoteKey,
                 'remote_url' => $remoteUrl,
                 'status' => Publication::STATUS_PUBLISHED,
-                'last_action' => $hasLocalImage ? 'publish_facebook_photo' : 'publish_facebook_post',
-                'full_response' => $response->json(),
+                'last_action' => $hasLocalImage ? 'publish_facebook_post_with_photo' : 'publish_facebook_post',
+                'full_response' => array_filter([
+                    'photo' => $uploadResponse?->json(),
+                    'post' => $response->json(),
+                ]),
                 'published_at' => now(),
                 'error_message' => null,
             ]);
