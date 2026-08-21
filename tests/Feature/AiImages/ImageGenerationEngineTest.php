@@ -35,6 +35,7 @@ class ImageGenerationEngineTest extends TestCase
             $this->assertSame('generate', $result->request->operation);
             $this->assertSame(AiImage::STATUS_PENDING, $result->image->status);
             $this->assertStringContainsString('Artículo de prueba', $result->image->prompt);
+            $this->assertStringContainsString('No incluyas personas bajo ninguna circunstancia', $result->image->prompt);
             $this->assertNotEmpty($result->image->resolution);
         }
 
