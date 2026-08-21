@@ -70,7 +70,10 @@ class FacebookPublicationEngine
                 }
             }
 
-            $response = $this->client->publishPost($profile, $message, $link, $photoId);
+            // Facebook turns a feed item with both a link and attached media into a
+            // shared story, which can hide the uploaded image and yield a permalink
+            // that is not publicly viewable. The article URL is already in $message.
+            $response = $this->client->publishPost($profile, $message, $hasLocalImage ? null : $link, $photoId);
             $remoteKey = (string) $response->json('id');
             $remoteUrl = $remoteKey !== '' ? 'https://www.facebook.com/'.$remoteKey : null;
 

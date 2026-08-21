@@ -245,7 +245,8 @@ class FacebookPublishingWorkflowTest extends TestCase
         ]);
         Http::assertSent(fn (Request $request) => $request->url() === 'https://graph.facebook.com/v24.0/123456789/photos');
         Http::assertSent(fn (Request $request) => $request->url() === 'https://graph.facebook.com/v24.0/123456789/feed'
-            && $request['attached_media[0]'] === '{"media_fbid":"555"}');
+            && $request['attached_media[0]'] === '{"media_fbid":"555"}'
+            && ! isset($request['link']));
     }
 
     private function facebookProfile(User $user): WordPressSite
