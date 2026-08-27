@@ -31,7 +31,9 @@
                         <tbody class="fw-semibold text-gray-700">
                             @foreach ($sourceSites as $sourceSite)
                                 @php
-                                    $dailyTarget = collect($sourceSite->normalizedPublicationSchedules())->sum('daily_target');
+                                    $dailyTarget = $sourceSite->company_id
+                                        ? $sourceSite->dailyPublicationTarget()
+                                        : collect($sourceSite->normalizedPublicationSchedules())->sum('daily_target');
                                     $scheduleSummary = $sourceSite->publicationScheduleSummary();
                                 @endphp
                                 <tr>

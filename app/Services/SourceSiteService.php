@@ -31,7 +31,7 @@ class SourceSiteService
 
         if (! $sourceSite->active) {
             $sourceSite->forceFill(['next_scan_at' => null])->save();
-        } elseif ($wasInactive || array_key_exists('publication_schedules', $data) || ! $sourceSite->next_scan_at) {
+        } elseif ($wasInactive || array_intersect(array_keys($data), ['publication_schedules', 'daily_publication_target', 'publication_priority_time', 'company_id']) !== [] || ! $sourceSite->next_scan_at) {
             $sourceSite->forceFill(['next_scan_at' => $this->publicationPlanner->firstScanAt($sourceSite)])->save();
         }
 
@@ -98,6 +98,8 @@ class SourceSiteService
             'daily_limit' => 20,
             'max_posts_per_scan' => 20,
             'max_generations_per_scan' => 5,
+            'daily_publication_target' => 5,
+            'publication_priority_time' => '08:00',
             'active' => true,
             'auto_generate' => true,
             'auto_publish' => false,

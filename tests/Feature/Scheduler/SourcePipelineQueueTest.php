@@ -189,11 +189,6 @@ class SourcePipelineQueueTest extends TestCase
                 'link' => 'https://target.test/analisis-paquete-economico',
                 'status' => 'publish',
             ], 201),
-            'second-target.test/wp-json/wp/v2/posts' => Http::response([
-                'id' => 654,
-                'link' => 'https://second-target.test/analisis-paquete-economico',
-                'status' => 'publish',
-            ], 201),
         ]);
 
         $this->actingAs($user)->post(route('admin.scheduler.sources.run', $sourceSite))->assertRedirect();
@@ -220,13 +215,13 @@ class SourcePipelineQueueTest extends TestCase
         $articleTask->refresh();
         $this->assertSame(Scheduler::STATUS_COMPLETED, $articleTask->status);
         $this->assertSame(AiArticle::STATUS_DRAFT, AiArticle::query()->sole()->status);
-        $this->assertSame(2, Publication::query()->where('status', Publication::STATUS_PUBLISHED)->count());
+        $this->assertSame(1, Publication::query()->where('status', Publication::STATUS_PUBLISHED)->count());
         $this->assertEqualsCanonicalizing(
-            [$wordpressSite->id, $secondWordpressSite->id],
+            [$wordpressSite->id],
             Publication::query()->pluck('wordpress_site_id')->all(),
         );
         $this->assertTrue(collect($articleTask->fresh()->events)->contains(
-            fn (array $event) => str_contains($event['message'], '2 perfiles'),
+            fn (array $event) => str_contains($event['message'], '1 perfil'),
         ));
 
         $this->actingAs($user)
@@ -318,6 +313,69 @@ class SourcePipelineQueueTest extends TestCase
             [$destinations[0]->id, $destinations[1]->id],
             [$destinations[0]->id, $destinations[1]->id],
         ], $planner->allocate($site, 4));
+
+        Carbon::setTestNow();
+    }
+
+    public function test_company_daily_target_counts_each_generated_article_once_for_all_destinations(): void
+    {
+        Carbon::setTestNow('2026-08-12 09:00:00');
+        $user = User::factory()->create();
+        $profile = app(AiPromptProfileService::class)->ensureDefaultFor($user);
+        $company = $user->companies()->create(['name' => 'Empresa completa', 'active' => true]);
+        $destinations = collect(['Portal', 'Facebook'])->map(fn (string $name) => $user->wordpressSites()->create([
+            'company_id' => $company->id,
+            'type' => $name === 'Facebook' ? WordPressSite::TYPE_FACEBOOK_PAGE : WordPressSite::TYPE_WORDPRESS,
+            'name' => $name,
+            'rest_api_url' => $name === 'Portal' ? 'https://portal.test' : null,
+            'facebook_page_id' => $name === 'Facebook' ? '123' : null,
+            'facebook_access_token' => $name === 'Facebook' ? 'token' : null,
+            'username' => $name === 'Portal' ? 'editor' : null,
+            'application_password' => $name === 'Portal' ? 'app-pass' : null,
+            'status' => WordPressSite::STATUS_ACTIVE,
+            'active' => true,
+        ]));
+        $site = $this->sourceSite($user, $profile->id, [
+            'company_id' => $company->id,
+            'daily_publication_target' => 2,
+            'publication_priority_time' => '08:00',
+            'auto_publish' => true,
+        ]);
+
+        Scheduler::query()->create([
+            'user_id' => $user->id,
+            'source_site_id' => $site->id,
+            'type' => Scheduler::TYPE_SOURCE_ARTICLE,
+            'name' => 'Artículo generado',
+            'status' => Scheduler::STATUS_QUEUED,
+            'step' => 'En cola',
+            'progress' => 0,
+            'attempts' => 0,
+            'max_attempts' => 3,
+            'payload' => ['publication_profile_ids' => $destinations->pluck('id')->all()],
+            'events' => [],
+        ]);
+
+        $planner = app(SourcePublicationPlanner::class);
+        $this->assertSame(1, $planner->generationCapacity($site));
+        $this->assertSame([
+            [$destinations[0]->id, $destinations[1]->id],
+        ], $planner->allocate($site, 1));
+
+        $instagram = $user->wordpressSites()->create([
+            'company_id' => $company->id,
+            'type' => WordPressSite::TYPE_INSTAGRAM,
+            'name' => 'Instagram',
+            'instagram_account_id' => '456',
+            'instagram_access_token' => 'token',
+            'status' => WordPressSite::STATUS_ACTIVE,
+            'active' => true,
+        ]);
+
+        $this->assertSame(1, $planner->generationCapacity($site->fresh()));
+        $this->assertSame([
+            [$destinations[0]->id, $destinations[1]->id, $instagram->id],
+        ], $planner->allocate($site->fresh(), 1));
 
         Carbon::setTestNow();
     }

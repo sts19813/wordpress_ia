@@ -35,14 +35,15 @@ class SourceSiteConfigurationTest extends TestCase
             ->assertSee('Filtros inteligentes')
             ->assertSee('Avanzado')
             ->assertSee('Probar y traer la nota más reciente')
-            ->assertSee('Publicación diaria por destino')
-            ->assertSee('Posts deseados por día')
-            ->assertSee('Prioridad a partir de')
+            ->assertSee('Una nota generada, todos los canales de la empresa')
+            ->assertSee('Artículos a generar por día')
+            ->assertSee('Iniciar publicaciones a partir de')
             ->assertSee('Navegación y extracción con IA')
             ->assertDontSee('Límite de posts escaneados al día')
             ->assertDontSee('Máximo de posts por consulta')
             ->assertDontSee('Máximo de artículos generados por consulta')
-            ->assertSee('name="publication_schedules[', false)
+            ->assertSee('name="daily_publication_target"', false)
+            ->assertDontSee('name="publication_schedules[', false)
             ->assertSee('id="save-source-button"', false)
             ->assertDontSee('id="save-source-button" disabled', false)
             ->assertDontSee('name="status"', false)
@@ -54,8 +55,10 @@ class SourceSiteConfigurationTest extends TestCase
     {
         $user = User::factory()->create();
         $promptProfile = app(AiPromptProfileService::class)->ensureDefaultFor($user);
+        $company = $user->companies()->create(['name' => 'Empresa editorial', 'active' => true]);
         $publicationProfiles = collect(['Sitio principal', 'Sitio secundario'])->map(
             fn (string $name) => $user->wordpressSites()->create([
+                'company_id' => $company->id,
                 'name' => $name,
                 'rest_api_url' => 'https://'.str($name)->slug().'.test',
                 'username' => 'editor',
@@ -76,11 +79,9 @@ class SourceSiteConfigurationTest extends TestCase
                 'max_posts_per_scan' => 12,
                 'max_generations_per_scan' => 4,
                 'ai_prompt_profile_id' => $promptProfile->id,
-                'publication_schedules' => $publicationProfiles->mapWithKeys(fn ($destination) => [$destination->id => [
-                    'enabled' => '1',
-                    'daily_target' => 4,
-                    'priority_time' => '07:30',
-                ]])->all(),
+                'company_id' => $company->id,
+                'daily_publication_target' => 4,
+                'publication_priority_time' => '07:30',
                 'active' => '1',
             ]);
 
@@ -88,6 +89,9 @@ class SourceSiteConfigurationTest extends TestCase
         $sourceSite = SourceSite::query()->sole();
 
         $this->assertSame($publicationProfiles->pluck('id')->all(), $sourceSite->publication_profile_ids);
+        $this->assertSame($company->id, $sourceSite->company_id);
+        $this->assertSame(4, $sourceSite->daily_publication_target);
+        $this->assertSame('07:30', $sourceSite->publication_priority_time);
         $this->assertSame(4, $sourceSite->publication_schedules[$publicationProfiles->first()->id]['daily_target']);
         $this->assertSame('07:30', $sourceSite->publication_schedules[$publicationProfiles->last()->id]['priority_time']);
         $this->assertSame($publicationProfiles->first()->id, $sourceSite->wordpress_site_id);
@@ -129,6 +133,48 @@ class SourceSiteConfigurationTest extends TestCase
         $this->assertTrue($source->auto_generate);
         $this->assertTrue($source->auto_publish);
         $this->assertSame(7, $source->max_generations_per_scan);
+    }
+
+    public function test_company_sources_include_new_active_destinations_without_using_another_ai_cupo(): void
+    {
+        $user = User::factory()->create();
+        $company = $user->companies()->create(['name' => 'Empresa de prueba', 'active' => true]);
+        $promptProfile = app(AiPromptProfileService::class)->ensureDefaultFor($user);
+        $wordpress = $user->wordpressSites()->create([
+            'company_id' => $company->id,
+            'name' => 'Portal',
+            'rest_api_url' => 'https://portal.test',
+            'username' => 'editor',
+            'application_password' => 'app-pass',
+            'status' => WordPressSite::STATUS_ACTIVE,
+            'active' => true,
+        ]);
+
+        $this->actingAs($user)->post(route('admin.source-sites.store'), [
+            'name' => 'Medio de empresa',
+            'url' => 'https://source.test',
+            'type' => SourceSite::TYPE_AUTO,
+            'auth_method' => SourceSite::AUTH_NONE,
+            'ai_prompt_profile_id' => $promptProfile->id,
+            'company_id' => $company->id,
+            'daily_publication_target' => 2,
+            'publication_priority_time' => '08:00',
+            'active' => '1',
+        ])->assertRedirect();
+
+        $source = SourceSite::query()->sole();
+        $facebook = $user->wordpressSites()->create([
+            'company_id' => $company->id,
+            'type' => WordPressSite::TYPE_FACEBOOK_PAGE,
+            'name' => 'Facebook',
+            'facebook_page_id' => '123',
+            'facebook_access_token' => 'token',
+            'status' => WordPressSite::STATUS_ACTIVE,
+            'active' => true,
+        ]);
+
+        $this->assertSame([$wordpress->id, $facebook->id], $source->fresh()->selectedPublicationProfileIds());
+        $this->assertSame(2, $source->fresh()->dailyPublicationTarget());
     }
 
     public function test_it_stores_hours_and_topic_filters(): void
@@ -319,7 +365,7 @@ class SourceSiteConfigurationTest extends TestCase
         Http::assertSent(fn (Request $request) => $request->url() === 'https://r.jina.ai/'.$articleUrl);
     }
 
-    public function test_edit_form_can_select_companies_and_destinations_from_different_owners(): void
+    public function test_edit_form_uses_the_selected_company_instead_of_manual_destinations(): void
     {
         $admin = User::factory()->create(['is_admin' => true]);
         $owner = User::factory()->create();
@@ -359,7 +405,7 @@ class SourceSiteConfigurationTest extends TestCase
             ->assertOk()
             ->assertSee($ownerCompany->name)
             ->assertSee($otherCompany->name)
-            ->assertSee($otherDestination->name);
+            ->assertDontSee($otherDestination->name);
 
         $this->actingAs($admin)
             ->put(route('admin.source-sites.update', $sourceSite), [
@@ -373,9 +419,8 @@ class SourceSiteConfigurationTest extends TestCase
                 'max_generations_per_scan' => 5,
                 'ai_prompt_profile_id' => $promptProfile->id,
                 'company_id' => $otherCompany->id,
-                'publication_profile_ids' => [$otherDestination->id],
-                'auto_generate' => '1',
-                'auto_publish' => '1',
+                'daily_publication_target' => 5,
+                'publication_priority_time' => '08:00',
                 'active' => '1',
             ])
             ->assertRedirect(route('admin.source-sites.index'));

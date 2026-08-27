@@ -46,7 +46,7 @@ class CompanyModuleTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_source_configuration_accepts_destinations_from_multiple_companies(): void
+    public function test_source_configuration_uses_all_destinations_of_its_company(): void
     {
         $user = User::factory()->create();
         $prompt = app(AiPromptProfileService::class)->ensureDefaultFor($user);
@@ -63,7 +63,8 @@ class CompanyModuleTest extends TestCase
 
         $source = SourceSite::query()->sole();
         $this->assertSame($company->id, $source->company_id);
-        $this->assertSame([$profile->id, $otherProfile->id], $source->publication_profile_ids);
+        $this->assertSame([$profile->id], $source->publication_profile_ids);
+        $this->assertSame([$profile->id], $source->selectedPublicationProfileIds());
     }
 
     public function test_company_destinations_tab_lists_the_catalog_and_profile_actions(): void
@@ -121,7 +122,7 @@ class CompanyModuleTest extends TestCase
         $this->assertNull($removed->fresh()->company_id);
         $this->assertSame($company->id, $kept->fresh()->company_id);
         $this->assertSame($company->id, $moved->fresh()->company_id);
-        $this->assertSame([$kept->id], $source->fresh()->publication_profile_ids);
+        $this->assertSame([$kept->id, $moved->id], $source->fresh()->publication_profile_ids);
         $this->assertSame($kept->id, $source->fresh()->wordpress_site_id);
 
         $this->actingAs($user)

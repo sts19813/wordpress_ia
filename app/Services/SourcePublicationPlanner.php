@@ -35,6 +35,23 @@ class SourcePublicationPlanner
     {
         $at = $at ? Carbon::instance($at) : now();
         $schedules = $sourceSite->normalizedPublicationSchedules();
+
+        if ($sourceSite->company_id) {
+            $used = Scheduler::query()
+                ->where('source_site_id', $sourceSite->id)
+                ->where('type', Scheduler::TYPE_SOURCE_ARTICLE)
+                ->whereDate('created_at', $at->toDateString())
+                ->count();
+            $priorityAt = $at->copy()->startOfDay()->setTimeFromTimeString($sourceSite->publicationPriorityTime());
+            $remaining = $at->lt($priorityAt)
+                ? 0
+                : max(0, $sourceSite->dailyPublicationTarget() - $used);
+
+            return collect($schedules)
+                ->mapWithKeys(fn (array $schedule, int $profileId) => [$profileId => $remaining])
+                ->all();
+        }
+
         $used = array_fill_keys(array_keys($schedules), 0);
 
         Scheduler::query()

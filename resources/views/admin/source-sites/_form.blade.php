@@ -18,12 +18,7 @@
     };
     $filterErrors = $errors->hasAny(['filter_topics', 'filter_topics.*', 'excluded_topics', 'excluded_topics.*', 'filter_instructions']);
     $advancedErrors = $errors->hasAny(['active', 'auth_method', 'api_key', 'username', 'password', 'custom_headers', 'cookies']);
-    $automationErrors = $errors->hasAny(['ai_prompt_profile_id', 'company_id']);
-    $selectedPublicationProfileIds = array_map('intval', old('publication_profile_ids', $sourceSite->selectedPublicationProfileIds()));
-    $publicationSchedules = old('publication_schedules', $sourceSite->normalizedPublicationSchedules());
-    if ($publicationSchedules === [] && $selectedPublicationProfileIds !== []) {
-        $publicationSchedules = collect($selectedPublicationProfileIds)->mapWithKeys(fn ($id) => [$id => ['daily_target' => 5, 'priority_time' => '08:00']])->all();
-    }
+    $automationErrors = $errors->hasAny(['ai_prompt_profile_id']);
     $selectedCompanyId = (int) old('company_id', $sourceSite->company_id ?: ($companies->count() === 1 ? $companies->first()->id : 0));
     $activeTab = $automationErrors ? 'automation' : ($advancedErrors ? 'advanced' : ($filterErrors ? 'filters' : 'basic'));
 @endphp
@@ -99,48 +94,36 @@
                             @error('type')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-12">
-                            <div class="d-flex align-items-center justify-content-between gap-3 mb-4">
+                            <div class="notice d-flex bg-light-primary rounded border-primary border border-dashed p-6">
+                                <i class="ki-outline ki-share fs-2tx text-primary me-4"></i>
                                 <div>
-                                    <label class="form-label required mb-1">Publicación diaria por destino</label>
-                                    <div class="text-muted fs-7">Selecciona cada destino, cuántos posts deseas publicar al día y desde qué hora debe tener prioridad.</div>
+                                    <div class="fw-bold text-gray-900 mb-1">Una nota generada, todos los canales de la empresa</div>
+                                    <div class="text-gray-700">La cuota se consume una sola vez por artículo. Después se publica automáticamente en todos los destinos activos de la empresa: WordPress, Facebook, Instagram y cualquier red que agregues en el futuro.</div>
                                 </div>
                             </div>
-                            <div class="row g-4" id="publication-schedule-list">
-                                @forelse ($wordpressSites as $wordpressSite)
-                                    @php
-                                        $schedule = $publicationSchedules[$wordpressSite->id] ?? $publicationSchedules[(string) $wordpressSite->id] ?? [];
-                                        $enabled = in_array($wordpressSite->id, $selectedPublicationProfileIds, true) || $schedule !== [];
-                                    @endphp
-                                    <div class="col-xl-6">
-                                        <div class="border border-dashed rounded p-5 h-100 publication-schedule-card {{ $enabled ? 'border-primary bg-light-primary' : '' }}">
-                                            <div class="form-check form-check-custom form-check-solid mb-4">
-                                                <input type="hidden" name="publication_schedules[{{ $wordpressSite->id }}][enabled]" value="0">
-                                                <input class="form-check-input publication-schedule-toggle" type="checkbox" name="publication_schedules[{{ $wordpressSite->id }}][enabled]" value="1" id="publication-profile-{{ $wordpressSite->id }}" @checked($enabled)>
-                                                <label class="form-check-label fw-bold text-gray-900" for="publication-profile-{{ $wordpressSite->id }}">
-                                                    {{ $wordpressSite->company?->name ?: 'Sin empresa' }} · {{ $wordpressSite->name }}
-                                                    <span class="text-muted fw-semibold d-block fs-8">{{ $wordpressSite->typeLabel() }}</span>
-                                                </label>
-                                            </div>
-                                            <div class="row g-3 publication-schedule-fields">
-                                                <div class="col-sm-6">
-                                                    <label class="form-label fs-8">Posts deseados por día</label>
-                                                    <input type="number" name="publication_schedules[{{ $wordpressSite->id }}][daily_target]" value="{{ $schedule['daily_target'] ?? 5 }}" class="form-control form-control-solid" min="1" max="100">
-                                                </div>
-                                                <div class="col-sm-6">
-                                                    <label class="form-label fs-8">Prioridad a partir de</label>
-                                                    <input type="time" name="publication_schedules[{{ $wordpressSite->id }}][priority_time]" value="{{ $schedule['priority_time'] ?? '08:00' }}" class="form-control form-control-solid">
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                @empty
-                                    <div class="col-12"><div class="notice bg-light-warning rounded p-5">Primero crea un perfil de publicación activo.</div></div>
-                                @endforelse
-                            </div>
-                            <div class="form-text mt-4">El sistema consultará la fuente desde esas horas hasta cumplir los cupos. Cada artículo generado se enviará inmediatamente a los destinos que aún tengan cupo.</div>
-                            @error('publication_schedules')<div class="text-danger fs-7 mt-2">{{ $message }}</div>@enderror
-                            @error('publication_schedules.*.daily_target')<div class="text-danger fs-7 mt-2">{{ $message }}</div>@enderror
-                            @error('publication_schedules.*.priority_time')<div class="text-danger fs-7 mt-2">{{ $message }}</div>@enderror
+                        </div>
+                        <div class="col-lg-4">
+                            <label class="form-label required">Empresa que recibirá las publicaciones</label>
+                            <select name="company_id" id="source-company-id" class="form-select form-select-solid @error('company_id') is-invalid @enderror" required>
+                                <option value="">Selecciona una empresa</option>
+                                @foreach ($companies as $company)
+                                    <option value="{{ $company->id }}" @selected($selectedCompanyId === $company->id)>{{ $company->name }}</option>
+                                @endforeach
+                            </select>
+                            <div class="form-text">Se usarán todos sus destinos activos; no se eligen red por red.</div>
+                            @error('company_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                        <div class="col-lg-4">
+                            <label class="form-label required">Artículos a generar por día</label>
+                            <input type="number" name="daily_publication_target" value="{{ old('daily_publication_target', $sourceSite->dailyPublicationTarget()) }}" class="form-control form-control-solid @error('daily_publication_target') is-invalid @enderror" min="1" max="100" required>
+                            <div class="form-text">Es una meta por empresa, no por red social.</div>
+                            @error('daily_publication_target')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                        <div class="col-lg-4">
+                            <label class="form-label required">Iniciar publicaciones a partir de</label>
+                            <input type="time" name="publication_priority_time" value="{{ old('publication_priority_time', $sourceSite->publicationPriorityTime()) }}" class="form-control form-control-solid @error('publication_priority_time') is-invalid @enderror" required>
+                            <div class="form-text">La fuente se consulta desde esta hora hasta cumplir la meta.</div>
+                            @error('publication_priority_time')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                     </div>
                 </div>
@@ -183,22 +166,11 @@
                         <i class="ki-outline ki-arrows-circle fs-2tx text-success me-4"></i>
                         <div>
                             <div class="fw-bold text-gray-900 mb-1">Flujo completo mediante colas</div>
-                            <div class="text-gray-700">Cada nota aceptada puede generar un artículo con IA y publicarse en destinos de una o varias empresas. El progreso completo aparecerá en el Programador.</div>
+                            <div class="text-gray-700">Cada nota aceptada se genera una vez con IA y se entrega a todos los destinos activos de la empresa seleccionada. El progreso completo aparecerá en el Programador.</div>
                         </div>
                     </div>
 
                     <div class="row g-7">
-                        <div class="col-lg-6">
-                            <label class="form-label required">Empresa propietaria de la fuente</label>
-                            <select name="company_id" id="source-company-id" class="form-select form-select-solid @error('company_id') is-invalid @enderror" required>
-                                <option value="">Selecciona una empresa</option>
-                                @foreach ($companies as $company)
-                                    <option value="{{ $company->id }}" @selected($selectedCompanyId === $company->id)>{{ $company->name }}</option>
-                                @endforeach
-                            </select>
-                            <div class="form-text">Organiza la fuente y sus artículos. No limita los destinos de publicación automática.</div>
-                            @error('company_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
                         <div class="col-lg-6">
                             <label class="form-label required">Perfil editorial para generar artículos</label>
                             <select name="ai_prompt_profile_id" class="form-select form-select-solid @error('ai_prompt_profile_id') is-invalid @enderror">
@@ -213,7 +185,7 @@
                         </div>
                         <div class="col-12">
                             <div class="notice bg-light-success border border-success border-dashed rounded p-5">
-                                La generación y publicación son automáticas. Sólo se generan artículos cuando uno o más destinos tienen cupo diario disponible.
+                                La generación y publicación son automáticas. Cada artículo consume un único cupo diario de la empresa y se envía a todos sus destinos activos.
                             </div>
                         </div>
                     </div>
@@ -354,17 +326,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const typeHelp = document.getElementById('source-type-help');
     const aiNotice = document.getElementById('ai-connection-notice');
     let lastRecommendation = null;
-
-    form.querySelectorAll('.publication-schedule-toggle').forEach(toggle => {
-        const syncCard = () => {
-            const card = toggle.closest('.publication-schedule-card');
-            card.classList.toggle('border-primary', toggle.checked);
-            card.classList.toggle('bg-light-primary', toggle.checked);
-            card.querySelectorAll('.publication-schedule-fields input').forEach(input => { input.disabled = !toggle.checked; });
-        };
-        toggle.addEventListener('change', syncCard);
-        syncCard();
-    });
 
     const typeDescriptions = {
         auto: 'Probará primero los conectores convencionales y usará IA automáticamente si ninguno localiza publicaciones.',

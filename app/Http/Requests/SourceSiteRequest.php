@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\SourceSite;
+use App\Models\WordPressSite;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -17,28 +18,55 @@ class SourceSiteRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $sourceSite = $this->route('sourceSite');
+        $companyId = filled($this->input('company_id')) ? (int) $this->input('company_id') : null;
         $publicationSchedulesInput = (array) $this->input('publication_schedules', []);
+        $dailyTarget = min(100, max(1, (int) $this->input(
+            'daily_publication_target',
+            $sourceSite?->dailyPublicationTarget() ?: 5,
+        )));
+        $priorityTime = (string) $this->input(
+            'publication_priority_time',
+            $sourceSite?->publicationPriorityTime() ?: '08:00',
+        );
 
-        if ($publicationSchedulesInput === [] && $this->filled('publication_profile_ids')) {
-            $legacyDailyTarget = max(1, (int) $this->input('max_generations_per_scan', 5));
-            $publicationSchedulesInput = collect((array) $this->input('publication_profile_ids'))
-                ->mapWithKeys(fn (mixed $profileId) => [(int) $profileId => [
-                    'enabled' => true,
-                    'daily_target' => $legacyDailyTarget,
-                    'priority_time' => '00:00',
+        if ($companyId) {
+            $publicationProfileIds = WordPressSite::query()
+                ->where('company_id', $companyId)
+                ->where('active', true)
+                ->where('status', WordPressSite::STATUS_ACTIVE)
+                ->orderBy('id')
+                ->pluck('id')
+                ->map(fn (mixed $id) => (int) $id)
+                ->all();
+            $publicationSchedules = collect($publicationProfileIds)
+                ->mapWithKeys(fn (int $profileId) => [$profileId => [
+                    'daily_target' => $dailyTarget,
+                    'priority_time' => $priorityTime,
                 ]])
                 ->all();
-        }
+        } else {
+            if ($publicationSchedulesInput === [] && $this->filled('publication_profile_ids')) {
+                $legacyDailyTarget = max(1, (int) $this->input('max_generations_per_scan', 5));
+                $publicationSchedulesInput = collect((array) $this->input('publication_profile_ids'))
+                    ->mapWithKeys(fn (mixed $profileId) => [(int) $profileId => [
+                        'enabled' => true,
+                        'daily_target' => $legacyDailyTarget,
+                        'priority_time' => '00:00',
+                    ]])
+                    ->all();
+            }
 
-        $publicationSchedules = collect($publicationSchedulesInput)
-            ->filter(fn (mixed $schedule) => is_array($schedule) && filter_var($schedule['enabled'] ?? false, FILTER_VALIDATE_BOOL))
-            ->mapWithKeys(fn (array $schedule, mixed $profileId) => [(int) $profileId => [
-                'daily_target' => (int) ($schedule['daily_target'] ?? 1),
-                'priority_time' => (string) ($schedule['priority_time'] ?? '08:00'),
-            ]])
-            ->all();
-        $publicationProfileIds = array_map('intval', array_keys($publicationSchedules));
-        $dailyTarget = max([1, ...array_column($publicationSchedules, 'daily_target')]);
+            $publicationSchedules = collect($publicationSchedulesInput)
+                ->filter(fn (mixed $schedule) => is_array($schedule) && filter_var($schedule['enabled'] ?? false, FILTER_VALIDATE_BOOL))
+                ->mapWithKeys(fn (array $schedule, mixed $profileId) => [(int) $profileId => [
+                    'daily_target' => (int) ($schedule['daily_target'] ?? 1),
+                    'priority_time' => (string) ($schedule['priority_time'] ?? '08:00'),
+                ]])
+                ->all();
+            $publicationProfileIds = array_map('intval', array_keys($publicationSchedules));
+            $dailyTarget = max([1, ...array_column($publicationSchedules, 'daily_target')]);
+            $priorityTime = (string) (collect($publicationSchedules)->pluck('priority_time')->filter()->sort()->first() ?: $priorityTime);
+        }
 
         $this->merge(array_filter([
             'frequency_minutes' => 60,
@@ -51,9 +79,11 @@ class SourceSiteRequest extends FormRequest
             'active' => $this->has('active') ? $this->boolean('active') : ($sourceSite?->active ?? true),
             'auto_generate' => $publicationSchedules !== [],
             'auto_publish' => $publicationSchedules !== [],
-            'company_id' => filled($this->input('company_id')) ? (int) $this->input('company_id') : null,
+            'company_id' => $companyId,
             'publication_profile_ids' => $publicationProfileIds,
             'publication_schedules' => $publicationSchedules,
+            'daily_publication_target' => $dailyTarget,
+            'publication_priority_time' => $priorityTime,
             'daily_limit' => max(50, $dailyTarget * 10),
             'max_posts_per_scan' => min(100, max(20, $dailyTarget * 5)),
             'max_generations_per_scan' => $dailyTarget,
@@ -104,6 +134,8 @@ class SourceSiteRequest extends FormRequest
                 'integer',
                 Rule::exists('companies', 'id'),
             ],
+            'daily_publication_target' => ['required', 'integer', 'min:1', 'max:100'],
+            'publication_priority_time' => ['required', 'date_format:H:i'],
             'publication_profile_ids' => ['nullable', 'array'],
             'publication_profile_ids.*' => [
                 'integer',
@@ -147,6 +179,8 @@ class SourceSiteRequest extends FormRequest
             'auto_publish' => 'publicación automática',
             'ai_prompt_profile_id' => 'perfil editorial IA',
             'company_id' => 'empresa',
+            'daily_publication_target' => 'artículos a generar por día',
+            'publication_priority_time' => 'hora de inicio de publicaciones',
             'publication_profile_ids' => 'perfiles de publicación',
             'publication_profile_ids.*' => 'perfil de publicación',
             'publication_schedules' => 'programación de publicación',

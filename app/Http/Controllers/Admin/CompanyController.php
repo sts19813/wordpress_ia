@@ -106,6 +106,19 @@ class CompanyController extends Controller
                 ->whereNotNull('publication_profile_ids')
                 ->get()
                 ->each(function (SourceSite $source) use ($profilesById): void {
+                    if ($source->company_id) {
+                        $validIds = $source->companyPublicationProfileIds();
+
+                        if ($validIds !== array_map('intval', $source->publication_profile_ids ?: [])) {
+                            $source->update([
+                                'publication_profile_ids' => $validIds,
+                                'wordpress_site_id' => $validIds[0] ?? null,
+                            ]);
+                        }
+
+                        return;
+                    }
+
                     $validIds = collect($source->publication_profile_ids)
                         ->map(fn ($id) => (int) $id)
                         ->filter(fn (int $id) => $profilesById->get($id)?->company_id !== null)

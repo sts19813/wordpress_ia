@@ -52,6 +52,8 @@ class SourceSite extends Model
         'wordpress_site_id',
         'publication_profile_ids',
         'publication_schedules',
+        'daily_publication_target',
+        'publication_priority_time',
         'auto_generate',
         'auto_publish',
         'url',
@@ -107,6 +109,7 @@ class SourceSite extends Model
             'daily_limit' => 'integer',
             'max_posts_per_scan' => 'integer',
             'max_generations_per_scan' => 'integer',
+            'daily_publication_target' => 'integer',
         ];
     }
 
@@ -194,6 +197,10 @@ class SourceSite extends Model
      */
     public function selectedPublicationProfileIds(): array
     {
+        if ($this->company_id) {
+            return $this->companyPublicationProfileIds();
+        }
+
         $scheduledProfileIds = array_keys($this->normalizedPublicationSchedules());
 
         if ($scheduledProfileIds !== []) {
@@ -217,6 +224,15 @@ class SourceSite extends Model
      */
     public function normalizedPublicationSchedules(): array
     {
+        if ($this->company_id) {
+            return collect($this->companyPublicationProfileIds())
+                ->mapWithKeys(fn (int $profileId) => [$profileId => [
+                    'daily_target' => $this->dailyPublicationTarget(),
+                    'priority_time' => $this->publicationPriorityTime(),
+                ]])
+                ->all();
+        }
+
         $schedules = collect($this->publication_schedules ?: [])
             ->mapWithKeys(function (mixed $schedule, mixed $profileId): array {
                 $profileId = (int) $profileId;
@@ -257,6 +273,10 @@ class SourceSite extends Model
             return 'Sin destinos';
         }
 
+        if ($this->company_id) {
+            return 'Empresa completa · '.$this->dailyPublicationTarget().' artículo(s)/día desde '.$this->publicationPriorityTime();
+        }
+
         $targets = collect($schedules)->pluck('daily_target');
         $targetLabel = $targets->min() === $targets->max()
             ? $targets->first().' por destino'
@@ -264,6 +284,54 @@ class SourceSite extends Model
         $earliest = collect($schedules)->min('priority_time');
 
         return count($schedules).' destino(s) · '.$targetLabel.'/día desde '.$earliest;
+    }
+
+    /**
+     * Los destinos de una fuente perteneciente a una empresa siempre se resuelven
+     * al momento de publicar. Así, agregar Facebook, Instagram o X posteriormente
+     * no exige volver a editar cada fuente.
+     *
+     * @return array<int, int>
+     */
+    public function companyPublicationProfileIds(): array
+    {
+        if (! $this->company_id) {
+            return [];
+        }
+
+        return WordPressSite::query()
+            ->where('company_id', $this->company_id)
+            ->where('active', true)
+            ->where('status', WordPressSite::STATUS_ACTIVE)
+            ->orderBy('id')
+            ->pluck('id')
+            ->map(fn (mixed $id) => (int) $id)
+            ->all();
+    }
+
+    public function dailyPublicationTarget(): int
+    {
+        if ($this->daily_publication_target) {
+            return min(100, max(1, (int) $this->daily_publication_target));
+        }
+
+        $legacyTarget = collect($this->publication_schedules ?: [])
+            ->pluck('daily_target')
+            ->filter()
+            ->max();
+
+        return min(100, max(1, (int) ($legacyTarget ?: $this->max_generations_per_scan ?: 5)));
+    }
+
+    public function publicationPriorityTime(): string
+    {
+        $time = (string) ($this->publication_priority_time ?: collect($this->publication_schedules ?: [])
+            ->pluck('priority_time')
+            ->filter()
+            ->sort()
+            ->first() ?: '08:00');
+
+        return preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $time) ? $time : '08:00';
     }
 
     public function scheduledTasks(): HasMany
