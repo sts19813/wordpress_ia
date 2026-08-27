@@ -31,6 +31,8 @@ Route::get('/', function () {
         : redirect()->route('login');
 });
 
+Route::view('politica-de-privacidad', 'legal.privacy')->name('privacy');
+
 Route::get('medios-publicacion/{aiImage}/{expires}/{token}/imagen.jpg', PublicationMediaController::class)
     ->whereNumber('expires')
     ->where('token', '[a-f0-9]{64}')
