@@ -7,7 +7,6 @@ use App\Models\AiImage;
 use App\Models\Publication;
 use App\Models\WordPressSite;
 use Illuminate\Http\Client\RequestException;
-use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 class FacebookPublicationEngine
@@ -26,12 +25,11 @@ class FacebookPublicationEngine
             ->first();
         $link = $this->publishedArticleUrl($article);
         $message = $this->message($article, $link);
-        $hasLocalImage = (bool) ($image?->file_path && Storage::disk('local')->exists($image->file_path));
         $payload = [
             'platform' => WordPressSite::TYPE_FACEBOOK_PAGE,
             'message' => $message,
             'link' => $link,
-            'has_image' => $hasLocalImage,
+            'native_link_post' => true,
         ];
 
         if (! $publication) {
@@ -52,33 +50,25 @@ class FacebookPublicationEngine
             ]);
         }
 
+        if (blank($link)) {
+            $publication->update([
+                'status' => Publication::STATUS_FAILED,
+                'last_action' => 'publish_facebook_failed',
+                'error_message' => 'Primero publica el artículo en WordPress. Facebook necesita la URL pública del artículo para crear un post con enlace.',
+            ]);
+
+            return $publication->fresh();
+        }
+
         try {
-            $photoId = null;
-            $uploadResponse = null;
-
-            if ($hasLocalImage) {
-                $uploadResponse = $this->client->uploadPhoto(
-                    $profile,
-                    Storage::disk('local')->get($image->file_path),
-                    basename($image->file_path),
-                    $image->mime_type ?: Storage::disk('local')->mimeType($image->file_path) ?: 'image/png',
-                );
-                $photoId = trim((string) $uploadResponse->json('id'));
-
-                if ($photoId === '') {
-                    throw new \RuntimeException('Facebook no devolvió el identificador de la imagen subida.');
-                }
-            }
-
-            // Facebook turns a feed item with both a link and attached media into a
-            // shared story, which can hide the uploaded image and yield a permalink
-            // that is not publicly viewable. The article URL is already in $message.
-            $response = $this->client->publishPost($profile, $message, $hasLocalImage ? null : $link, $photoId);
+            // Do not attach a local image: Facebook would turn it into a photo post.
+            // It obtains the preview image from the Open Graph metadata at $link.
+            $response = $this->client->publishPost($profile, $message, $link);
             $remoteKey = (string) $response->json('id');
             $remoteUrl = $remoteKey !== '' ? 'https://www.facebook.com/'.$remoteKey : null;
 
             try {
-                $remoteUrl = $this->client->publicationUrl($profile, $remoteKey, $photoId) ?: $remoteUrl;
+                $remoteUrl = $this->client->publicationUrl($profile, $remoteKey) ?: $remoteUrl;
             } catch (Throwable) {
                 // La publicación ya existe; una consulta de permalink no debe marcarla como fallida.
             }
@@ -87,11 +77,8 @@ class FacebookPublicationEngine
                 'remote_post_key' => $remoteKey,
                 'remote_url' => $remoteUrl,
                 'status' => Publication::STATUS_PUBLISHED,
-                'last_action' => $hasLocalImage ? 'publish_facebook_post_with_photo' : 'publish_facebook_post',
-                'full_response' => array_filter([
-                    'photo' => $uploadResponse?->json(),
-                    'post' => $response->json(),
-                ]),
+                'last_action' => 'publish_facebook_link_post',
+                'full_response' => ['post' => $response->json()],
                 'published_at' => now(),
                 'error_message' => null,
             ]);

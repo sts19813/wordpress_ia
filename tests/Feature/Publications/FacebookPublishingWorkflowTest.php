@@ -11,7 +11,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class FacebookPublishingWorkflowTest extends TestCase
@@ -156,9 +155,12 @@ class FacebookPublishingWorkflowTest extends TestCase
         $user = User::factory()->create();
         $profile = $this->facebookProfile($user);
         $article = $this->article($user);
+        $this->publishedWordPressPublication($user, $article);
 
-        $response = $this->actingAs($user)->post(route('admin.publications.publish', $article));
-        $publication = Publication::query()->sole();
+        $response = $this->actingAs($user)->post(route('admin.publications.publish', $article), [
+            'site_ids' => [$profile->id],
+        ]);
+        $publication = Publication::query()->where('wordpress_site_id', $profile->id)->sole();
 
         $response->assertRedirect(route('admin.ai-articles.show', $article));
         $this->assertSame($profile->id, $publication->wordpress_site_id);
@@ -168,8 +170,9 @@ class FacebookPublishingWorkflowTest extends TestCase
 
         Http::assertSent(fn (Request $request) => $request->url() === 'https://graph.facebook.com/v24.0/123456789/feed'
             && str_contains((string) $request['message'], 'Título para Facebook')
-            && str_contains((string) $request['message'], 'Contenido completo del artículo generado.')
+            && str_contains((string) $request['message'], 'Resumen del artículo para la publicación.')
             && str_contains((string) $request['message'], '#Política')
+            && $request['link'] === 'https://noticias.test/titulo-para-facebook'
             && $request['access_token'] === 'page-token-secret');
     }
 
@@ -199,19 +202,14 @@ class FacebookPublishingWorkflowTest extends TestCase
         $this->assertSame(WordPressSite::TYPE_WORDPRESS, $profile->fresh()->type);
     }
 
-    public function test_generated_image_is_attached_to_a_facebook_feed_post(): void
+    public function test_facebook_publishes_a_link_post_without_uploading_the_generated_image(): void
     {
-        Storage::fake('local');
-        Storage::disk('local')->put('ai-images/principal.png', 'fake-image');
         Http::fake([
             'graph.facebook.com/v24.0/me*' => Http::response([
                 'id' => '123456789',
                 'name' => 'Noticias Demo',
                 'category' => 'News & media website',
             ]),
-            'graph.facebook.com/v24.0/123456789/photos' => Http::response([
-                'id' => '555',
-            ], 200),
             'graph.facebook.com/v24.0/123456789/feed' => Http::response([
                 'id' => '123456789_987654321',
             ], 200),
@@ -222,8 +220,9 @@ class FacebookPublishingWorkflowTest extends TestCase
         ]);
 
         $user = User::factory()->create();
-        $this->facebookProfile($user);
+        $profile = $this->facebookProfile($user);
         $article = $this->article($user);
+        $this->publishedWordPressPublication($user, $article);
         AiImage::query()->create([
             'ai_article_id' => $article->id,
             'type' => AiImage::TYPE_MAIN,
@@ -234,19 +233,41 @@ class FacebookPublishingWorkflowTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->post(route('admin.publications.publish', $article))
+            ->post(route('admin.publications.publish', $article), ['site_ids' => [$profile->id]])
             ->assertRedirect(route('admin.ai-articles.show', $article));
 
         $this->assertDatabaseHas('publications', [
             'status' => Publication::STATUS_PUBLISHED,
             'remote_post_key' => '123456789_987654321',
             'remote_url' => 'https://www.facebook.com/NoticiasDemo/posts/987654321',
-            'last_action' => 'publish_facebook_post_with_photo',
+            'last_action' => 'publish_facebook_link_post',
         ]);
-        Http::assertSent(fn (Request $request) => $request->url() === 'https://graph.facebook.com/v24.0/123456789/photos');
         Http::assertSent(fn (Request $request) => $request->url() === 'https://graph.facebook.com/v24.0/123456789/feed'
-            && $request['attached_media[0]'] === '{"media_fbid":"555"}'
-            && ! isset($request['link']));
+            && $request['link'] === 'https://noticias.test/titulo-para-facebook'
+            && ! isset($request['attached_media[0]']));
+        Http::assertNotSent(fn (Request $request) => $request->url() === 'https://graph.facebook.com/v24.0/123456789/photos');
+    }
+
+    public function test_facebook_requires_a_published_wordpress_url(): void
+    {
+        $user = User::factory()->create();
+        $profile = $this->facebookProfile($user);
+        $article = $this->article($user);
+
+        $this->actingAs($user)
+            ->post(route('admin.publications.publish', $article))
+            ->assertRedirect(route('admin.ai-articles.show', $article));
+
+        $this->assertDatabaseHas('publications', [
+            'wordpress_site_id' => $profile->id,
+            'status' => Publication::STATUS_FAILED,
+            'last_action' => 'publish_facebook_failed',
+        ]);
+        $this->assertStringContainsString(
+            'Primero publica el artículo en WordPress',
+            (string) Publication::query()->sole()->error_message,
+        );
+        Http::assertNothingSent();
     }
 
     private function facebookProfile(User $user): WordPressSite
@@ -259,6 +280,29 @@ class FacebookPublishingWorkflowTest extends TestCase
             'facebook_api_version' => 'v24.0',
             'status' => WordPressSite::STATUS_ACTIVE,
             'active' => true,
+        ]);
+    }
+
+    private function publishedWordPressPublication(User $user, AiArticle $article): Publication
+    {
+        $site = $user->wordpressSites()->create([
+            'type' => WordPressSite::TYPE_WORDPRESS,
+            'name' => 'WordPress Noticias',
+            'rest_api_url' => 'https://noticias.test',
+            'username' => 'editor',
+            'application_password' => 'application-password',
+            'status' => WordPressSite::STATUS_ACTIVE,
+            'active' => true,
+        ]);
+
+        return Publication::query()->create([
+            'user_id' => $user->id,
+            'wordpress_site_id' => $site->id,
+            'ai_article_id' => $article->id,
+            'status' => Publication::STATUS_PUBLISHED,
+            'remote_post_id' => 123,
+            'remote_url' => 'https://noticias.test/titulo-para-facebook',
+            'published_at' => now(),
         ]);
     }
 
