@@ -29,6 +29,7 @@ class SidebarNavigationTest extends TestCase
                 'IA y publicación',
                 'Notas generadas por IA',
                 'Imágenes generadas por IA',
+                'Resumen de producción',
                 'Notas publicadas',
                 'Programación de eventos',
                 'Sistema',
@@ -41,6 +42,7 @@ class SidebarNavigationTest extends TestCase
             ->assertSee('--admin-sidebar-selected: #075fd1;', false)
             ->assertSee(route('admin.quick-posts.index'), false)
             ->assertSee(route('admin.ai-articles.index'), false)
+            ->assertSee(route('admin.ai-production-report.index'), false)
             ->assertSee(route('admin.publications.index'), false)
             ->assertSee(route('admin.scheduler.index'), false);
     }

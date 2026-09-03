@@ -40,7 +40,7 @@ class SystemPermissions
         $routes = [
             'contenido.gestionar' => ['admin.news.', 'admin.quick-posts.', 'admin.source-post-media.'],
             'empresas.gestionar' => ['admin.companies.', 'admin.source-sites.', 'admin.source-scan-logs.'],
-            'ia.gestionar' => ['admin.ai-articles.', 'admin.ai-images.'],
+            'ia.gestionar' => ['admin.ai-articles.', 'admin.ai-images.', 'admin.ai-production-report.'],
             'publicaciones.gestionar' => ['admin.publications.', 'admin.wordpress-sites.', 'admin.scheduler.', 'admin.x-oauth.'],
             'logs.ver' => ['admin.system-logs.'],
             'configuracion.gestionar' => ['admin.settings.'],

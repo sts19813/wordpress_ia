@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AccountController;
 use App\Http\Controllers\Admin\AiArticleController;
 use App\Http\Controllers\Admin\AiImageController;
+use App\Http\Controllers\Admin\AiProductionReportController;
 use App\Http\Controllers\Admin\CompanyController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\NewsController;
@@ -91,6 +92,8 @@ Route::middleware(['auth', 'active', 'system.permission'])->prefix('admin')->nam
         ->parameters(['articulos-ia' => 'aiArticle']);
     Route::get('imagenes-ia', [AiImageController::class, 'index'])->name('ai-images.index');
     Route::get('imagenes-ia/{aiImage}/archivo', [AiImageController::class, 'file'])->name('ai-images.file');
+    Route::get('reportes/produccion-ia', [AiProductionReportController::class, 'index'])->name('ai-production-report.index');
+    Route::get('reportes/produccion-ia/exportar', [AiProductionReportController::class, 'export'])->name('ai-production-report.export');
     Route::get('publicaciones', [PublicationController::class, 'index'])->name('publications.index');
     Route::put('empresas/{company}/destinos', [CompanyController::class, 'updateDestinations'])
         ->name('companies.destinations.update');

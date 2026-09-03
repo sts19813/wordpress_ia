@@ -31,6 +31,7 @@
             'items' => [
                 ['label' => 'Notas generadas por IA', 'route' => 'admin.ai-articles.index', 'active' => 'admin.ai-articles.*', 'permission' => 'ia.gestionar'],
                 ['label' => 'Imágenes generadas por IA', 'route' => 'admin.ai-images.index', 'active' => 'admin.ai-images.*', 'permission' => 'ia.gestionar'],
+                ['label' => 'Resumen de producción', 'route' => 'admin.ai-production-report.index', 'active' => 'admin.ai-production-report.*', 'permission' => 'ia.gestionar'],
                 ['label' => 'Notas publicadas', 'route' => 'admin.publications.index', 'active' => 'admin.publications.*', 'permission' => 'publicaciones.gestionar'],
                 ['label' => 'Programación de eventos', 'route' => 'admin.scheduler.index', 'active' => 'admin.scheduler.*', 'permission' => 'publicaciones.gestionar'],
             ],
