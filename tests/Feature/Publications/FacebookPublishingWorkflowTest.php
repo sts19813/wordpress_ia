@@ -11,6 +11,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class FacebookPublishingWorkflowTest extends TestCase
@@ -202,7 +203,60 @@ class FacebookPublishingWorkflowTest extends TestCase
         $this->assertSame(WordPressSite::TYPE_WORDPRESS, $profile->fresh()->type);
     }
 
-    public function test_facebook_publishes_a_link_post_without_uploading_the_generated_image(): void
+    public function test_facebook_uploads_the_generated_image_and_keeps_the_article_link_in_the_message(): void
+    {
+        Storage::fake('local');
+        Http::fake([
+            'graph.facebook.com/v24.0/me*' => Http::response([
+                'id' => '123456789',
+                'name' => 'Noticias Demo',
+                'category' => 'News & media website',
+            ]),
+            'graph.facebook.com/v24.0/123456789/photos' => Http::response([
+                'id' => 'photo-456',
+            ], 200),
+            'graph.facebook.com/v24.0/123456789/feed' => Http::response([
+                'id' => '123456789_987654321',
+            ], 200),
+            'graph.facebook.com/v24.0/123456789_987654321*' => Http::response([
+                'id' => '123456789_987654321',
+                'permalink_url' => 'https://www.facebook.com/NoticiasDemo/posts/987654321',
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $profile = $this->facebookProfile($user);
+        $article = $this->article($user);
+        $this->publishedWordPressPublication($user, $article);
+        $image = AiImage::query()->create([
+            'ai_article_id' => $article->id,
+            'type' => AiImage::TYPE_MAIN,
+            'prompt' => 'Imagen de prueba',
+            'status' => AiImage::STATUS_GENERATED,
+            'file_path' => 'ai-images/principal.png',
+            'mime_type' => 'image/png',
+        ]);
+        Storage::disk('local')->put($image->file_path, 'contenido-de-imagen');
+
+        $this->actingAs($user)
+            ->post(route('admin.publications.publish', $article), ['site_ids' => [$profile->id]])
+            ->assertRedirect(route('admin.ai-articles.show', $article));
+
+        $this->assertDatabaseHas('publications', [
+            'status' => Publication::STATUS_PUBLISHED,
+            'remote_post_key' => '123456789_987654321',
+            'remote_url' => 'https://www.facebook.com/NoticiasDemo/posts/987654321',
+            'last_action' => 'publish_facebook_photo_post',
+        ]);
+        Http::assertSent(fn (Request $request) => $request->url() === 'https://graph.facebook.com/v24.0/123456789/photos'
+            && $request->hasFile('source', 'contenido-de-imagen', 'principal.png'));
+        Http::assertSent(fn (Request $request) => $request->url() === 'https://graph.facebook.com/v24.0/123456789/feed'
+            && ! isset($request['link'])
+            && str_contains((string) $request['message'], 'https://noticias.test/titulo-para-facebook')
+            && $request['attached_media[0]'] === json_encode(['media_fbid' => 'photo-456'], JSON_THROW_ON_ERROR));
+    }
+
+    public function test_facebook_falls_back_to_a_link_post_when_the_article_has_no_local_image(): void
     {
         Http::fake([
             'graph.facebook.com/v24.0/me*' => Http::response([
@@ -223,14 +277,6 @@ class FacebookPublishingWorkflowTest extends TestCase
         $profile = $this->facebookProfile($user);
         $article = $this->article($user);
         $this->publishedWordPressPublication($user, $article);
-        AiImage::query()->create([
-            'ai_article_id' => $article->id,
-            'type' => AiImage::TYPE_MAIN,
-            'prompt' => 'Imagen de prueba',
-            'status' => AiImage::STATUS_GENERATED,
-            'file_path' => 'ai-images/principal.png',
-            'mime_type' => 'image/png',
-        ]);
 
         $this->actingAs($user)
             ->post(route('admin.publications.publish', $article), ['site_ids' => [$profile->id]])
@@ -238,8 +284,6 @@ class FacebookPublishingWorkflowTest extends TestCase
 
         $this->assertDatabaseHas('publications', [
             'status' => Publication::STATUS_PUBLISHED,
-            'remote_post_key' => '123456789_987654321',
-            'remote_url' => 'https://www.facebook.com/NoticiasDemo/posts/987654321',
             'last_action' => 'publish_facebook_link_post',
         ]);
         Http::assertSent(fn (Request $request) => $request->url() === 'https://graph.facebook.com/v24.0/123456789/feed'

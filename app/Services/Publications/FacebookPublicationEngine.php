@@ -7,6 +7,8 @@ use App\Models\AiImage;
 use App\Models\Publication;
 use App\Models\WordPressSite;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Facades\Storage;
+use RuntimeException;
 use Throwable;
 
 class FacebookPublicationEngine
@@ -25,11 +27,12 @@ class FacebookPublicationEngine
             ->first();
         $link = $this->publishedArticleUrl($article);
         $message = $this->message($article, $link);
+        $hasLocalImage = (bool) ($image?->file_path && Storage::disk('local')->exists($image->file_path));
         $payload = [
             'platform' => WordPressSite::TYPE_FACEBOOK_PAGE,
             'message' => $message,
-            'link' => $link,
-            'native_link_post' => true,
+            'article_url' => $link,
+            'publication_type' => $hasLocalImage ? 'photo' : 'link',
         ];
 
         if (! $publication) {
@@ -61,14 +64,36 @@ class FacebookPublicationEngine
         }
 
         try {
-            // Do not attach a local image: Facebook would turn it into a photo post.
-            // It obtains the preview image from the Open Graph metadata at $link.
-            $response = $this->client->publishPost($profile, $message, $link);
+            $photoResponse = null;
+            $photoId = null;
+
+            if ($hasLocalImage) {
+                $photoResponse = $this->client->uploadPhoto(
+                    $profile,
+                    Storage::disk('local')->get($image->file_path),
+                    basename($image->file_path),
+                    $image->mime_type ?: Storage::disk('local')->mimeType($image->file_path) ?: 'image/jpeg',
+                );
+                $photoId = (string) $photoResponse->json('id');
+
+                if ($photoId === '') {
+                    throw new RuntimeException('Facebook no devolvió el identificador de la imagen subida.');
+                }
+            }
+
+            // A photo post makes the image independent from Facebook's Open Graph
+            // scraper. The article URL remains visible and clickable in the message.
+            $response = $this->client->publishPost(
+                $profile,
+                $message,
+                $hasLocalImage ? null : $link,
+                $photoId,
+            );
             $remoteKey = (string) $response->json('id');
             $remoteUrl = $remoteKey !== '' ? 'https://www.facebook.com/'.$remoteKey : null;
 
             try {
-                $remoteUrl = $this->client->publicationUrl($profile, $remoteKey) ?: $remoteUrl;
+                $remoteUrl = $this->client->publicationUrl($profile, $remoteKey, $photoId) ?: $remoteUrl;
             } catch (Throwable) {
                 // La publicación ya existe; una consulta de permalink no debe marcarla como fallida.
             }
@@ -77,8 +102,11 @@ class FacebookPublicationEngine
                 'remote_post_key' => $remoteKey,
                 'remote_url' => $remoteUrl,
                 'status' => Publication::STATUS_PUBLISHED,
-                'last_action' => 'publish_facebook_link_post',
-                'full_response' => ['post' => $response->json()],
+                'last_action' => $hasLocalImage ? 'publish_facebook_photo_post' : 'publish_facebook_link_post',
+                'full_response' => [
+                    'photo' => $photoResponse?->json(),
+                    'post' => $response->json(),
+                ],
                 'published_at' => now(),
                 'error_message' => null,
             ]);
