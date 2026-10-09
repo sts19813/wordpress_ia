@@ -37,8 +37,16 @@ Comprueba también que `storage/` y `bootstrap/cache/` tengan permisos de escrit
 En **hPanel → Sitios web → Administrar → Tareas cron**, crea una tarea de tipo **Custom** cada minuto. Usa la ruta real de tu cuenta:
 
 ```bash
-/usr/bin/php /home/USUARIO/domains/DOMINIO/public_html/artisan schedule:run
+/opt/alt/php84/usr/bin/php /home/USUARIO/domains/DOMINIO/current/artisan schedule:run
 ```
+
+Para `app.pulsosur.com`, la tarea debe quedar exactamente así:
+
+```bash
+cd /home/u670461366/domains/app.pulsosur.com/current && /opt/alt/php84/usr/bin/php artisan schedule:run
+```
+
+No uses `/usr/bin/php` en esta cuenta: el CLI por defecto es PHP 8.3 y las dependencias instaladas requieren PHP 8.4.
 
 El programador de Laravel ejecutará el worker de las colas `ai-text` y `ai-image`, sin solapar procesos. Puedes comprobar el registro con:
 
@@ -56,6 +64,12 @@ Si hPanel no acepta una frecuencia menor a 5 minutos, el sistema seguirá funcio
 php artisan queue:work database --queue=social-capture,ai-text,ai-image --stop-when-empty --tries=3 --timeout=300
 php artisan queue:failed
 php artisan queue:retry all
+```
+
+Para probar credenciales de publicacion sin mostrar tokens:
+
+```bash
+/opt/alt/php84/usr/bin/php artisan publication-profiles:test
 ```
 
 El primer comando permite procesar manualmente la cola para comprobar la configuración. El módulo **Programador** muestra el avance, los intentos, la etapa actual y la bitácora de cada solicitud.
