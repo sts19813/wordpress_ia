@@ -21,7 +21,8 @@ class SidebarNavigationTest extends TestCase
                 'Dashboard',
                 'Contenido',
                 'Notas obtenidas',
-                'Generar post rápido',
+                'Generar post',
+                'Generar post desde URL',
                 'Empresas y fuentes',
                 'Empresas',
                 'Sitios fuente',
@@ -40,6 +41,7 @@ class SidebarNavigationTest extends TestCase
             ->assertSee('menu-sub-accordion', false)
             ->assertSee('--admin-sidebar-submenu-text: #f1f5ff;', false)
             ->assertSee('--admin-sidebar-selected: #075fd1;', false)
+            ->assertSee(route('admin.manual-posts.create'), false)
             ->assertSee(route('admin.quick-posts.index'), false)
             ->assertSee(route('admin.ai-articles.index'), false)
             ->assertSee(route('admin.ai-production-report.index'), false)
@@ -60,6 +62,6 @@ class SidebarNavigationTest extends TestCase
             ->assertSee('data-kt-drawer-width="92%"', false)
             ->assertSee('Abrir menú principal')
             ->assertSee('Abrir todos los módulos')
-            ->assertSee(route('admin.quick-posts.create'), false);
+            ->assertSee(route('admin.manual-posts.create'), false);
     }
 }

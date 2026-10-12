@@ -101,6 +101,7 @@ class SourcePost extends Model
             'facebook' => 'Facebook',
             'x' => 'X',
             'instagram' => 'Instagram',
+            'manual' => 'Manual',
             default => 'Post rápido',
         };
     }

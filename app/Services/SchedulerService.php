@@ -11,6 +11,7 @@ use App\Jobs\ScanSourceSite;
 use App\Models\AiArticle;
 use App\Models\AiPromptProfile;
 use App\Models\Scheduler;
+use App\Models\SourcePost;
 use App\Models\User;
 
 class SchedulerService
@@ -78,6 +79,51 @@ class SchedulerService
 
         $this->addEvent($task, 'info', 'URL recibida y añadida a la cola de captura social.');
         CaptureQuickPost::dispatch($task->id)->onQueue('social-capture');
+
+        return $task->fresh();
+    }
+
+    /**
+     * @param  array<int, int>  $publicationProfileIds
+     * @param  array<int, int>  $companyIds
+     */
+    public function createManualPostTask(
+        User $user,
+        AiPromptProfile $profile,
+        SourcePost $sourcePost,
+        array $publicationProfileIds = [],
+        array $companyIds = [],
+    ): Scheduler {
+        $publicationProfileIds = array_values(array_unique(array_map('intval', $publicationProfileIds)));
+        $companyIds = array_values(array_unique(array_map('intval', $companyIds)));
+        $hasOriginalImages = $sourcePost->media()->exists();
+        $imageMode = $hasOriginalImages ? 'original' : 'generate';
+
+        $task = Scheduler::query()->create([
+            'user_id' => $user->id,
+            'source_post_id' => $sourcePost->id,
+            'type' => Scheduler::TYPE_QUICK_POST,
+            'name' => 'Generar post',
+            'status' => Scheduler::STATUS_QUEUED,
+            'step' => 'Texto recibido; IA en cola',
+            'progress' => 35,
+            'max_attempts' => 3,
+            'payload' => [
+                'profile_id' => $profile->id,
+                'source_post_ids' => [$sourcePost->id],
+                'origin' => 'manual_post',
+                'image_mode' => $imageMode,
+                'generate_image' => $imageMode === 'generate' && (bool) $profile->generate_image,
+                'company_id' => count($companyIds) === 1 ? $companyIds[0] : null,
+                'company_ids' => $companyIds,
+                'publication_profile_ids' => $publicationProfileIds,
+                'publication_ready' => false,
+            ],
+            'events' => [],
+        ]);
+
+        $this->addEvent($task, 'info', 'Texto recibido y añadido a la cola de generación.');
+        GenerateAiArticle::dispatch($task->id)->onQueue('ai-text');
 
         return $task->fresh();
     }

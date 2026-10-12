@@ -25,6 +25,7 @@ class QuickPostController extends Controller
             'posts' => SourcePost::query()
                 ->with(['media', 'sourceSite:id,name'])
                 ->where('origin_type', SourcePost::ORIGIN_QUICK_POST)
+                ->where(fn ($query) => $query->whereNull('social_platform')->orWhere('social_platform', '!=', 'manual'))
                 ->latest('captured_at')
                 ->get(),
         ]);

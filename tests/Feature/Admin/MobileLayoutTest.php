@@ -15,6 +15,7 @@ class MobileLayoutTest extends TestCase
         $this->actingAs(User::factory()->create());
 
         $routes = [
+            'admin.manual-posts.create',
             'admin.quick-posts.create',
             'admin.dashboard',
             'admin.source-sites.index',

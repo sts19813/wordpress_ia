@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\AiImageController;
 use App\Http\Controllers\Admin\AiProductionReportController;
 use App\Http\Controllers\Admin\CompanyController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\ManualPostController;
 use App\Http\Controllers\Admin\NewsController;
 use App\Http\Controllers\Admin\PublicationController;
 use App\Http\Controllers\Admin\QuickPostController;
@@ -72,6 +73,8 @@ Route::get('auth/x/callback', [XOAuthController::class, 'callback'])
 Route::middleware(['auth', 'active', 'system.permission'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::get('noticias', [NewsController::class, 'index'])->name('news.index');
+    Route::get('generar-post', [ManualPostController::class, 'create'])->name('manual-posts.create');
+    Route::post('generar-post', [ManualPostController::class, 'store'])->name('manual-posts.store');
     Route::get('post-rapido', [QuickPostController::class, 'index'])->name('quick-posts.index');
     Route::get('post-rapido/nuevo', [QuickPostController::class, 'create'])->name('quick-posts.create');
     Route::post('post-rapido', [QuickPostController::class, 'store'])->name('quick-posts.store');

@@ -65,6 +65,49 @@ class QuickPostWorkflowTest extends TestCase
         Queue::assertPushedOn('social-capture', CaptureQuickPost::class);
     }
 
+    public function test_manual_post_creates_a_source_and_queues_ai_for_multiple_companies(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        $profile = app(AiPromptProfileService::class)->ensureDefaultFor($user);
+        $firstCompany = $user->companies()->create(['name' => 'Empresa Uno', 'active' => true]);
+        $secondCompany = $user->companies()->create(['name' => 'Empresa Dos', 'active' => true]);
+        $firstDestination = $this->publicationProfile($user, [
+            'company_id' => $firstCompany->id,
+            'name' => 'WordPress Uno',
+        ]);
+        $secondDestination = $this->publicationProfile($user, [
+            'company_id' => $secondCompany->id,
+            'name' => 'WordPress Dos',
+        ]);
+
+        $content = 'Integran Comité de Contraloría Social del proyecto de mejoramiento del Barrio Mágico de Chetumal'
+            ."\n\n".str_repeat('Contenido base para que la inteligencia artificial redacte una nota original con suficiente contexto. ', 4);
+
+        $response = $this->actingAs($user)
+            ->post(route('admin.manual-posts.store'), [
+                'content' => $content,
+                'ai_prompt_profile_id' => $profile->id,
+                'company_ids' => [$firstCompany->id, $secondCompany->id],
+                'publication_profile_ids' => [$firstDestination->id, $secondDestination->id],
+            ]);
+
+        $task = Scheduler::query()->sole();
+        $sourcePost = SourcePost::query()->sole();
+        $response->assertRedirect(route('admin.scheduler.index', ['task' => $task->id]));
+        $this->assertSame(SourcePost::ORIGIN_QUICK_POST, $sourcePost->origin_type);
+        $this->assertSame('manual', $sourcePost->social_platform);
+        $this->assertSame($sourcePost->id, $task->source_post_id);
+        $this->assertSame('manual_post', $task->payload['origin']);
+        $this->assertSame([$sourcePost->id], $task->payload['source_post_ids']);
+        $this->assertSame([$firstCompany->id, $secondCompany->id], $task->payload['company_ids']);
+        $this->assertNull($task->payload['company_id']);
+        $this->assertSame([$firstDestination->id, $secondDestination->id], $task->payload['publication_profile_ids']);
+        $this->assertSame('generate', $task->payload['image_mode']);
+        $this->assertTrue($task->payload['generate_image']);
+        Queue::assertPushedOn('ai-text', GenerateAiArticle::class);
+    }
+
     public function test_quick_post_form_lists_only_available_publication_profiles(): void
     {
         $user = User::factory()->create();
