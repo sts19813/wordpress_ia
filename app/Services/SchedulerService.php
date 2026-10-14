@@ -99,6 +99,7 @@ class SchedulerService
         SourcePost $sourcePost,
         array $publicationProfileIds = [],
         array $companyIds = [],
+        bool $requiresReview = true,
     ): Scheduler {
         $publicationProfileIds = array_values(array_unique(array_map('intval', $publicationProfileIds)));
         $companyIds = array_values(array_unique(array_map('intval', $companyIds)));
@@ -123,7 +124,7 @@ class SchedulerService
                 'company_id' => count($companyIds) === 1 ? $companyIds[0] : null,
                 'company_ids' => $companyIds,
                 'publication_profile_ids' => $publicationProfileIds,
-                'requires_review' => true,
+                'requires_review' => $requiresReview,
                 'review_approved' => false,
                 'publication_ready' => false,
             ],

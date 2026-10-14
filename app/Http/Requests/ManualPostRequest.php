@@ -18,6 +18,7 @@ class ManualPostRequest extends FormRequest
     {
         $this->merge([
             'content' => trim((string) $this->input('content')),
+            'publish_without_review' => $this->boolean('publish_without_review'),
             'company_ids' => array_values(array_unique(array_map('intval', (array) $this->input('company_ids', [])))),
             'publication_profile_ids' => array_values(array_unique(array_map('intval', (array) $this->input('publication_profile_ids', [])))),
         ]);
@@ -28,6 +29,7 @@ class ManualPostRequest extends FormRequest
         return [
             'content' => ['required', 'string', 'min:80', 'max:20000'],
             'ai_prompt_profile_id' => ['required', 'integer', Rule::exists('ai_prompt_profiles', 'id')],
+            'publish_without_review' => ['boolean'],
             'company_ids' => ['nullable', 'array'],
             'company_ids.*' => [
                 'integer',
@@ -69,6 +71,10 @@ class ManualPostRequest extends FormRequest
             $companyIds = array_values(array_unique(array_map('intval', (array) $this->input('company_ids', []))));
 
             if ($profileIds === []) {
+                if ($this->boolean('publish_without_review') && $companyIds === []) {
+                    $validator->errors()->add('publication_profile_ids', 'Selecciona al menos un destino para publicar sin revisar.');
+                }
+
                 return;
             }
 
@@ -112,5 +118,10 @@ class ManualPostRequest extends FormRequest
             ->pluck('id')
             ->map(fn ($id): int => (int) $id)
             ->all();
+    }
+
+    public function publishesWithoutReview(): bool
+    {
+        return (bool) $this->validated('publish_without_review', false);
     }
 }

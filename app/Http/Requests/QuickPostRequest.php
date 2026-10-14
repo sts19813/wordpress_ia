@@ -21,6 +21,7 @@ class QuickPostRequest extends FormRequest
         $this->merge([
             'url' => trim((string) $this->input('url')),
             'image_mode' => trim((string) $this->input('image_mode', 'generate')),
+            'publish_without_review' => $this->boolean('publish_without_review'),
             'company_ids' => array_values(array_unique(array_filter(
                 array_map('intval', (array) ($this->input('company_ids') ?: [$this->input('company_id')])),
                 fn (int $id): bool => $id > 0,
@@ -50,6 +51,7 @@ class QuickPostRequest extends FormRequest
                 Rule::exists('ai_prompt_profiles', 'id'),
             ],
             'image_mode' => ['required', Rule::in(['generate', 'original'])],
+            'publish_without_review' => ['boolean'],
             'company_ids' => ['nullable', 'array'],
             'company_ids.*' => [
                 'integer',
@@ -83,6 +85,10 @@ class QuickPostRequest extends FormRequest
             $companyIds = array_values(array_unique(array_map('intval', (array) $this->input('company_ids', []))));
 
             if ($profileIds === []) {
+                if ($this->boolean('publish_without_review') && $companyIds === []) {
+                    $validator->errors()->add('publication_profile_ids', 'Selecciona al menos un destino para publicar sin revisar.');
+                }
+
                 return;
             }
 
@@ -120,5 +126,10 @@ class QuickPostRequest extends FormRequest
             ->pluck('id')
             ->map(fn ($id): int => (int) $id)
             ->all();
+    }
+
+    public function publishesWithoutReview(): bool
+    {
+        return (bool) $this->validated('publish_without_review', false);
     }
 }

@@ -264,6 +264,48 @@ class QuickPostWorkflowTest extends TestCase
         $this->assertTrue(Scheduler::query()->sole()->payload['generate_image']);
     }
 
+    public function test_user_can_authorize_a_manual_post_for_direct_publication(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        $profile = app(AiPromptProfileService::class)->ensureDefaultFor($user);
+        $company = $user->companies()->create(['name' => 'Empresa directa', 'active' => true]);
+        $destination = $this->publicationProfile($user, ['company_id' => $company->id]);
+        $content = str_repeat('Contenido suficiente para generar una nota y autorizar su publicación inmediata. ', 3);
+
+        $this->actingAs($user)
+            ->post(route('admin.manual-posts.store'), [
+                'content' => $content,
+                'ai_prompt_profile_id' => $profile->id,
+                'company_ids' => [$company->id],
+                'publication_profile_ids' => [$destination->id],
+                'publish_without_review' => true,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $task = Scheduler::query()->sole();
+        $this->assertFalse($task->payload['requires_review']);
+        $this->assertSame([$destination->id], $task->payload['publication_profile_ids']);
+    }
+
+    public function test_direct_publication_requires_a_selected_destination(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        $profile = app(AiPromptProfileService::class)->ensureDefaultFor($user);
+
+        $this->actingAs($user)
+            ->post(route('admin.manual-posts.store-url'), [
+                'url' => 'https://x.com/openai/status/123456',
+                'ai_prompt_profile_id' => $profile->id,
+                'image_mode' => 'original',
+                'publish_without_review' => true,
+            ])
+            ->assertSessionHasErrors('publication_profile_ids');
+
+        $this->assertDatabaseCount('schedulers', 0);
+    }
+
     public function test_audio_upload_is_transcribed_for_voice_mode(): void
     {
         config()->set('services.openai.api_key', 'test-key');

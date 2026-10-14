@@ -110,6 +110,7 @@ class ManualPostController extends Controller
             $sourcePost,
             $publicationProfileIds,
             $companyIds,
+            ! $request->publishesWithoutReview(),
         );
 
         $imageCount = $sourcePost->media()->count();
@@ -118,7 +119,9 @@ class ManualPostController extends Controller
             : ' Podrás agregar imágenes al revisar el borrador.';
         $publicationCount = count($publicationProfileIds);
         $publicationMessage = $publicationCount > 0
-            ? " Podrás revisarlo antes de publicarlo en {$publicationCount} destino(s)."
+            ? ($request->publishesWithoutReview()
+                ? " Se publicará automáticamente en {$publicationCount} destino(s)."
+                : " Podrás revisarlo antes de publicarlo en {$publicationCount} destino(s).")
             : ' El resultado quedará como borrador.';
 
         $message = 'El post se añadió a la cola de generación.'.$imageMessage.$publicationMessage;
@@ -148,7 +151,7 @@ class ManualPostController extends Controller
             $request->validated('image_mode'),
             $publicationProfileIds,
             count($companyIds) === 1 ? $companyIds[0] : null,
-            true,
+            ! $request->publishesWithoutReview(),
             $companyIds,
         );
         $imageMessage = $request->validated('image_mode') === 'original'
@@ -156,7 +159,9 @@ class ManualPostController extends Controller
             : 'generando una imagen principal con IA';
         $publicationCount = count($publicationProfileIds);
         $publicationMessage = $publicationCount > 0
-            ? " Podrás revisarlo antes de publicarlo en {$publicationCount} destino(s)."
+            ? ($request->publishesWithoutReview()
+                ? " Se publicará automáticamente en {$publicationCount} destino(s)."
+                : " Podrás revisarlo antes de publicarlo en {$publicationCount} destino(s).")
             : ' El resultado quedará como borrador.';
         $message = "La captura y recreación con IA se añadieron a la cola, {$imageMessage}.{$publicationMessage}";
 

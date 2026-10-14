@@ -164,6 +164,10 @@
                         </div>
                         <div class="card-footer d-flex flex-column flex-sm-row justify-content-end gap-3">
                             <a href="{{ route('admin.news.index') }}" class="btn btn-light">Cancelar</a>
+                            <label class="manual-post-auto-publish d-flex align-items-center gap-2 cursor-pointer mb-0">
+                                <span class="text-end"><span class="fw-bold text-gray-900 d-block fs-8">Publicar sin revisar</span><span class="text-muted d-block fs-9">Autoriza publicación automática</span></span>
+                                <span class="form-check form-switch form-check-custom form-check-solid m-0"><input class="form-check-input" type="checkbox" name="publish_without_review" value="1" id="publish-without-review" @checked(old('publish_without_review'))></span>
+                            </label>
                             <button type="submit" class="btn btn-primary" id="manual-post-submit"><i class="ki-outline ki-sparkles fs-2"></i>Generar post</button>
                         </div>
                     </div>
@@ -257,8 +261,9 @@
 .manual-post-destination-icon { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; flex: 0 0 36px; border-radius: 8px; color: #fff; font-size: 1rem; }
 .manual-post-destination-icon.is-facebook { background: #1877f2; }.manual-post-destination-icon.is-instagram { background: #c13584; }.manual-post-destination-icon.is-x { background: #111; }.manual-post-destination-icon.is-wordpress { background: #28799e; }
 .manual-post-voice { padding: 1rem; border: 1px dashed var(--bs-primary); border-radius: .5rem; background: var(--bs-primary-light); }.manual-post-voice-controls { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .65rem; }
+.manual-post-auto-publish { min-height: 42px; }
 .review-post-image { width: 100%; max-height: 420px; object-fit: cover; }.review-image-empty { display: flex; align-items: center; gap: 1rem; padding: 1rem; border: 1px dashed var(--bs-primary); border-radius: .5rem; background: var(--bs-primary-light); }
-@media (max-width: 767.98px) { .manual-post-page .row { --bs-gutter-y: 1rem; }.manual-post-page .card-body { padding: 1.15rem; }.manual-post-mode-button { flex-direction: column; gap: .1rem; font-size: .75rem; }.manual-post-textarea { min-height: 320px; font-size: 1rem; }.manual-post-preview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.manual-post-company { padding: 1rem !important; }.manual-post-destination { align-items: flex-start !important; }.manual-post-page .card-footer { padding: 1rem 1.15rem; }.manual-post-page .card-footer .btn, .manual-post-page .btn-light-primary { width: 100%; }.manual-post-voice-controls .btn { flex: 1 1 auto; } }
+@media (max-width: 767.98px) { .manual-post-page .row { --bs-gutter-y: 1rem; }.manual-post-page .card-body { padding: 1.15rem; }.manual-post-mode-button { flex-direction: column; gap: .1rem; font-size: .75rem; }.manual-post-textarea { min-height: 320px; font-size: 1rem; }.manual-post-preview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.manual-post-company { padding: 1rem !important; }.manual-post-destination { align-items: flex-start !important; }.manual-post-page .card-footer { padding: 1rem 1.15rem; }.manual-post-page .card-footer .btn, .manual-post-page .btn-light-primary { width: 100%; }.manual-post-auto-publish { width: 100%; justify-content: space-between; padding: .2rem 0; }.manual-post-voice-controls .btn { flex: 1 1 auto; } }
 </style>
 @endpush
 
@@ -330,9 +335,10 @@ document.addEventListener('DOMContentLoaded', function () {
             const task = await response.json();
             if (!response.ok) throw new Error(task.message || 'No se pudo consultar la generación.');
             updateGeneratingAlert(task.progress, task.step);
-            if (task.status === 'completed' && (task.review_url || task.preview_url)) {
-                await Swal.fire({ icon: 'success', title: 'Borrador listo', text: 'Ábrelo para revisarlo antes de publicar.', confirmButtonText: 'Ver borrador', allowOutsideClick: false });
-                window.location.assign(task.review_url || task.preview_url);
+            if (task.status === 'completed' && (task.review_url || task.preview_url || task.article_url)) {
+                const needsReview = Boolean(task.review_url || task.preview_url);
+                await Swal.fire({ icon: 'success', title: needsReview ? 'Borrador listo' : 'Post publicado', text: needsReview ? 'Ábrelo para revisarlo antes de publicar.' : 'La publicación se completó en los destinos elegidos.', confirmButtonText: needsReview ? 'Ver borrador' : 'Ver post', allowOutsideClick: false });
+                window.location.assign(task.review_url || task.preview_url || task.article_url);
                 return;
             }
             if (task.status === 'failed') throw new Error(task.last_error || 'La generación no pudo completarse.');
