@@ -107,6 +107,9 @@ class SchedulerController extends Controller
             'last_error' => $scheduler->last_error,
             'events' => $scheduler->events ?: [],
             'article_url' => $scheduler->article ? route('admin.ai-articles.show', $scheduler->article) : null,
+            'preview_url' => $scheduler->article && (bool) data_get($scheduler->payload, 'requires_review')
+                ? route('admin.ai-articles.show', ['aiArticle' => $scheduler->article, 'review_task' => $scheduler->id])
+                : null,
             'publication_url' => $scheduler->publication?->remote_url,
             'source_site' => $scheduler->sourceSite?->name,
             'updated_at' => $scheduler->updated_at->toIso8601String(),

@@ -75,6 +75,8 @@ Route::middleware(['auth', 'active', 'system.permission'])->prefix('admin')->nam
     Route::get('noticias', [NewsController::class, 'index'])->name('news.index');
     Route::get('generar-post', [ManualPostController::class, 'create'])->name('manual-posts.create');
     Route::post('generar-post', [ManualPostController::class, 'store'])->name('manual-posts.store');
+    Route::post('generar-post/transcribir', [ManualPostController::class, 'transcribe'])->name('manual-posts.transcribe');
+    Route::post('generar-post/{scheduler}/publicar', [ManualPostController::class, 'publish'])->name('manual-posts.publish');
     Route::get('post-rapido', [QuickPostController::class, 'index'])->name('quick-posts.index');
     Route::get('post-rapido/nuevo', [QuickPostController::class, 'create'])->name('quick-posts.create');
     Route::post('post-rapido', [QuickPostController::class, 'store'])->name('quick-posts.store');

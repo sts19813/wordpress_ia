@@ -22,6 +22,7 @@ use App\Services\QuickPosts\OriginalPostImageService;
 use App\Services\QuickPosts\SocialPostCaptureService;
 use App\Services\SchedulerService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -61,6 +62,7 @@ class QuickPostWorkflowTest extends TestCase
         $this->assertSame($selectedProfile->id, $task->payload['profile_id']);
         $this->assertFalse($task->payload['generate_image']);
         $this->assertSame([$publicationProfile->id], $task->payload['publication_profile_ids']);
+        $this->assertTrue($task->payload['requires_review']);
         $this->assertFalse($task->payload['publication_ready']);
         Queue::assertPushedOn('social-capture', CaptureQuickPost::class);
     }
@@ -105,10 +107,11 @@ class QuickPostWorkflowTest extends TestCase
         $this->assertSame([$firstDestination->id, $secondDestination->id], $task->payload['publication_profile_ids']);
         $this->assertSame('generate', $task->payload['image_mode']);
         $this->assertTrue($task->payload['generate_image']);
+        $this->assertTrue($task->payload['requires_review']);
         Queue::assertPushedOn('ai-text', GenerateAiArticle::class);
     }
 
-    public function test_quick_post_form_lists_only_available_publication_profiles(): void
+    public function test_quick_post_create_redirects_to_the_unified_form_with_all_modes(): void
     {
         $user = User::factory()->create();
         $otherUser = User::factory()->create();
@@ -118,9 +121,11 @@ class QuickPostWorkflowTest extends TestCase
             'system_prompt' => AiPromptProfile::DEFAULT_SYSTEM_PROMPT,
             'content_length' => 'very_short',
         ]);
-        $this->publicationProfile($user, ['name' => 'Mi sitio principal']);
+        $company = $user->companies()->create(['name' => 'Empresa editorial', 'active' => true]);
+        $this->publicationProfile($user, ['name' => 'Mi sitio principal', 'company_id' => $company->id]);
         $this->publicationProfile($user, [
             'name' => 'Facebook Noticias',
+            'company_id' => $company->id,
             'type' => WordPressSite::TYPE_FACEBOOK_PAGE,
             'rest_api_url' => '',
             'username' => '',
@@ -133,20 +138,88 @@ class QuickPostWorkflowTest extends TestCase
 
         $this->actingAs($user)
             ->get(route('admin.quick-posts.create'))
+            ->assertRedirect(route('admin.manual-posts.create', ['mode' => 'url']));
+
+        $this->actingAs($user)
+            ->get(route('admin.manual-posts.create', ['mode' => 'url']))
             ->assertOk()
-            ->assertSee('Generar imágenes nuevas con IA')
-            ->assertSee('Conservar las imágenes originales')
+            ->assertSee('Texto')
+            ->assertSee('Desde URL')
+            ->assertSee('Voz')
+            ->assertSee('Grabar')
+            ->assertSee('Cargar audio')
+            ->assertSee('Generar con IA')
+            ->assertSee('Conservar imágenes originales')
             ->assertSee('name="image_mode"', false)
             ->assertSee('name="ai_prompt_profile_id"', false)
             ->assertSee('Perfil para redes')
             ->assertSee('Muy corto (150–200 palabras)')
-            ->assertSee('Publicar automáticamente al terminar')
             ->assertSee('name="publication_profile_ids[]"', false)
             ->assertSee('Mi sitio principal')
             ->assertSee('Facebook Noticias')
             ->assertDontSee('Perfil pausado')
             ->assertDontSee('Perfil de otra cuenta')
             ->assertDontSee('Posts, fotos e hilos públicos');
+    }
+
+    public function test_manual_post_waits_for_review_then_queues_every_selected_destination(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        $profile = app(AiPromptProfileService::class)->ensureDefaultFor($user);
+        $firstDestination = $this->publicationProfile($user, ['name' => 'Sitio uno']);
+        $secondDestination = $this->publicationProfile($user, ['name' => 'Sitio dos']);
+        $article = $user->aiArticles()->create([
+            'title' => 'Borrador por revisar',
+            'content' => '<p>Contenido listo.</p>',
+            'status' => AiArticle::STATUS_DRAFT,
+        ]);
+        $task = Scheduler::query()->create([
+            'user_id' => $user->id,
+            'ai_article_id' => $article->id,
+            'type' => Scheduler::TYPE_QUICK_POST,
+            'name' => 'Generar post',
+            'status' => Scheduler::STATUS_COMPLETED,
+            'step' => 'Borrador listo para revisión',
+            'progress' => 100,
+            'max_attempts' => 3,
+            'payload' => [
+                'requires_review' => true,
+                'review_approved' => false,
+                'publication_ready' => false,
+                'publication_profile_ids' => [$firstDestination->id, $secondDestination->id],
+            ],
+            'events' => [],
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('admin.manual-posts.publish', $task))
+            ->assertRedirect(route('admin.scheduler.index', ['task' => $task->id]));
+
+        $task->refresh();
+        $this->assertSame(Scheduler::STATUS_QUEUED, $task->status);
+        $this->assertTrue($task->payload['review_approved']);
+        $this->assertTrue($task->payload['publication_ready']);
+        Queue::assertPushedOn('publication', PublishQuickPost::class);
+    }
+
+    public function test_audio_upload_is_transcribed_for_voice_mode(): void
+    {
+        config()->set('services.openai.api_key', 'test-key');
+        Http::fake([
+            'https://api.openai.com/v1/audio/transcriptions' => Http::response([
+                'text' => 'Esta es una transcripción de prueba.',
+            ]),
+        ]);
+        $user = User::factory()->create();
+        $audio = UploadedFile::fake()->create('nota.mp3', 20, 'audio/mpeg');
+
+        $this->actingAs($user)
+            ->postJson(route('admin.manual-posts.transcribe'), ['audio' => $audio])
+            ->assertOk()
+            ->assertJsonPath('text', 'Esta es una transcripción de prueba.');
+
+        Http::assertSent(fn ($request) => str_ends_with($request->url(), '/audio/transcriptions'));
     }
 
     public function test_quick_post_can_use_the_same_global_profile_for_every_user(): void
@@ -426,6 +499,37 @@ class QuickPostWorkflowTest extends TestCase
         $this->assertSame(90, $task->progress);
         $this->assertTrue($task->payload['publication_ready']);
         Queue::assertPushedOn('publication', PublishQuickPost::class);
+    }
+
+    public function test_review_post_completes_as_a_draft_without_publishing(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        $profile = app(AiPromptProfileService::class)->ensureDefaultFor($user);
+        $destination = $this->publicationProfile($user);
+        $task = app(SchedulerService::class)->createQuickPostTask(
+            $user,
+            $profile,
+            'https://x.com/example/status/123456',
+            'original',
+            [$destination->id],
+            null,
+            true,
+        );
+        $article = $user->aiArticles()->create([
+            'title' => 'Borrador pendiente de revisión',
+            'content' => '<p>Contenido listo.</p>',
+            'status' => AiArticle::STATUS_DRAFT,
+        ]);
+
+        app(SchedulerService::class)->completeOrPublish($task, $article, 'El borrador está listo.');
+
+        $task->refresh();
+        $this->assertSame(Scheduler::STATUS_COMPLETED, $task->status);
+        $this->assertSame($article->id, $task->ai_article_id);
+        $this->assertSame('Borrador listo para revisión', $task->step);
+        $this->assertFalse($task->payload['publication_ready']);
+        Queue::assertNotPushed(PublishQuickPost::class);
     }
 
     public function test_publication_job_publishes_in_every_selected_destination(): void

@@ -21,6 +21,11 @@ class QuickPostRequest extends FormRequest
         $this->merge([
             'url' => trim((string) $this->input('url')),
             'image_mode' => trim((string) $this->input('image_mode', 'generate')),
+            'company_ids' => array_values(array_unique(array_filter(
+                array_map('intval', (array) ($this->input('company_ids') ?: [$this->input('company_id')])),
+                fn (int $id): bool => $id > 0,
+            ))),
+            'publication_profile_ids' => array_values(array_unique(array_map('intval', (array) $this->input('publication_profile_ids', [])))),
         ]);
     }
 
@@ -45,8 +50,8 @@ class QuickPostRequest extends FormRequest
                 Rule::exists('ai_prompt_profiles', 'id'),
             ],
             'image_mode' => ['required', Rule::in(['generate', 'original'])],
-            'company_id' => [
-                'nullable',
+            'company_ids' => ['nullable', 'array'],
+            'company_ids.*' => [
                 'integer',
                 Rule::exists('companies', 'id')->where(fn ($query) => $query
                     ->where('user_id', $this->user()->id)
@@ -75,29 +80,45 @@ class QuickPostRequest extends FormRequest
     {
         return [function (Validator $validator): void {
             $profileIds = array_values(array_unique(array_map('intval', (array) $this->input('publication_profile_ids', []))));
-            $companyId = (int) $this->input('company_id');
+            $companyIds = array_values(array_unique(array_map('intval', (array) $this->input('company_ids', []))));
 
             if ($profileIds === []) {
                 return;
             }
 
-            if (! $companyId) {
-                // Compatibility for profiles created before the companies module.
-                $legacyCount = $this->user()->wordpressSites()
-                    ->whereNull('company_id')
-                    ->whereIn('id', $profileIds)
-                    ->count();
-
-                if ($legacyCount !== count($profileIds)) {
-                    $validator->errors()->add('company_id', 'Selecciona la empresa de los destinos de publicación.');
-                }
-
+            if ($companyIds === []) {
                 return;
             }
 
-            if ($this->user()->wordpressSites()->where('company_id', $companyId)->whereIn('id', $profileIds)->count() !== count($profileIds)) {
-                $validator->errors()->add('publication_profile_ids', 'Todos los destinos deben pertenecer a la empresa seleccionada.');
+            $profiles = $this->user()->wordpressSites()->whereIn('id', $profileIds)->get(['id', 'company_id']);
+
+            if ($profiles->contains(fn ($profile): bool => ! in_array((int) $profile->company_id, $companyIds, true))) {
+                $validator->errors()->add('publication_profile_ids', 'Todos los destinos deben pertenecer a las empresas seleccionadas.');
             }
         }];
+    }
+
+    /** @return array<int, int> */
+    public function companyIds(): array
+    {
+        return array_values(array_unique(array_map('intval', $this->validated('company_ids', []))));
+    }
+
+    /** @return array<int, int> */
+    public function publicationProfileIds(): array
+    {
+        $profileIds = array_values(array_unique(array_map('intval', $this->validated('publication_profile_ids', []))));
+
+        if ($profileIds !== [] || $this->companyIds() === []) {
+            return $profileIds;
+        }
+
+        return $this->user()->wordpressSites()
+            ->whereIn('company_id', $this->companyIds())
+            ->where('active', true)
+            ->where('status', 'active')
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
     }
 }

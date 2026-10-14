@@ -22,7 +22,16 @@
             @if ($article->status === 'draft' && auth()->user()->can('update', $article))
                 <a href="{{ route('admin.ai-articles.edit', $article) }}" class="btn btn-primary"><i class="ki-outline ki-pencil fs-2"></i>Editar borrador</a>
             @endif
-            @if ($article->status !== 'failed' && auth()->user()->can('update', $article))
+            @if ($reviewTask && $article->status === 'draft')
+                @if ($publicationProfiles->isNotEmpty())
+                    <form method="POST" action="{{ route('admin.manual-posts.publish', $reviewTask) }}" data-publish-review-form data-destination-count="{{ $publicationProfiles->count() }}">
+                        @csrf
+                        <button class="btn btn-success" type="submit"><i class="ki-outline ki-send fs-2"></i>Publicar en {{ $publicationProfiles->count() }} destino(s)</button>
+                    </form>
+                @else
+                    <span class="btn btn-light" title="No seleccionaste destinos al generar este post">Borrador sin destinos</span>
+                @endif
+            @elseif ($article->status !== 'failed' && auth()->user()->can('update', $article))
                 @if ($publicationProfiles->isEmpty())
                     <a href="{{ route('admin.wordpress-sites.create') }}" class="btn btn-success"><i class="ki-outline ki-send fs-2"></i>Configurar y publicar</a>
                 @elseif ($publicationProfiles->count() === 1)
@@ -199,3 +208,30 @@
 .ai-article-preview p, .ai-article-preview ul, .ai-article-preview ol { margin-bottom: 1.15rem; }
 </style>
 @endpush
+
+@if ($reviewTask && $publicationProfiles->isNotEmpty())
+    @push('scripts')
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                document.querySelector('[data-publish-review-form]')?.addEventListener('submit', function (event) {
+                    if (!window.Swal) return;
+                    event.preventDefault();
+                    const form = event.currentTarget;
+                    const count = form.dataset.destinationCount;
+                    Swal.fire({
+                        icon: 'question',
+                        title: '¿Publicar ahora?',
+                        text: 'El post se enviará a ' + count + ' destino(s) seleccionados.',
+                        showCancelButton: true,
+                        confirmButtonText: 'Publicar',
+                        cancelButtonText: 'Seguir revisando',
+                        buttonsStyling: false,
+                        customClass: { confirmButton: 'btn btn-success', cancelButton: 'btn btn-light' },
+                    }).then(function (result) {
+                        if (result.isConfirmed) form.submit();
+                    });
+                });
+            });
+        </script>
+    @endpush
+@endif

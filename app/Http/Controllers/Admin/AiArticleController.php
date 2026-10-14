@@ -7,6 +7,7 @@ use App\Http\Requests\AiArticleGenerateRequest;
 use App\Http\Requests\AiArticleUpdateRequest;
 use App\Models\AiArticle;
 use App\Models\AiPromptProfile;
+use App\Models\Scheduler;
 use App\Models\SourcePost;
 use App\Services\AiPromptProfileService;
 use App\Services\SchedulerService;
@@ -98,15 +99,34 @@ class AiArticleController extends Controller
                 ->latest(),
         ]);
 
+        $reviewTaskId = (int) $request->query('review_task', 0);
+        $reviewTask = null;
+
+        if ($reviewTaskId > 0) {
+            $reviewTask = Scheduler::query()
+                ->whereKey($reviewTaskId)
+                ->where('ai_article_id', $aiArticle->id)
+                ->when(! $request->user()->isAdmin(), fn ($query) => $query->where('user_id', $request->user()->id))
+                ->first();
+
+            if (! $reviewTask || ! (bool) data_get($reviewTask->payload, 'requires_review')) {
+                $reviewTask = null;
+            }
+        }
+
+        $reviewProfileIds = array_values(array_unique(array_map('intval', $reviewTask?->payload['publication_profile_ids'] ?? [])));
+
         return view('admin.ai-articles.show', [
             'article' => $aiArticle,
             'sourcePosts' => $aiArticle->sourcePosts()->load('sourceSite:id,name'),
             'publicationProfiles' => $request->user()->accessibleWordPressSites()
-                ->when($aiArticle->company_id, fn ($query, $companyId) => $query->where('company_id', $companyId))
+                ->when($reviewTask, fn ($query) => $query->whereIn('id', $reviewProfileIds))
+                ->when(! $reviewTask && $aiArticle->company_id, fn ($query, $companyId) => $query->where('company_id', $companyId))
                 ->where('active', true)
                 ->where('status', 'active')
                 ->orderBy('name')
                 ->get(),
+            'reviewTask' => $reviewTask,
         ]);
     }
 

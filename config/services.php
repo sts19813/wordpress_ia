@@ -46,6 +46,7 @@ return [
         'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
         'text_model' => env('OPENAI_TEXT_MODEL', 'gpt-4.1-mini'),
         'image_model' => env('OPENAI_IMAGE_MODEL', 'gpt-image-2'),
+        'transcription_model' => env('OPENAI_TRANSCRIPTION_MODEL', 'gpt-transcribe'),
         'connect_timeout' => (int) env('OPENAI_CONNECT_TIMEOUT', 15),
         'timeout' => (int) env('OPENAI_TIMEOUT', 180),
     ],

@@ -25,7 +25,15 @@ class MobileLayoutTest extends TestCase
         ];
 
         foreach ($routes as $routeName) {
-            $this->get(route($routeName))
+            $response = $this->get(route($routeName));
+
+            if ($routeName === 'admin.quick-posts.create') {
+                $response->assertRedirect(route('admin.manual-posts.create', ['mode' => 'url']));
+
+                continue;
+            }
+
+            $response
                 ->assertOk()
                 ->assertSee('id="kt_app_content"', false)
                 ->assertSee('id="kt_app_content_container"', false);

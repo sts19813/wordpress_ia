@@ -5,11 +5,14 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ManualPostRequest;
 use App\Models\AiPromptProfile;
+use App\Models\Scheduler;
 use App\Models\SourcePost;
 use App\Models\SourcePostMedia;
 use App\Services\AiPromptProfileService;
+use App\Services\OpenAI\AudioTranscriptionService;
 use App\Services\SchedulerService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -43,10 +46,11 @@ class ManualPostController extends Controller
                 ->orderBy('name')
                 ->get(),
             'companies' => $companies,
+            'activeMode' => in_array($request->query('mode'), ['url', 'voice'], true) ? $request->query('mode') : 'text',
         ]);
     }
 
-    public function store(ManualPostRequest $request): RedirectResponse
+    public function store(ManualPostRequest $request): RedirectResponse|JsonResponse
     {
         $validated = $request->validated();
         $profile = AiPromptProfile::query()->findOrFail($validated['ai_prompt_profile_id']);
@@ -94,12 +98,48 @@ class ManualPostController extends Controller
             : ($profile->generate_image ? ' Se generará una imagen con IA.' : ' El post quedará sin imagen principal.');
         $publicationCount = count($publicationProfileIds);
         $publicationMessage = $publicationCount > 0
-            ? " Después se publicará automáticamente en {$publicationCount} destino(s)."
+            ? " Podrás revisarlo antes de publicarlo en {$publicationCount} destino(s)."
             : ' El resultado quedará como borrador.';
+
+        $message = 'El post se añadió a la cola de generación.'.$imageMessage.$publicationMessage;
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'task_id' => $task->id,
+                'status_url' => route('admin.scheduler.status', $task),
+                'message' => $message,
+            ], 202);
+        }
 
         return redirect()
             ->route('admin.scheduler.index', ['task' => $task->id])
-            ->with('status', 'El post se añadió a la cola de generación.'.$imageMessage.$publicationMessage);
+            ->with('status', $message);
+    }
+
+    public function transcribe(Request $request, AudioTranscriptionService $transcriptions): JsonResponse
+    {
+        $validated = $request->validate([
+            'audio' => ['required', 'file', 'max:25600', 'mimes:mp3,mp4,m4a,wav,webm,mpeg,mpga,ogg'],
+        ], [
+            'audio.max' => 'El audio puede pesar máximo 25 MB.',
+            'audio.mimes' => 'Usa un audio MP3, M4A, MP4, WAV, WebM u OGG.',
+        ]);
+
+        return response()->json([
+            'text' => $transcriptions->transcribe($validated['audio']),
+        ]);
+    }
+
+    public function publish(Request $request, Scheduler $scheduler): RedirectResponse
+    {
+        abort_unless($this->canManageTask($request, $scheduler), 403);
+        abort_unless((bool) data_get($scheduler->payload, 'requires_review'), 404);
+
+        $task = $this->scheduler->approvePublication($scheduler);
+
+        return redirect()
+            ->route('admin.scheduler.index', ['task' => $task->id])
+            ->with('status', 'La publicación se añadió a la cola para todos los destinos seleccionados.');
     }
 
     private function titleFromContent(string $content): string
@@ -135,5 +175,10 @@ class ManualPostController extends Controller
                 'size' => $image->getSize(),
             ],
         ]);
+    }
+
+    private function canManageTask(Request $request, Scheduler $task): bool
+    {
+        return $request->user()->isAdmin() || $task->user_id === $request->user()->id;
     }
 }

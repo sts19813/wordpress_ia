@@ -51,10 +51,13 @@ class SchedulerService
         ?string $imageMode = null,
         array $publicationProfileIds = [],
         ?int $companyId = null,
+        bool $requiresReview = false,
+        array $companyIds = [],
     ): Scheduler {
         $imageMode ??= $profile->generate_image ? 'generate' : 'original';
         $imageMode = in_array($imageMode, ['generate', 'original'], true) ? $imageMode : 'generate';
         $publicationProfileIds = array_values(array_unique(array_map('intval', $publicationProfileIds)));
+        $companyIds = array_values(array_unique(array_map('intval', $companyIds)));
 
         $task = Scheduler::query()->create([
             'user_id' => $user->id,
@@ -71,7 +74,10 @@ class SchedulerService
                 'image_mode' => $imageMode,
                 'generate_image' => $imageMode === 'generate',
                 'company_id' => $companyId,
+                'company_ids' => $companyIds,
                 'publication_profile_ids' => $publicationProfileIds,
+                'requires_review' => $requiresReview,
+                'review_approved' => false,
                 'publication_ready' => false,
             ],
             'events' => [],
@@ -117,6 +123,8 @@ class SchedulerService
                 'company_id' => count($companyIds) === 1 ? $companyIds[0] : null,
                 'company_ids' => $companyIds,
                 'publication_profile_ids' => $publicationProfileIds,
+                'requires_review' => true,
+                'review_approved' => false,
                 'publication_ready' => false,
             ],
             'events' => [],
@@ -124,6 +132,37 @@ class SchedulerService
 
         $this->addEvent($task, 'info', 'Texto recibido y añadido a la cola de generación.');
         GenerateAiArticle::dispatch($task->id)->onQueue('ai-text');
+
+        return $task->fresh();
+    }
+
+    public function approvePublication(Scheduler $task): Scheduler
+    {
+        $payload = $task->payload ?: [];
+        $profileIds = array_values(array_unique(array_map('intval', $payload['publication_profile_ids'] ?? [])));
+
+        if (! $task->article || $task->article->status !== AiArticle::STATUS_DRAFT) {
+            throw new \RuntimeException('El borrador aún no está listo para publicar.');
+        }
+
+        if ($profileIds === []) {
+            throw new \RuntimeException('No seleccionaste destinos de publicación para este post.');
+        }
+
+        $task->update([
+            'status' => Scheduler::STATUS_QUEUED,
+            'step' => 'Publicación aprobada; envío en cola',
+            'progress' => 90,
+            'last_error' => null,
+            'finished_at' => null,
+            'payload' => [
+                ...$payload,
+                'review_approved' => true,
+                'publication_ready' => true,
+            ],
+        ]);
+        $this->addEvent($task, 'info', 'El borrador fue aprobado para publicar en '.count($profileIds).' destino(s).');
+        PublishQuickPost::dispatch($task->id)->onQueue('publication');
 
         return $task->fresh();
     }
@@ -136,6 +175,20 @@ class SchedulerService
     ): Scheduler {
         $payload = $task->payload ?: [];
         $profileIds = array_values(array_unique(array_map('intval', $payload['publication_profile_ids'] ?? [])));
+
+        if ((bool) ($payload['requires_review'] ?? false) && ! (bool) ($payload['review_approved'] ?? false)) {
+            $task->update([
+                'ai_article_id' => $article->id,
+                'status' => Scheduler::STATUS_COMPLETED,
+                'step' => 'Borrador listo para revisión',
+                'progress' => 100,
+                'last_error' => null,
+                'finished_at' => now(),
+            ]);
+            $this->addEvent($task, 'success', 'El borrador quedó listo. Revísalo antes de publicarlo.');
+
+            return $task->fresh();
+        }
 
         if ($profileIds === []) {
             return $this->completed($task, $draftMessage);

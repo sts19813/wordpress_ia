@@ -9,6 +9,7 @@ use App\Models\SourcePost;
 use App\Services\AiPromptProfileService;
 use App\Services\SchedulerService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -31,59 +32,48 @@ class QuickPostController extends Controller
         ]);
     }
 
-    public function create(Request $request): View
+    public function create(Request $request): RedirectResponse
     {
-        $this->profiles->ensureDefaultFor($request->user());
-
-        $companies = $request->user()->companies()
-            ->where('active', true)
-            ->with(['publicationProfiles' => fn ($query) => $query
-                ->where('active', true)
-                ->where('status', 'active')
-                ->orderBy('name')])
-            ->orderBy('name')
-            ->get();
-
-        return view('admin.quick-posts.create', [
-            'profiles' => AiPromptProfile::query()
-                ->orderByDesc('is_default')
-                ->orderBy('name')
-                ->get(),
-            'publicationProfiles' => $request->user()
-                ->wordpressSites()
-                ->where('active', true)
-                ->where('status', 'active')
-                ->orderBy('name')
-                ->get(),
-            'companies' => $companies,
-        ]);
+        return redirect()->route('admin.manual-posts.create', ['mode' => 'url']);
     }
 
-    public function store(QuickPostRequest $request): RedirectResponse
+    public function store(QuickPostRequest $request): RedirectResponse|JsonResponse
     {
         $profile = AiPromptProfile::query()->findOrFail($request->validated('ai_prompt_profile_id'));
+        $companyIds = $request->companyIds();
+        $publicationProfileIds = $request->publicationProfileIds();
         $task = $this->scheduler->createQuickPostTask(
             $request->user(),
             $profile,
             $request->validated('url'),
             $request->validated('image_mode'),
-            $request->validated()['publication_profile_ids'] ?? [],
-            $request->validated('company_id'),
+            $publicationProfileIds,
+            count($companyIds) === 1 ? $companyIds[0] : null,
+            true,
+            $companyIds,
         );
 
         $imageMessage = $request->validated('image_mode') === 'original'
             ? 'conservando sus imágenes originales'
             : 'generando imágenes nuevas con IA';
-        $publicationCount = count($request->validated()['publication_profile_ids'] ?? []);
+        $publicationCount = count($publicationProfileIds);
         $publicationMessage = $publicationCount > 0
-            ? ($publicationCount === 1
-                ? ' Después se publicará automáticamente en el perfil seleccionado.'
-                : " Después se publicará automáticamente en {$publicationCount} perfiles.")
+            ? " Podrás revisarlo antes de publicarlo en {$publicationCount} destino(s)."
             : ' El resultado quedará como borrador.';
+
+        $message = "La captura y recreación con IA se añadieron a la cola, {$imageMessage}.{$publicationMessage}";
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'task_id' => $task->id,
+                'status_url' => route('admin.scheduler.status', $task),
+                'message' => $message,
+            ], 202);
+        }
 
         return redirect()
             ->route('admin.scheduler.index', ['task' => $task->id])
-            ->with('status', "La captura y recreación con IA se añadieron a la cola, {$imageMessage}.{$publicationMessage}");
+            ->with('status', $message);
     }
 
     public function destroy(SourcePost $sourcePost): RedirectResponse
