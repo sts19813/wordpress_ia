@@ -75,12 +75,11 @@ Route::middleware(['auth', 'active', 'system.permission'])->prefix('admin')->nam
     Route::get('noticias', [NewsController::class, 'index'])->name('news.index');
     Route::get('generar-post', [ManualPostController::class, 'create'])->name('manual-posts.create');
     Route::post('generar-post', [ManualPostController::class, 'store'])->name('manual-posts.store');
+    Route::post('generar-post/url', [ManualPostController::class, 'storeUrl'])->name('manual-posts.store-url');
     Route::post('generar-post/transcribir', [ManualPostController::class, 'transcribe'])->name('manual-posts.transcribe');
+    Route::put('generar-post/{scheduler}/revision', [ManualPostController::class, 'updateReview'])->name('manual-posts.review.update');
     Route::post('generar-post/{scheduler}/publicar', [ManualPostController::class, 'publish'])->name('manual-posts.publish');
     Route::get('post-rapido', [QuickPostController::class, 'index'])->name('quick-posts.index');
-    Route::get('post-rapido/nuevo', [QuickPostController::class, 'create'])->name('quick-posts.create');
-    Route::post('post-rapido', [QuickPostController::class, 'store'])->name('quick-posts.store');
-    Route::delete('post-rapido/{sourcePost}', [QuickPostController::class, 'destroy'])->name('quick-posts.destroy');
     Route::get('medios-originales/{sourcePostMedia}', SourcePostMediaController::class)->name('source-post-media.file');
     Route::get('bitacora-fuentes', SourceScanLogController::class)->name('source-scan-logs.index');
     Route::delete('bitacora-fuentes', [SourceScanLogController::class, 'destroy'])->name('source-scan-logs.destroy');

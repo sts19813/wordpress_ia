@@ -165,7 +165,7 @@ class CompanyModuleTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->post(route('admin.quick-posts.store'), [
+            ->post(route('admin.manual-posts.store-url'), [
                 'url' => 'https://x.com/openai/status/123456',
                 'ai_prompt_profile_id' => $prompt->id,
                 'image_mode' => 'original',

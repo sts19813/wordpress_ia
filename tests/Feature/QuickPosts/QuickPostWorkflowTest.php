@@ -47,7 +47,7 @@ class QuickPostWorkflowTest extends TestCase
         ]);
         $publicationProfile = $this->publicationProfile($user);
 
-        $response = $this->actingAs($user)->post(route('admin.quick-posts.store'), [
+        $response = $this->actingAs($user)->post(route('admin.manual-posts.store-url'), [
             'url' => $url,
             'ai_prompt_profile_id' => $selectedProfile->id,
             'image_mode' => 'original',
@@ -105,13 +105,13 @@ class QuickPostWorkflowTest extends TestCase
         $this->assertSame([$firstCompany->id, $secondCompany->id], $task->payload['company_ids']);
         $this->assertNull($task->payload['company_id']);
         $this->assertSame([$firstDestination->id, $secondDestination->id], $task->payload['publication_profile_ids']);
-        $this->assertSame('generate', $task->payload['image_mode']);
-        $this->assertTrue($task->payload['generate_image']);
+        $this->assertSame('none', $task->payload['image_mode']);
+        $this->assertFalse($task->payload['generate_image']);
         $this->assertTrue($task->payload['requires_review']);
         Queue::assertPushedOn('ai-text', GenerateAiArticle::class);
     }
 
-    public function test_quick_post_create_redirects_to_the_unified_form_with_all_modes(): void
+    public function test_unified_form_lists_all_generation_modes(): void
     {
         $user = User::factory()->create();
         $otherUser = User::factory()->create();
@@ -135,10 +135,6 @@ class QuickPostWorkflowTest extends TestCase
         ]);
         $this->publicationProfile($user, ['name' => 'Perfil pausado', 'active' => false]);
         $this->publicationProfile($otherUser, ['name' => 'Perfil de otra cuenta']);
-
-        $this->actingAs($user)
-            ->get(route('admin.quick-posts.create'))
-            ->assertRedirect(route('admin.manual-posts.create', ['mode' => 'url']));
 
         $this->actingAs($user)
             ->get(route('admin.manual-posts.create', ['mode' => 'url']))
@@ -193,14 +189,79 @@ class QuickPostWorkflowTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->post(route('admin.manual-posts.publish', $task))
-            ->assertRedirect(route('admin.scheduler.index', ['task' => $task->id]));
+            ->post(route('admin.manual-posts.publish', $task), [
+                'publication_profile_ids' => [$firstDestination->id, $secondDestination->id],
+            ])
+            ->assertRedirect(route('admin.manual-posts.create', ['review_task' => $task->id]));
 
         $task->refresh();
         $this->assertSame(Scheduler::STATUS_QUEUED, $task->status);
         $this->assertTrue($task->payload['review_approved']);
         $this->assertTrue($task->payload['publication_ready']);
         Queue::assertPushedOn('publication', PublishQuickPost::class);
+    }
+
+    public function test_review_can_add_images_and_change_publication_destinations(): void
+    {
+        Storage::fake('local');
+        $user = User::factory()->create();
+        $company = $user->companies()->create(['name' => 'Empresa de revisión', 'active' => true]);
+        $destination = $this->publicationProfile($user, ['company_id' => $company->id]);
+        $article = $user->aiArticles()->create([
+            'title' => 'Borrador sin imagen',
+            'content' => '<p>Contenido listo.</p>',
+            'status' => AiArticle::STATUS_DRAFT,
+        ]);
+        $task = Scheduler::query()->create([
+            'user_id' => $user->id,
+            'ai_article_id' => $article->id,
+            'type' => Scheduler::TYPE_QUICK_POST,
+            'name' => 'Generar post',
+            'status' => Scheduler::STATUS_COMPLETED,
+            'step' => 'Borrador listo para revisión',
+            'progress' => 100,
+            'max_attempts' => 3,
+            'payload' => [
+                'requires_review' => true,
+                'review_approved' => false,
+                'publication_profile_ids' => [],
+                'company_ids' => [],
+            ],
+            'events' => [],
+        ]);
+
+        $this->actingAs($user)
+            ->put(route('admin.manual-posts.review.update', $task), [
+                'company_ids' => [$company->id],
+                'publication_profile_ids' => [$destination->id],
+                'images' => [UploadedFile::fake()->image('portada.jpg', 1200, 630)],
+            ])
+            ->assertRedirect(route('admin.manual-posts.create', ['review_task' => $task->id]));
+
+        $task->refresh();
+        $image = $article->fresh('images')->images->sole();
+        $this->assertSame([$company->id], $task->payload['company_ids']);
+        $this->assertSame([$destination->id], $task->payload['publication_profile_ids']);
+        $this->assertSame(AiImage::TYPE_MAIN, $image->type);
+        $this->assertSame('upload', $image->model);
+        Storage::disk('local')->assertExists($image->file_path);
+    }
+
+    public function test_url_only_generates_an_ai_image_when_that_option_is_selected(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        $profile = app(AiPromptProfileService::class)->ensureDefaultFor($user);
+
+        $this->actingAs($user)
+            ->post(route('admin.manual-posts.store-url'), [
+                'url' => 'https://x.com/openai/status/123456',
+                'ai_prompt_profile_id' => $profile->id,
+                'image_mode' => 'generate',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertTrue(Scheduler::query()->sole()->payload['generate_image']);
     }
 
     public function test_audio_upload_is_transcribed_for_voice_mode(): void
@@ -230,7 +291,7 @@ class QuickPostWorkflowTest extends TestCase
         $globalProfile = app(AiPromptProfileService::class)->ensureDefaultFor($otherUser);
 
         $this->actingAs($user)
-            ->post(route('admin.quick-posts.store'), [
+            ->post(route('admin.manual-posts.store-url'), [
                 'url' => 'https://x.com/openai/status/123456',
                 'ai_prompt_profile_id' => $globalProfile->id,
                 'image_mode' => 'original',
@@ -249,7 +310,7 @@ class QuickPostWorkflowTest extends TestCase
         $otherPublicationProfile = $this->publicationProfile($otherUser);
 
         $this->actingAs($user)
-            ->post(route('admin.quick-posts.store'), [
+            ->post(route('admin.manual-posts.store-url'), [
                 'url' => 'https://x.com/openai/status/123456',
                 'ai_prompt_profile_id' => $profile->id,
                 'image_mode' => 'original',
@@ -290,51 +351,32 @@ class QuickPostWorkflowTest extends TestCase
         Queue::assertPushedOn('ai-text', GenerateAiArticle::class);
     }
 
-    public function test_quick_post_archive_and_original_media_are_visible(): void
+    public function test_generated_posts_are_visible_in_the_history(): void
     {
         Storage::fake('local');
         $user = User::factory()->create();
-        $post = SourcePost::query()->create([
-            'origin_type' => SourcePost::ORIGIN_QUICK_POST,
-            'social_platform' => 'instagram',
-            'title' => 'Post visual archivado',
-            'content' => 'Texto de Instagram.',
-            'url' => 'https://www.instagram.com/p/ABC123/',
-            'canonical_url' => 'https://www.instagram.com/p/ABC123/',
-            'hash' => hash('sha256', 'quick-post-media'),
-            'status' => SourcePost::STATUS_FETCHED,
-            'captured_at' => now(),
-        ]);
-        Storage::disk('local')->put('source-posts/test/original.jpg', 'image');
-        $media = SourcePostMedia::query()->create([
-            'source_post_id' => $post->id,
-            'position' => 0,
-            'original_url' => 'https://cdninstagram.com/original.jpg',
-            'url_hash' => hash('sha256', 'original-image'),
-            'file_path' => 'source-posts/test/original.jpg',
-            'mime_type' => 'image/jpeg',
+        $article = $user->aiArticles()->create(['title' => 'Post visual generado', 'content' => '<p>Contenido.</p>', 'status' => AiArticle::STATUS_DRAFT]);
+        $task = Scheduler::query()->create([
+            'user_id' => $user->id,
+            'ai_article_id' => $article->id,
+            'type' => Scheduler::TYPE_QUICK_POST,
+            'name' => 'Generar post',
+            'status' => Scheduler::STATUS_COMPLETED,
+            'step' => 'Borrador listo para revisión',
+            'progress' => 100,
+            'max_attempts' => 3,
+            'payload' => ['requires_review' => true, 'publication_profile_ids' => []],
+            'events' => [],
         ]);
 
         $this->actingAs($user)
             ->get(route('admin.quick-posts.index'))
             ->assertOk()
-            ->assertSee('Post visual archivado')
-            ->assertSee('1 imagen archivada')
-            ->assertSee('Ver original')
-            ->assertSee('Generar')
-            ->assertDontSee('ki-dots-vertical')
-            ->assertSee('quick-posts-table', false)
-            ->assertDontSee('class="table-responsive"', false);
-
-        $this->actingAs($user)
-            ->get(route('admin.news.show', $post))
-            ->assertOk()
-            ->assertSee('Texto de Instagram.')
-            ->assertSee('Post rápido');
-
-        $this->actingAs($user)
-            ->get(route('admin.source-post-media.file', $media))
-            ->assertOk();
+            ->assertSee('Historial de posts')
+            ->assertSee('Post visual generado')
+            ->assertSee('Revisar borrador')
+            ->assertSee(route('admin.manual-posts.create', ['review_task' => $task->id]), false)
+            ->assertDontSee('Nuevo desde URL');
     }
 
     public function test_invalid_or_unsupported_urls_never_start_capture(): void
@@ -342,7 +384,7 @@ class QuickPostWorkflowTest extends TestCase
         $user = User::factory()->create();
 
         $this->actingAs($user)
-            ->post(route('admin.quick-posts.store'), ['url' => 'https://example.com/article'])
+            ->post(route('admin.manual-posts.store-url'), ['url' => 'https://example.com/article'])
             ->assertSessionHasErrors('url');
 
         $this->assertDatabaseCount('schedulers', 0);

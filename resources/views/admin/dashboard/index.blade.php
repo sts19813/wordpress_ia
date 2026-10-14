@@ -15,8 +15,8 @@
             <a href="{{ route('admin.publications.index') }}" class="btn btn-light-primary">
                 <i class="ki-outline ki-send fs-2"></i>Ver publicaciones
             </a>
-            <a href="{{ route('admin.quick-posts.create') }}" class="btn btn-primary">
-                <i class="ki-outline ki-plus fs-2"></i>Crear post rápido
+            <a href="{{ route('admin.manual-posts.create') }}" class="btn btn-primary">
+                <i class="ki-outline ki-plus fs-2"></i>Generar post
             </a>
         </div>
     </div>

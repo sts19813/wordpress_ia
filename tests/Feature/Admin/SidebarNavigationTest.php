@@ -22,7 +22,7 @@ class SidebarNavigationTest extends TestCase
                 'Contenido',
                 'Notas obtenidas',
                 'Generar post',
-                'Generar post desde URL',
+                'Historial de posts',
                 'Empresas y fuentes',
                 'Empresas',
                 'Sitios fuente',

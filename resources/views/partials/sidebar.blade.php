@@ -14,7 +14,7 @@
             'items' => [
                 ['label' => 'Notas obtenidas', 'route' => 'admin.news.index', 'active' => 'admin.news.*', 'permission' => 'contenido.gestionar'],
                 ['label' => 'Generar post', 'route' => 'admin.manual-posts.create', 'active' => 'admin.manual-posts.*', 'permission' => 'contenido.gestionar'],
-                ['label' => 'Generar post desde URL', 'route' => 'admin.quick-posts.index', 'active' => 'admin.quick-posts.*', 'permission' => 'contenido.gestionar'],
+                ['label' => 'Historial de posts', 'route' => 'admin.quick-posts.index', 'active' => 'admin.quick-posts.*', 'permission' => 'contenido.gestionar'],
             ],
         ],
         [

@@ -16,7 +16,6 @@ class MobileLayoutTest extends TestCase
 
         $routes = [
             'admin.manual-posts.create',
-            'admin.quick-posts.create',
             'admin.dashboard',
             'admin.source-sites.index',
             'admin.ai-images.index',
@@ -26,12 +25,6 @@ class MobileLayoutTest extends TestCase
 
         foreach ($routes as $routeName) {
             $response = $this->get(route($routeName));
-
-            if ($routeName === 'admin.quick-posts.create') {
-                $response->assertRedirect(route('admin.manual-posts.create', ['mode' => 'url']));
-
-                continue;
-            }
 
             $response
                 ->assertOk()

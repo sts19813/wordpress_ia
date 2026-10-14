@@ -4,6 +4,9 @@
     $oldCompanyIds = array_map('intval', old('company_ids', []));
     $oldPublicationProfileIds = array_map('intval', old('publication_profile_ids', []));
     $defaultProfileId = old('ai_prompt_profile_id', $profiles->firstWhere('is_default', true)?->id);
+    $reviewCompanyIds = array_map('intval', data_get($reviewTask?->payload, 'company_ids', []));
+    $reviewProfileIds = array_map('intval', data_get($reviewTask?->payload, 'publication_profile_ids', []));
+    $reviewArticle = $reviewTask?->article;
 @endphp
 
 @section('title', 'Generar post | '.config('app.name'))
@@ -22,7 +25,7 @@
     <div class="manual-post-page">
         <form method="POST" action="{{ route('admin.manual-posts.store') }}" enctype="multipart/form-data" id="manual-post-form"
             data-manual-action="{{ route('admin.manual-posts.store') }}"
-            data-url-action="{{ route('admin.quick-posts.store') }}"
+            data-url-action="{{ route('admin.manual-posts.store-url') }}"
             data-transcribe-url="{{ route('admin.manual-posts.transcribe') }}"
             data-initial-mode="{{ $activeMode }}">
             @csrf
@@ -167,6 +170,71 @@
                 </div>
             </div>
         </form>
+
+        @if ($reviewTask && $reviewArticle)
+            <div class="modal fade" id="generated-post-review" tabindex="-1" aria-labelledby="generated-post-review-title" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-scrollable modal-xl modal-fullscreen-md-down">
+                    <form method="POST" action="{{ route('admin.manual-posts.review.update', $reviewTask) }}" enctype="multipart/form-data" class="modal-content" id="generated-post-review-form" data-publish-action="{{ route('admin.manual-posts.publish', $reviewTask) }}">
+                        @csrf @method('PUT')
+                        <div class="modal-header">
+                            <div class="min-w-0"><h2 class="fw-bold fs-4 mb-1" id="generated-post-review-title">Revisar borrador</h2><div class="text-muted fs-8">Ajusta imágenes y destinos antes de publicar.</div></div>
+                            <a href="{{ route('admin.manual-posts.create') }}" class="btn btn-icon btn-sm btn-active-light-primary" aria-label="Cerrar"><i class="ki-outline ki-cross fs-2"></i></a>
+                        </div>
+                        <div class="modal-body p-0">
+                            <div class="row g-0">
+                                <div class="col-lg-7 border-end">
+                                    <div class="p-5 p-lg-8">
+                                        @forelse ($reviewArticle->images->where('status', 'generated') as $image)
+                                            <img src="{{ route('admin.ai-images.file', $image) }}" alt="" class="review-post-image rounded mb-4">
+                                        @empty
+                                            <div class="review-image-empty mb-5"><i class="ki-outline ki-picture fs-2x text-primary"></i><div><div class="fw-bold text-gray-900">Sin imágenes</div><div class="text-muted fs-8">Puedes agregarlas antes de publicar.</div></div></div>
+                                        @endforelse
+
+                                        @if ($reviewArticle->images->where('status', 'generated')->isEmpty())
+                                            <label for="review-post-images" class="manual-post-upload d-flex flex-column align-items-center justify-content-center rounded border border-dashed p-5 cursor-pointer mb-6">
+                                                <i class="ki-outline ki-picture fs-2x text-primary mb-2"></i><span class="fw-bold text-gray-900">Agregar imágenes desde galería</span><span class="text-muted fs-8">Hasta 8 imágenes JPG, PNG o WebP.</span>
+                                            </label>
+                                            <input id="review-post-images" class="d-none" type="file" name="images[]" accept="image/jpeg,image/png,image/webp" multiple>
+                                        @endif
+
+                                        <h1 class="fs-3 fw-bolder text-gray-900 mb-4">{{ $reviewArticle->title }}</h1>
+                                        @if ($reviewArticle->excerpt)<p class="fs-5 text-gray-600 fw-semibold mb-6">{{ $reviewArticle->excerpt }}</p>@endif
+                                        <div class="ai-article-preview text-gray-800 fs-6 lh-lg">{!! $reviewArticle->content !!}</div>
+                                        @if ($reviewArticle->conclusion)<div class="border-top mt-7 pt-5"><h2 class="fs-4 fw-bold">Conclusión</h2><p>{{ $reviewArticle->conclusion }}</p></div>@endif
+                                    </div>
+                                </div>
+                                <div class="col-lg-5">
+                                    <div class="p-5 p-lg-7">
+                                        <div class="d-flex align-items-center justify-content-between gap-3 mb-5"><div><h3 class="fw-bold fs-5 mb-1">Publicar en</h3><div class="text-muted fs-8">Selecciona una o varias empresas.</div></div><button type="button" class="btn btn-sm btn-light-primary" data-review-select-all>Todas</button></div>
+                                        @foreach ($companies as $company)
+                                            @php
+                                                $profileIds = $company->publicationProfiles->pluck('id')->map(fn ($id) => (int) $id)->all();
+                                                $companyChecked = in_array($company->id, $reviewCompanyIds, true) || count(array_intersect($profileIds, $reviewProfileIds)) > 0;
+                                            @endphp
+                                            <div class="manual-post-company rounded border p-4 mb-4">
+                                                <label class="d-flex align-items-start gap-3 cursor-pointer mb-3"><input class="form-check-input mt-1" type="checkbox" name="company_ids[]" value="{{ $company->id }}" data-review-company="{{ $company->id }}" @checked($companyChecked)><span><span class="fw-bold text-gray-900 d-block">{{ $company->name }}</span><span class="text-muted fs-8">{{ $company->publicationProfiles->count() }} destino(s)</span></span></label>
+                                                @foreach ($company->publicationProfiles as $publicationProfile)
+                                                    @php($checked = in_array($publicationProfile->id, $reviewProfileIds, true) || ($companyChecked && $reviewProfileIds === []))
+                                                    <label class="manual-post-destination d-flex align-items-center gap-3 rounded p-3 cursor-pointer"><input class="form-check-input" type="checkbox" name="publication_profile_ids[]" value="{{ $publicationProfile->id }}" data-review-destination="{{ $company->id }}" @checked($checked)><span class="flex-grow-1"><span class="fw-semibold text-gray-900 d-block">{{ $publicationProfile->name }}</span><span class="text-muted fs-8">{{ $publicationProfile->typeLabel() }}</span></span></label>
+                                                @endforeach
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer flex-column flex-sm-row gap-3">
+                            <button type="submit" class="btn btn-light-primary w-100 w-sm-auto">Guardar borrador</button>
+                            @if (! data_get($reviewTask->payload, 'review_approved'))
+                                <button type="button" class="btn btn-success w-100 w-sm-auto" id="review-publish-button"><i class="ki-outline ki-send fs-2"></i>Publicar en destinos elegidos</button>
+                            @else
+                                <span class="btn btn-light w-100 w-sm-auto disabled">Publicación en proceso</span>
+                            @endif
+                        </div>
+                    </form>
+                </div>
+            </div>
+        @endif
     </div>
 @endsection
 
@@ -189,6 +257,7 @@
 .manual-post-destination-icon { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; flex: 0 0 36px; border-radius: 8px; color: #fff; font-size: 1rem; }
 .manual-post-destination-icon.is-facebook { background: #1877f2; }.manual-post-destination-icon.is-instagram { background: #c13584; }.manual-post-destination-icon.is-x { background: #111; }.manual-post-destination-icon.is-wordpress { background: #28799e; }
 .manual-post-voice { padding: 1rem; border: 1px dashed var(--bs-primary); border-radius: .5rem; background: var(--bs-primary-light); }.manual-post-voice-controls { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .65rem; }
+.review-post-image { width: 100%; max-height: 420px; object-fit: cover; }.review-image-empty { display: flex; align-items: center; gap: 1rem; padding: 1rem; border: 1px dashed var(--bs-primary); border-radius: .5rem; background: var(--bs-primary-light); }
 @media (max-width: 767.98px) { .manual-post-page .row { --bs-gutter-y: 1rem; }.manual-post-page .card-body { padding: 1.15rem; }.manual-post-mode-button { flex-direction: column; gap: .1rem; font-size: .75rem; }.manual-post-textarea { min-height: 320px; font-size: 1rem; }.manual-post-preview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.manual-post-company { padding: 1rem !important; }.manual-post-destination { align-items: flex-start !important; }.manual-post-page .card-footer { padding: 1rem 1.15rem; }.manual-post-page .card-footer .btn, .manual-post-page .btn-light-primary { width: 100%; }.manual-post-voice-controls .btn { flex: 1 1 auto; } }
 </style>
 @endpush
@@ -261,9 +330,9 @@ document.addEventListener('DOMContentLoaded', function () {
             const task = await response.json();
             if (!response.ok) throw new Error(task.message || 'No se pudo consultar la generación.');
             updateGeneratingAlert(task.progress, task.step);
-            if (task.status === 'completed' && task.preview_url) {
+            if (task.status === 'completed' && (task.review_url || task.preview_url)) {
                 await Swal.fire({ icon: 'success', title: 'Borrador listo', text: 'Ábrelo para revisarlo antes de publicar.', confirmButtonText: 'Ver borrador', allowOutsideClick: false });
-                window.location.assign(task.preview_url);
+                window.location.assign(task.review_url || task.preview_url);
                 return;
             }
             if (task.status === 'failed') throw new Error(task.last_error || 'La generación no pudo completarse.');
@@ -339,6 +408,21 @@ document.addEventListener('DOMContentLoaded', function () {
             Swal.close(); setButton(false); swalError('No se pudo iniciar', error.message);
         }
     });
+    const reviewModalElement = document.getElementById('generated-post-review');
+    if (reviewModalElement && window.bootstrap) {
+        bootstrap.Modal.getOrCreateInstance(reviewModalElement, { backdrop: 'static' }).show();
+        const reviewForm = document.getElementById('generated-post-review-form');
+        const reviewCompanies = Array.from(document.querySelectorAll('[data-review-company]'));
+        const reviewDestinations = Array.from(document.querySelectorAll('[data-review-destination]'));
+        reviewCompanies.forEach((input) => input.addEventListener('change', () => reviewDestinations.filter((destination) => destination.dataset.reviewDestination === input.dataset.reviewCompany).forEach((destination) => { destination.checked = input.checked; })));
+        reviewDestinations.forEach((input) => input.addEventListener('change', () => { const company = reviewCompanies.find((item) => item.dataset.reviewCompany === input.dataset.reviewDestination); if (company) company.checked = reviewDestinations.some((destination) => destination.dataset.reviewDestination === input.dataset.reviewDestination && destination.checked); }));
+        document.querySelector('[data-review-select-all]')?.addEventListener('click', () => { const checked = reviewDestinations.some((input) => !input.checked); reviewCompanies.forEach((input) => { input.checked = checked; }); reviewDestinations.forEach((input) => { input.checked = checked; }); });
+        document.getElementById('review-publish-button')?.addEventListener('click', () => {
+            reviewForm.action = reviewForm.dataset.publishAction;
+            reviewForm.querySelector('[name="_method"]')?.remove();
+            reviewForm.submit();
+        });
+    }
     refreshCounter(); setMode(mode);
 });
 </script>

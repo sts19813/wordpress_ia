@@ -103,7 +103,7 @@ class SchedulerService
         $publicationProfileIds = array_values(array_unique(array_map('intval', $publicationProfileIds)));
         $companyIds = array_values(array_unique(array_map('intval', $companyIds)));
         $hasOriginalImages = $sourcePost->media()->exists();
-        $imageMode = $hasOriginalImages ? 'original' : 'generate';
+        $imageMode = $hasOriginalImages ? 'original' : 'none';
 
         $task = Scheduler::query()->create([
             'user_id' => $user->id,
@@ -119,7 +119,7 @@ class SchedulerService
                 'source_post_ids' => [$sourcePost->id],
                 'origin' => 'manual_post',
                 'image_mode' => $imageMode,
-                'generate_image' => $imageMode === 'generate' && (bool) $profile->generate_image,
+                'generate_image' => false,
                 'company_id' => count($companyIds) === 1 ? $companyIds[0] : null,
                 'company_ids' => $companyIds,
                 'publication_profile_ids' => $publicationProfileIds,
@@ -163,6 +163,27 @@ class SchedulerService
         ]);
         $this->addEvent($task, 'info', 'El borrador fue aprobado para publicar en '.count($profileIds).' destino(s).');
         PublishQuickPost::dispatch($task->id)->onQueue('publication');
+
+        return $task->fresh();
+    }
+
+    /**
+     * @param  array<int, int>  $companyIds
+     * @param  array<int, int>  $publicationProfileIds
+     */
+    public function updateReview(Scheduler $task, array $companyIds, array $publicationProfileIds): Scheduler
+    {
+        $payload = $task->payload ?: [];
+
+        $task->update([
+            'payload' => [
+                ...$payload,
+                'company_id' => count($companyIds) === 1 ? $companyIds[0] : null,
+                'company_ids' => $companyIds,
+                'publication_profile_ids' => $publicationProfileIds,
+                'generate_image' => false,
+            ],
+        ]);
 
         return $task->fresh();
     }
