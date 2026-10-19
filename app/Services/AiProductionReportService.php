@@ -14,6 +14,15 @@ use Illuminate\Support\Str;
 class AiProductionReportService
 {
     /**
+     * The report is rendered and exported in one request.  Keeping these
+     * collections bounded prevents an all-time report from exhausting PHP
+     * memory on production.
+     */
+    public const ARTICLE_LIMIT = 200;
+
+    public const FAILURE_LIMIT = 200;
+
+    /**
      * @param  array<string, mixed>  $input
      * @return array<string, mixed>
      */
@@ -42,14 +51,20 @@ class AiProductionReportService
     public function build(array $filters): array
     {
         $articles = $this->articleQuery($filters)
+            ->select(['id', 'company_id', 'title', 'generated_at', 'model', 'cost'])
             ->with([
                 'company:id,name',
                 'publications' => fn ($query) => $query
                     ->where('status', Publication::STATUS_PUBLISHED)
-                    ->with('wordpressSite.company:id,name')
+                    ->select(['id', 'ai_article_id', 'wordpress_site_id', 'remote_url', 'published_at'])
+                    ->with([
+                        'wordpressSite:id,company_id,name,type',
+                        'wordpressSite.company:id,name',
+                    ])
                     ->orderBy('published_at'),
             ])
             ->orderByDesc('generated_at')
+            ->limit(self::ARTICLE_LIMIT)
             ->get();
 
         $failures = AiArticle::query()
@@ -58,6 +73,7 @@ class AiProductionReportService
             ->where('created_at', '<', $filters['end'])
             ->when($filters['company_id'], fn (Builder $query, int $companyId) => $query->where('company_id', $companyId))
             ->orderByDesc('created_at')
+            ->limit(self::FAILURE_LIMIT)
             ->get(['id', 'company_id', 'title', 'model', 'generation_error', 'created_at']);
 
         $articleRows = $articles->map(fn (AiArticle $article): array => $this->articleRow($article));
@@ -84,6 +100,10 @@ class AiProductionReportService
             'destinations' => $this->destinations($articleRows),
             'articles' => $articleRows,
             'failures' => $failures,
+            'limits' => [
+                'articles' => self::ARTICLE_LIMIT,
+                'failures' => self::FAILURE_LIMIT,
+            ],
             'companies' => Company::query()->orderBy('name')->get(['id', 'name']),
         ];
     }

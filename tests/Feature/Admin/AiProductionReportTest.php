@@ -113,6 +113,40 @@ class AiProductionReportTest extends TestCase
         $this->assertStringContainsString('[Content_Types].xml', $content);
     }
 
+    public function test_report_limits_the_loaded_articles_and_failures_to_protect_the_request(): void
+    {
+        Carbon::setTestNow('2026-09-03 10:00:00');
+        $admin = User::factory()->create(['is_admin' => true]);
+        $company = $admin->companies()->create(['name' => 'Empresa limitada', 'active' => true]);
+
+        foreach (range(1, 205) as $number) {
+            $this->article($admin, $company->id, 'Nota limitada '.$number, '2026-08-20 10:00:00');
+        }
+
+        foreach (range(1, 205) as $number) {
+            $failure = AiArticle::query()->create([
+                'user_id' => $admin->id,
+                'company_id' => $company->id,
+                'title' => 'Fallo limitado '.$number,
+                'status' => AiArticle::STATUS_FAILED,
+            ]);
+            $failure->timestamps = false;
+            $failure->forceFill([
+                'created_at' => Carbon::parse('2026-08-20 11:00:00'),
+                'updated_at' => Carbon::parse('2026-08-20 11:00:00'),
+            ])->save();
+        }
+
+        $response = $this->actingAs($admin)->get(route('admin.ai-production-report.index', [
+            'date_from' => '2026-08-20',
+            'date_to' => '2026-08-20',
+        ]));
+
+        $response->assertOk()->assertSee('200 notas más recientes')->assertSee('Últimos 200 intentos');
+        $this->assertCount(200, $response->viewData('articles'));
+        $this->assertCount(200, $response->viewData('failures'));
+    }
+
     private function article(User $user, int $companyId, string $title, string $generatedAt): AiArticle
     {
         return AiArticle::query()->create([

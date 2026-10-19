@@ -194,7 +194,7 @@
             <div class="card-header align-items-center border-0 pt-5">
                 <div class="card-title d-block">
                     <h2 class="fw-bold text-gray-900 fs-3 mb-1">Detalle de notas</h2>
-                    <div class="text-muted fs-7">Busca por título, empresa, estado o perfil de publicación.</div>
+                    <div class="text-muted fs-7">Se muestran las {{ number_format($limits['articles']) }} notas más recientes del periodo. Busca por título, empresa, estado o perfil de publicación.</div>
                 </div>
             </div>
             <div class="card-body pt-3">
@@ -258,7 +258,7 @@
             <div class="card-header align-items-center border-0 pt-5">
                 <div class="card-title d-block">
                     <h2 class="fw-bold text-gray-900 fs-3 mb-1">Fallos de generación</h2>
-                    <div class="text-muted fs-7">Intentos que no produjeron una nota y no se incluyen en el total generado.</div>
+                    <div class="text-muted fs-7">Últimos {{ number_format($limits['failures']) }} intentos que no produjeron una nota y no se incluyen en el total generado.</div>
                 </div>
                 <span class="badge badge-light-danger">{{ number_format($summary['failed_generations']) }}</span>
             </div>
