@@ -11,7 +11,7 @@ class PublicPagesTest extends TestCase
         $this->get(route('privacy'))
             ->assertOk()
             ->assertSee('Política de privacidad')
-            ->assertSee('Pulsorsur')
+            ->assertSee('Pulsosur')
             ->assertSee('Facebook, Instagram y otros servicios externos');
     }
 }

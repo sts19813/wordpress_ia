@@ -149,6 +149,17 @@
                             </div>
                         </div>
                     @endforeach
+
+                    <div class="menu-item pt-4 mt-2">
+                        <a class="menu-link {{ request()->routeIs('admin.help.*') ? 'active' : '' }}"
+                            href="{{ route('admin.help.index') }}">
+                            <span class="menu-icon"><i class="ki-outline ki-question-2 fs-2"></i></span>
+                            <span class="menu-title">Ayuda</span>
+                        </a>
+                        <div class="sidebar-hover-card">
+                            <a href="{{ route('admin.help.index') }}" class="sidebar-hover-title">Ayuda</a>
+                        </div>
+                    </div>
                 </div>
             </div>
 

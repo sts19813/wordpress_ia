@@ -1265,6 +1265,8 @@
 
                         <div id="kt_app_content" class="app-content flex-column-fluid">
                             <div id="kt_app_content_container" class="app-container container-fluid">
+                                @include('partials.contextual-help')
+
                                 @if (session('status'))
                                     <div class="alert alert-success d-flex align-items-center mb-6">
                                         <i class="ki-outline ki-check-circle fs-2hx text-success me-4"></i>

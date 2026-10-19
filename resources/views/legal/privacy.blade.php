@@ -3,8 +3,8 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="description" content="Política de privacidad de Pulsorsur.">
-        <title>Política de privacidad | Pulsorsur</title>
+        <meta name="description" content="Política de privacidad de Pulsosur.">
+        <title>Política de privacidad | Pulsosur</title>
         <style>
             :root { color-scheme: light; }
             * { box-sizing: border-box; }
@@ -26,14 +26,14 @@
     <body>
         <main>
             <article>
-                <div class="brand">Pulsorsur</div>
+                <div class="brand">Pulsosur</div>
                 <h1>Política de privacidad</h1>
                 <p class="updated">Última actualización: 27 de agosto de 2026.</p>
 
-                <p>Esta Política de privacidad explica cómo Pulsorsur recopila, utiliza, conserva y protege la información necesaria para operar su plataforma de creación, administración y publicación de contenido digital.</p>
+                <p>Esta Política de privacidad explica cómo Pulsosur recopila, utiliza, conserva y protege la información necesaria para operar su plataforma de creación, administración y publicación de contenido digital.</p>
 
                 <h2>1. Responsable y contacto</h2>
-                <p>Pulsorsur es responsable del tratamiento de los datos que se describen en esta política. Para dudas, solicitudes de privacidad o ejercicio de derechos, escribe a <a href="mailto:webtulumnoticias@gmail.com">webtulumnoticias@gmail.com</a>.</p>
+                <p>Pulsosur es responsable del tratamiento de los datos que se describen en esta política. Para dudas, solicitudes de privacidad o ejercicio de derechos, escribe a <a href="mailto:webtulumnoticias@gmail.com">webtulumnoticias@gmail.com</a>.</p>
 
                 <h2>2. Información que tratamos</h2>
                 <p>Según las funciones que utilices, podemos tratar:</p>
@@ -45,11 +45,11 @@
                 </ul>
 
                 <h2>3. Finalidades</h2>
-                <p>Usamos la información para prestar las funciones de Pulsorsur: administrar cuentas y destinos de publicación, generar y organizar contenido, publicar en los servicios que elijas, verificar el resultado de las publicaciones, ofrecer soporte y mantener la seguridad de la plataforma.</p>
+                <p>Usamos la información para prestar las funciones de Pulsosur: administrar cuentas y destinos de publicación, generar y organizar contenido, publicar en los servicios que elijas, verificar el resultado de las publicaciones, ofrecer soporte y mantener la seguridad de la plataforma.</p>
 
                 <h2>4. Facebook, Instagram y otros servicios externos</h2>
-                <p>Cuando conectas una página de Facebook, Instagram u otro destino, Pulsorsur usa únicamente los permisos que autorizas para realizar la acción solicitada. En el caso de Meta, la plataforma puede usar identificadores de página, tokens de acceso, información de la página administrada y datos de publicaciones para publicar contenido y verificar su estado.</p>
-                <p>Pulsorsur no usa esos datos para venderlos, crear perfiles publicitarios ni acceder a páginas que no hayas autorizado. El uso de datos provenientes de Meta también está sujeto a las políticas aplicables de Meta.</p>
+                <p>Cuando conectas una página de Facebook, Instagram u otro destino, Pulsosur usa únicamente los permisos que autorizas para realizar la acción solicitada. En el caso de Meta, la plataforma puede usar identificadores de página, tokens de acceso, información de la página administrada y datos de publicaciones para publicar contenido y verificar su estado.</p>
+                <p>Pulsosur no usa esos datos para venderlos, crear perfiles publicitarios ni acceder a páginas que no hayas autorizado. El uso de datos provenientes de Meta también está sujeto a las políticas aplicables de Meta.</p>
 
                 <h2>5. Compartición de información</h2>
                 <p>La información se comparte solo cuando es necesario para prestar el servicio, por ejemplo con proveedores de infraestructura, herramientas de inteligencia artificial, WordPress y las redes sociales o destinos que conectes. No vendemos datos personales.</p>
@@ -70,7 +70,7 @@
                     Esta página es pública y puede usarse como URL de política de privacidad en la configuración de la app de Meta.
                 </div>
             </article>
-            <footer>© {{ date('Y') }} Pulsorsur</footer>
+            <footer>© {{ date('Y') }} Pulsosur</footer>
         </main>
     </body>
 </html>

@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\AiImageController;
 use App\Http\Controllers\Admin\AiProductionReportController;
 use App\Http\Controllers\Admin\CompanyController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\HelpCenterController;
 use App\Http\Controllers\Admin\ManualPostController;
 use App\Http\Controllers\Admin\NewsController;
 use App\Http\Controllers\Admin\PublicationController;
@@ -72,6 +73,10 @@ Route::get('auth/x/callback', [XOAuthController::class, 'callback'])
 
 Route::middleware(['auth', 'active', 'system.permission'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+    Route::get('ayuda', [HelpCenterController::class, 'index'])->name('help.index');
+    Route::get('ayuda/estadisticas', [HelpCenterController::class, 'analytics'])->name('help.analytics');
+    Route::post('ayuda/comentarios', [HelpCenterController::class, 'feedback'])->name('help.feedback');
+    Route::get('ayuda/{article}', [HelpCenterController::class, 'show'])->name('help.show');
     Route::get('noticias', [NewsController::class, 'index'])->name('news.index');
     Route::get('generar-post', [ManualPostController::class, 'create'])->name('manual-posts.create');
     Route::post('generar-post', [ManualPostController::class, 'store'])->name('manual-posts.store');
