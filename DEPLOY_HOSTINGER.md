@@ -27,6 +27,14 @@ El script canónico es [`scripts/deploy-hostinger.sh`](scripts/deploy-hostinger.
 
 El script clona la rama, instala dependencias, compila assets, ejecuta migraciones y cambia el release activo sólo al terminar correctamente. También limita el compilador Vite/Rolldown a un hilo, necesario en el plan compartido de Hostinger.
 
+Si el commit no cambia recursos de frontend y el plan compartido no tiene capacidad para compilar, se puede omitir ese paso de forma explícita:
+
+```bash
+SKIP_ASSET_BUILD=1 ~/deploy_app_pulsosur.sh main
+```
+
+No uses esta opción cuando cambien JavaScript, CSS o archivos de Vite.
+
 Desde la raíz del proyecto en el servidor:
 
 ```bash

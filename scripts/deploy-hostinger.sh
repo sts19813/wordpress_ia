@@ -35,9 +35,13 @@ echo "==> Instalando dependencias PHP"
 "$PHP" "$COMPOSER" install --no-dev --optimize-autoloader --no-interaction
 
 echo "==> Compilando assets"
-"$NPM" install --ignore-scripts
-"$NPM" run build
-rm -rf node_modules
+if [ "${SKIP_ASSET_BUILD:-0}" = "1" ]; then
+    echo "==> Assets sin cambios: se omite compilación"
+else
+    "$NPM" install --ignore-scripts
+    "$NPM" run build
+    rm -rf node_modules
+fi
 
 echo "==> Modo mantenimiento"
 if [ -n "$PREVIOUS" ] && [ -d "$PREVIOUS" ]; then
