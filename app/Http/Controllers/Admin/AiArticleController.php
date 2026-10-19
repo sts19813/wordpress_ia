@@ -147,7 +147,7 @@ class AiArticleController extends Controller
             'sourcePosts' => $aiArticle->sourcePosts()->load('sourceSite:id,name'),
             'publicationProfiles' => $request->user()->accessibleWordPressSites()
                 ->when($reviewTask, fn ($query) => $query->whereIn('id', $reviewProfileIds))
-                ->when(! $reviewTask && $aiArticle->company_id, fn ($query, $companyId) => $query->where('company_id', $companyId))
+                ->when(! $reviewTask && $aiArticle->company_id, fn ($query) => $query->where('company_id', $aiArticle->company_id))
                 ->where('active', true)
                 ->where('status', 'active')
                 ->orderBy('name')

@@ -141,6 +141,23 @@ class WordPressPublishingWorkflowTest extends TestCase
         ]);
     }
 
+    public function test_company_article_shows_its_active_publication_profiles(): void
+    {
+        $user = User::factory()->create();
+        $company = $user->companies()->create(['name' => 'Empresa editorial', 'active' => true]);
+        $first = $this->site($user, ['name' => 'Uno', 'company_id' => $company->id]);
+        $second = $this->site($user, ['name' => 'Dos', 'company_id' => $company->id]);
+        $article = $this->article($user);
+        $article->update(['company_id' => $company->id]);
+
+        $this->actingAs($user)
+            ->get(route('admin.ai-articles.show', $article))
+            ->assertOk()
+            ->assertSee('publish-sites-modal')
+            ->assertSee($first->name)
+            ->assertSee($second->name);
+    }
+
     public function test_a_failed_destination_does_not_stop_the_other_publications(): void
     {
         Http::fake([
