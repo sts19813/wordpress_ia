@@ -24,7 +24,7 @@
         </div>
     @endif
 
-    <div class="card card-flush">
+    <div class="card card-flush publications-card">
         <div class="card-header"><div class="card-title"><h3 class="fw-bold mb-0">Historial</h3></div></div>
         <div class="card-body pt-0">
             <table class="table align-middle table-row-dashed fs-6 gy-4 admin-datatable publications-table">
@@ -76,6 +76,37 @@
             table-layout: fixed;
         }
 
+        .publications-card,
+        .publications-card .card-body,
+        .publications-card .admin-datatable-wrapper,
+        .publications-card .admin-datatable-wrapper > .row,
+        .publications-card .admin-datatable-wrapper > .row > [class*="col-"] {
+            min-width: 0;
+            max-width: 100%;
+        }
+
+        .publications-card .admin-datatable-wrapper > .row:first-child {
+            margin-right: 0;
+            margin-left: 0;
+        }
+
+        .publications-card .dataTables_filter {
+            width: 100%;
+            min-width: 0;
+        }
+
+        .publications-card .dataTables_filter label {
+            width: 100%;
+            min-width: 0;
+            justify-content: flex-end;
+        }
+
+        .publications-card .dataTables_filter input {
+            width: min(260px, calc(100% - 4.75rem)) !important;
+            min-width: 0 !important;
+            max-width: calc(100% - 4.75rem);
+        }
+
         .publications-table th:nth-child(1) { width: 46%; }
         .publications-table th:nth-child(2) { width: 24%; }
         .publications-table th:nth-child(3) { width: 12%; }
@@ -95,7 +126,20 @@
             white-space: nowrap;
         }
 
-        @media (max-width: 767.98px) {
+        @media (max-width: 991.98px) {
+            .publications-card .admin-datatable-wrapper > .row:first-child > [class*="col-"] {
+                flex: 0 0 100%;
+                width: 100%;
+            }
+
+            .publications-card .dataTables_filter {
+                margin-top: .75rem;
+            }
+
+            .publications-card .dataTables_filter label {
+                justify-content: flex-start;
+            }
+
             .publications-table,
             .publications-table tbody,
             .publications-table tr,
