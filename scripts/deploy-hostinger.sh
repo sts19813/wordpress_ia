@@ -16,6 +16,10 @@ PREVIOUS=$(readlink -f "$BASE/current" 2>/dev/null || true)
 # npm usa `env node` internamente; el binario de Node de Hostinger no está en
 # el PATH predeterminado de las sesiones SSH ni de cron.
 export PATH="$(dirname "$NODE"):$PATH"
+# Rolldown (Vite) usa Rayon al compilar. En el plan compartido el límite de
+# procesos/hilos puede impedir el pool predeterminado; un hilo basta para el
+# build y evita abortar el despliegue antes del cambio de release.
+export RAYON_NUM_THREADS="${RAYON_NUM_THREADS:-1}"
 
 mkdir -p "$BASE/releases" "$BASE/shared" "$BASE/backups"
 

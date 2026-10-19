@@ -25,7 +25,7 @@ El script canónico es [`scripts/deploy-hostinger.sh`](scripts/deploy-hostinger.
 ~/deploy_app_pulsosur.sh main
 ```
 
-El script clona la rama, instala dependencias, compila assets, ejecuta migraciones y cambia el release activo sólo al terminar correctamente.
+El script clona la rama, instala dependencias, compila assets, ejecuta migraciones y cambia el release activo sólo al terminar correctamente. También limita el compilador Vite/Rolldown a un hilo, necesario en el plan compartido de Hostinger.
 
 Desde la raíz del proyecto en el servidor:
 
