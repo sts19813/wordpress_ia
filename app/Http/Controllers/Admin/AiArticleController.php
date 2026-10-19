@@ -28,12 +28,38 @@ class AiArticleController extends Controller
     public function index(Request $request): View
     {
         Gate::authorize('viewAny', AiArticle::class);
+        $search = trim((string) $request->query('q', ''));
 
         return view('admin.ai-articles.index', [
             'articles' => AiArticle::query()
-                ->with(['images', 'promptProfile:id,name'])
-                ->latest()
-                ->get(),
+                ->select([
+                    'id',
+                    'user_id',
+                    'ai_prompt_profile_id',
+                    'title',
+                    'excerpt',
+                    'generation_error',
+                    'model',
+                    'status',
+                    'created_at',
+                ])
+                ->with('promptProfile:id,name')
+                ->when($search !== '', function ($query) use ($search): void {
+                    $like = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search).'%';
+
+                    $query->where(function ($query) use ($like): void {
+                        $query
+                            ->where('title', 'like', $like)
+                            ->orWhere('excerpt', 'like', $like)
+                            ->orWhere('model', 'like', $like)
+                            ->orWhere('status', 'like', $like)
+                            ->orWhereHas('promptProfile', fn ($profileQuery) => $profileQuery->where('name', 'like', $like));
+                    });
+                })
+                ->latest('id')
+                ->paginate(50)
+                ->withQueryString(),
+            'search' => $search,
         ]);
     }
 

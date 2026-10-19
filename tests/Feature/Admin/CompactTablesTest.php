@@ -6,6 +6,7 @@ use App\Models\AiArticle;
 use App\Models\SourceScanLog;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Tests\TestCase;
 
 class CompactTablesTest extends TestCase
@@ -73,5 +74,39 @@ class CompactTablesTest extends TestCase
             ->assertDontSee('name="date_to"', false)
             ->assertDontSee('class="table-responsive"', false)
             ->assertDontSee('<th>Método</th>', false);
+    }
+
+    public function test_ai_articles_are_paginated_on_the_server_while_preserving_the_total(): void
+    {
+        $user = User::factory()->create();
+        $firstArticle = $user->aiArticles()->create([
+            'title' => 'Artículo fuera de la primera página',
+            'content' => '<p>Contenido.</p>',
+            'status' => AiArticle::STATUS_DRAFT,
+        ]);
+
+        foreach (range(1, 50) as $number) {
+            $user->aiArticles()->create([
+                'title' => 'Artículo paginado '.$number,
+                'content' => '<p>Contenido.</p>',
+                'status' => AiArticle::STATUS_DRAFT,
+            ]);
+        }
+
+        $firstPage = $this->actingAs($user)->get(route('admin.ai-articles.index'));
+
+        $firstPage
+            ->assertOk()
+            ->assertSee('Mostrando 1 a 50 de 51 artículos')
+            ->assertSee('Artículo paginado 50')
+            ->assertDontSee('Artículo fuera de la primera página')
+            ->assertDontSee('admin-datatable ai-articles-table', false)
+            ->assertViewHas('articles', fn (LengthAwarePaginator $articles) => $articles->total() === 51 && $articles->count() === 50);
+
+        $this->actingAs($user)
+            ->get(route('admin.ai-articles.index', ['page' => 2]))
+            ->assertOk()
+            ->assertSee($firstArticle->title)
+            ->assertSee('Mostrando 51 a 51 de 51 artículos');
     }
 }
