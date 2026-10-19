@@ -50,8 +50,11 @@ class SourcePipelineQueueTest extends TestCase
         Queue::fake();
         $user = User::factory()->create();
         $profile = app(AiPromptProfileService::class)->ensureDefaultFor($user);
+        $company = $user->companies()->create(['name' => 'Empresa programada', 'active' => true]);
         $site = $this->sourceSite($user, $profile->id, [
             'name' => 'Forbes programado',
+            'company_id' => $company->id,
+            'daily_publication_target' => 2,
             'frequency_minutes' => 24 * 60,
             'next_scan_at' => now()->addDay(),
         ]);
@@ -61,9 +64,9 @@ class SourcePipelineQueueTest extends TestCase
             ->assertOk()
             ->assertSee('Próximas consultas de sitios fuente')
             ->assertSee('Forbes programado')
-            ->assertSee('Sin destinos')
+            ->assertSee('2 artículos')
             ->assertSee($site->next_scan_at->format('d/m/y H:i'))
-            ->assertSee('IA · Guarda borrador')
+            ->assertSee('<span class="badge badge-light-primary">Empresa programada</span>', false)
             ->assertSee('Consultar')
             ->assertDontSee('Máximo')
             ->assertDontSee('class="table-responsive"', false);

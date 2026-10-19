@@ -47,14 +47,7 @@
                         @php
                             $activeTask = $activeSourceTasks->get($sourceSite->id);
                             $isDue = $sourceSite->active && $sourceSite->next_scan_at?->lte(now());
-                            $publicationProfileCount = count($sourceSite->selectedPublicationProfileIds());
-                            $automation = ! $sourceSite->auto_generate
-                                ? 'Solo obtener notas'
-                                : ($sourceSite->auto_publish && $publicationProfileCount > 0
-                                    ? ($publicationProfileCount === 1 && $sourceSite->wordpressSite
-                                        ? 'IA · Publica en '.$sourceSite->wordpressSite->name
-                                        : 'IA · Publica en '.$publicationProfileCount.' perfiles')
-                                    : 'IA · Guarda borrador');
+                            $dailyTarget = $sourceSite->dailyPublicationTarget();
                         @endphp
                         <tr>
                             <td data-label="Sitio fuente">
@@ -63,7 +56,7 @@
                                 </a>
                             </td>
                             <td data-label="Objetivo diario" class="text-nowrap">
-                                {{ $sourceSite->publicationScheduleSummary() }}
+                                {{ $dailyTarget }} {{ Illuminate\Support\Str::plural('artículo', $dailyTarget) }}
                             </td>
                             <td data-label="Próxima consulta" class="text-nowrap">
                                 @if (! $sourceSite->active)
@@ -79,7 +72,7 @@
                                 @endif
                             </td>
                             <td data-label="Automatización">
-                                <span class="d-block text-truncate">{{ $automation }}</span>
+                                <span class="badge badge-light-primary">{{ $sourceSite->company?->name ?: 'Sin empresa' }}</span>
                             </td>
                             <td data-label="Acción" class="text-end">
                                 @if ($activeTask)
