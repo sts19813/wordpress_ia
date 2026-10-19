@@ -32,6 +32,8 @@ php artisan optimize
 
 Comprueba también que `storage/` y `bootstrap/cache/` tengan permisos de escritura y que el document root del dominio apunte a `public/`.
 
+El archivo `public/.htaccess` se versiona con el proyecto e incluye el manejador de PHP 8.5 y las reglas de rutas de Laravel. Debe conservar permisos `644`; si el servidor no puede leerlo, las rutas públicas como la imagen temporal usada para publicar en Instagram devolverán un 404.
+
 ## 3. Crear el cron
 
 En **hPanel → Sitios web → Administrar → Tareas cron**, crea una tarea de tipo **Custom** cada minuto. Usa la ruta real de tu cuenta:
