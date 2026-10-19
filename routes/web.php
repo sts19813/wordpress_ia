@@ -131,6 +131,7 @@ Route::middleware(['auth', 'active', 'system.permission'])->prefix('admin')->nam
     Route::get('usuarios', [UserAccessController::class, 'index'])->name('users.index');
     Route::post('usuarios', [UserAccessController::class, 'storeUser'])->name('users.store');
     Route::put('usuarios/{user}', [UserAccessController::class, 'updateUser'])->name('users.update');
+    Route::delete('usuarios/{user}', [UserAccessController::class, 'destroyUser'])->name('users.destroy');
     Route::post('roles', [UserAccessController::class, 'storeRole'])->name('roles.store');
     Route::put('roles/{role}', [UserAccessController::class, 'updateRole'])->name('roles.update');
     Route::delete('roles/{role}', [UserAccessController::class, 'destroyRole'])->name('roles.destroy');

@@ -59,6 +59,45 @@ class UserAccessModuleTest extends TestCase
         $this->assertTrue($user->hasDirectPermission('reportes.exportar'));
     }
 
+    public function test_administrator_can_delete_another_user_but_not_their_own_account(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        $managedUser = User::factory()->create(['name' => 'Usuario para eliminar']);
+
+        $this->actingAs($admin)
+            ->get(route('admin.users.index'))
+            ->assertOk()
+            ->assertSee(route('admin.users.destroy', $managedUser), false)
+            ->assertSee('aria-label="Eliminar usuario Usuario para eliminar"', false);
+
+        $this->actingAs($admin)
+            ->delete(route('admin.users.destroy', $managedUser))
+            ->assertRedirect(route('admin.users.index'))
+            ->assertSessionHas('status');
+
+        $this->assertDatabaseMissing('users', ['id' => $managedUser->id]);
+
+        $this->actingAs($admin)
+            ->delete(route('admin.users.destroy', $admin))
+            ->assertRedirect()
+            ->assertSessionHasErrors('user');
+
+        $this->assertDatabaseHas('users', ['id' => $admin->id]);
+    }
+
+    public function test_non_administrator_cannot_delete_users_even_with_user_management_permission(): void
+    {
+        $nonAdmin = User::factory()->create();
+        $nonAdmin->givePermissionTo('usuarios.gestionar');
+        $managedUser = User::factory()->create();
+
+        $this->actingAs($nonAdmin)
+            ->delete(route('admin.users.destroy', $managedUser))
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('users', ['id' => $managedUser->id]);
+    }
+
     public function test_module_permission_is_enforced_on_real_admin_routes(): void
     {
         $operatorRole = Role::findByName('Operador');

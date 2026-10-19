@@ -102,6 +102,35 @@ class UserAccessController extends Controller
         return back()->with('status', 'Usuario actualizado correctamente.');
     }
 
+    public function destroyUser(Request $request, User $user): RedirectResponse
+    {
+        abort_unless($request->user()?->isAdmin(), 403);
+
+        if ($request->user()->is($user)) {
+            return back()->withErrors([
+                'user' => 'No puedes eliminar tu propia cuenta desde esta pantalla.',
+            ]);
+        }
+
+        if ($user->isAdmin() && $user->is_active && $this->activeAdministratorCount() <= 1) {
+            return back()->withErrors([
+                'user' => 'Debe permanecer al menos un administrador activo en el sistema.',
+            ]);
+        }
+
+        $name = $user->name;
+
+        DB::transaction(function () use ($user): void {
+            $user->syncRoles([]);
+            $user->syncPermissions([]);
+            $user->delete();
+        });
+
+        return redirect()
+            ->route('admin.users.index')
+            ->with('status', "Usuario eliminado correctamente: {$name}.");
+    }
+
     public function storeRole(Request $request): RedirectResponse
     {
         $validated = $this->validateRole($request);

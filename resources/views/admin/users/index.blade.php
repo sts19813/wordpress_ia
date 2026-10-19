@@ -77,7 +77,16 @@
                                                 @forelse ($managedUser->permissions as $permission)<span class="badge badge-light">{{ $permissionLabels[$permission->name] ?? $permission->name }}</span>@empty<span class="text-muted fs-8">Ninguno</span>@endforelse
                                             </div>
                                         </td>
-                                        <td class="text-end"><button type="button" class="btn btn-sm btn-light-primary" data-bs-toggle="modal" data-bs-target="#edit-user-{{ $managedUser->id }}"><i class="ki-outline ki-pencil fs-4"></i>Editar</button></td>
+                                        <td class="text-end text-nowrap">
+                                            <button type="button" class="btn btn-sm btn-light-primary" data-bs-toggle="modal" data-bs-target="#edit-user-{{ $managedUser->id }}"><i class="ki-outline ki-pencil fs-4"></i>Editar</button>
+                                            @if (auth()->user()->isAdmin() && ! auth()->user()->is($managedUser))
+                                                <form method="POST" action="{{ route('admin.users.destroy', $managedUser) }}" class="d-inline" data-confirm-delete data-confirm-title="Eliminar usuario" data-confirm-text="Se eliminará permanentemente la cuenta de {{ $managedUser->name }} y sus accesos.">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="btn btn-sm btn-icon btn-light-danger ms-1" title="Eliminar usuario" aria-label="Eliminar usuario {{ $managedUser->name }}"><i class="ki-outline ki-trash fs-3"></i></button>
+                                                </form>
+                                            @endif
+                                        </td>
                                     </tr>
                                 @endforeach
                             </tbody>
