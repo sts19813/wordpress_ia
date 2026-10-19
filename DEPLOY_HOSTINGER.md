@@ -19,6 +19,14 @@ OPENAI_TIMEOUT=180
 
 ## 2. Actualizar la aplicación
 
+El script canónico es [`scripts/deploy-hostinger.sh`](scripts/deploy-hostinger.sh). En el servidor debe vivir como `~/deploy_app_pulsosur.sh` y mantenerse como copia de ese archivo versionado. Recibe opcionalmente la rama a desplegar:
+
+```bash
+~/deploy_app_pulsosur.sh main
+```
+
+El script clona la rama, instala dependencias, compila assets, ejecuta migraciones y cambia el release activo sólo al terminar correctamente.
+
 Desde la raíz del proyecto en el servidor:
 
 ```bash
