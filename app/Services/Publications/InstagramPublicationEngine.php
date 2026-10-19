@@ -19,6 +19,10 @@ class InstagramPublicationEngine
 
     private const MEDIA_PUBLISH_ATTEMPTS = 3;
 
+    // Meta can retrieve the image asynchronously after the container is created.
+    // Keep the signed media URL available long enough for that delayed download.
+    private const MEDIA_URL_EXPIRATION_DAYS = 7;
+
     public function __construct(
         private readonly InstagramClient $client,
         private readonly InstagramMediaUrl $mediaUrl,
@@ -33,7 +37,7 @@ class InstagramPublicationEngine
                 throw new RuntimeException('Instagram requiere una imagen generada disponible para publicar.');
             }
 
-            $imageUrl = $this->mediaUrl->temporary($image, now()->addHour());
+            $imageUrl = $this->mediaUrl->temporary($image, now()->addDays(self::MEDIA_URL_EXPIRATION_DAYS));
             $caption = $this->caption($article);
             $container = $this->client->createImageContainer($profile, $imageUrl, $caption);
             $creationId = (string) $container->json('id');

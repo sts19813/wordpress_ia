@@ -128,6 +128,9 @@ class InstagramAndXPublishingWorkflowTest extends TestCase
         $this->assertSame('https://www.instagram.com/p/ABC123/', $publication->remote_url);
         $this->assertSame('publish_instagram_image', $publication->last_action);
         $this->assertNotNull($imageUrl);
+        $imageUrlParts = array_values(array_filter(explode('/', (string) parse_url($imageUrl, PHP_URL_PATH))));
+        $expiresAt = (int) $imageUrlParts[2];
+        $this->assertGreaterThanOrEqual(now()->addDays(6)->getTimestamp(), $expiresAt);
         $mediaUrlBehindProxy = preg_replace('#^https?://[^/]+#', 'https://media-proxy.example', $imageUrl);
         $mediaResponse = $this->get($mediaUrlBehindProxy)
             ->assertOk()
