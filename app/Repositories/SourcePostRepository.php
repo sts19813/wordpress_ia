@@ -5,6 +5,7 @@ namespace App\Repositories;
 use App\Models\SourcePost;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class SourcePostRepository
 {
@@ -13,20 +14,49 @@ class SourcePostRepository
      */
     public function getForAdmin(array $filters): Collection
     {
+        return $this->adminQuery($filters)->get();
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     */
+    public function paginateForAdmin(array $filters, int $perPage = 50): LengthAwarePaginator
+    {
+        return $this->adminQuery($filters)
+            ->select([
+                'id',
+                'source_site_id',
+                'origin_type',
+                'social_platform',
+                'title',
+                'author',
+                'published_at',
+                'url',
+                'status',
+            ])
+            ->paginate($perPage)
+            ->withQueryString();
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     */
+    private function adminQuery(array $filters): Builder
+    {
         $sort = $this->allowedSorts()[$filters['sort'] ?? 'published_at'] ?? 'published_at';
         $direction = ($filters['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
 
         return SourcePost::query()
             ->with('sourceSite:id,name')
             ->when($filters['search'] ?? null, function (Builder $query, string $search): void {
-                $query->where(function (Builder $query) use ($search): void {
+                $like = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search).'%';
+
+                $query->where(function (Builder $query) use ($like): void {
                     $query
-                        ->where('title', 'like', "%{$search}%")
-                        ->orWhere('content', 'like', "%{$search}%")
-                        ->orWhere('summary', 'like', "%{$search}%")
-                        ->orWhere('author', 'like', "%{$search}%")
-                        ->orWhere('url', 'like', "%{$search}%")
-                        ->orWhere('hash', 'like', "%{$search}%");
+                        ->where('title', 'like', $like)
+                        ->orWhere('author', 'like', $like)
+                        ->orWhere('url', 'like', $like)
+                        ->orWhereHas('sourceSite', fn (Builder $siteQuery) => $siteQuery->where('name', 'like', $like));
                 });
             })
             ->when($filters['source_site_id'] ?? null, fn (Builder $query, string $sourceSiteId) => $query->where('source_site_id', $sourceSiteId))
@@ -39,8 +69,7 @@ class SourcePostRepository
             ->when($filters['date_from'] ?? null, fn (Builder $query, string $date) => $query->whereDate('published_at', '>=', $date))
             ->when($filters['date_to'] ?? null, fn (Builder $query, string $date) => $query->whereDate('published_at', '<=', $date))
             ->orderBy($sort, $direction)
-            ->orderBy('id', 'desc')
-            ->get();
+            ->orderBy('id', 'desc');
     }
 
     /**

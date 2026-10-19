@@ -6,7 +6,7 @@
     <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-4 w-100">
         <div>
             <h1 class="page-heading text-gray-900 fw-bold fs-3 my-0">Noticias obtenidas</h1>
-            <div class="text-muted fw-semibold fs-7 pt-1">Revisa las notas encontradas en tus sitios fuente y conviértelas en contenido.</div>
+            <div class="text-muted fw-semibold fs-7 pt-1">{{ number_format($sourcePosts->total()) }} noticias encontradas para revisar y convertir en contenido.</div>
         </div>
 
         <div class="d-flex flex-column flex-sm-row gap-3">
@@ -49,8 +49,23 @@
 
         <div class="card card-flush">
             <div class="card-body py-5">
+                <form method="GET" action="{{ route('admin.news.index') }}" class="news-search row align-items-center g-3 mb-4">
+                    @if ($selectedSourceSiteId)
+                        <input type="hidden" name="source_site_id" value="{{ $selectedSourceSiteId }}">
+                    @endif
+                    <div class="col-sm">
+                        <label for="news-search" class="visually-hidden">Buscar noticias</label>
+                        <input id="news-search" type="search" name="q" value="{{ $search }}" class="form-control" placeholder="Buscar por título, fuente, autor o URL">
+                    </div>
+                    <div class="col-sm-auto d-flex gap-2">
+                        <button type="submit" class="btn btn-light-primary">Buscar</button>
+                        @if ($search !== '')
+                            <a href="{{ route('admin.news.index', ['source_site_id' => $selectedSourceSiteId]) }}" class="btn btn-light">Limpiar</a>
+                        @endif
+                    </div>
+                </form>
                 <div class="table-responsive news-table-wrap">
-                    <table class="table align-middle table-row-dashed fs-7 gy-3 admin-datatable news-table" data-page-length="50">
+                    <table class="table align-middle table-row-dashed fs-7 gy-3 news-table">
                         <thead>
                             <tr class="text-start text-gray-500 fw-bold fs-8 text-uppercase gs-0">
                                 <th class="min-w-300px">Título</th>
@@ -61,7 +76,7 @@
                             </tr>
                         </thead>
                         <tbody class="fw-semibold text-gray-700">
-                            @foreach ($sourcePosts as $sourcePost)
+                            @forelse ($sourcePosts as $sourcePost)
                                 <tr>
                                     <td>
                                         <a href="{{ route('admin.news.show', $sourcePost) }}" class="news-title text-gray-900 text-hover-primary fw-bold">
@@ -116,9 +131,37 @@
                                         </div>
                                     </td>
                                 </tr>
-                            @endforeach
+                            @empty
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-8">No se encontraron noticias.</td>
+                                </tr>
+                            @endforelse
                         </tbody>
                     </table>
+                </div>
+                <div class="news-pagination d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3 pt-4">
+                    <div class="text-muted fs-7">
+                        @if ($sourcePosts->total())
+                            Mostrando {{ number_format($sourcePosts->firstItem()) }} a {{ number_format($sourcePosts->lastItem()) }} de {{ number_format($sourcePosts->total()) }} noticias
+                        @else
+                            Mostrando 0 noticias
+                        @endif
+                    </div>
+                    @if ($sourcePosts->hasPages())
+                        <nav class="d-flex align-items-center gap-2" aria-label="Paginación de noticias">
+                            @if ($sourcePosts->onFirstPage())
+                                <span class="btn btn-sm btn-light disabled">Anterior</span>
+                            @else
+                                <a href="{{ $sourcePosts->previousPageUrl() }}" class="btn btn-sm btn-light">Anterior</a>
+                            @endif
+                            <span class="text-muted fs-8">Página {{ $sourcePosts->currentPage() }} de {{ $sourcePosts->lastPage() }}</span>
+                            @if ($sourcePosts->hasMorePages())
+                                <a href="{{ $sourcePosts->nextPageUrl() }}" class="btn btn-sm btn-light-primary">Siguiente</a>
+                            @else
+                                <span class="btn btn-sm btn-light disabled">Siguiente</span>
+                            @endif
+                        </nav>
+                    @endif
                 </div>
             </div>
         </div>
@@ -155,26 +198,6 @@
             -webkit-line-clamp: 2;
         }
 
-        .news-index-page .admin-datatable-wrapper {
-            width: 100%;
-            overflow: visible;
-        }
-
-        .news-index-page .dataTables_filter {
-            width: 100%;
-            padding-right: 2px;
-        }
-
-        .news-index-page .dataTables_filter label {
-            width: 100%;
-            justify-content: flex-end;
-        }
-
-        .news-index-page .dataTables_filter input {
-            width: 280px !important;
-            max-width: calc(100% - 68px);
-        }
-
         .news-index-page .dropdown-menu {
             min-width: 210px;
             z-index: 1080;
@@ -186,14 +209,6 @@
                 padding-left: 0;
             }
 
-            .news-index-page .dataTables_filter label {
-                justify-content: center;
-            }
-
-            .news-index-page .dataTables_filter input {
-                width: 100% !important;
-                max-width: 100%;
-            }
         }
     </style>
 @endpush

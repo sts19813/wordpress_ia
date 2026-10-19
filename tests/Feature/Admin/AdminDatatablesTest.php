@@ -6,13 +6,14 @@ use App\Models\SourcePost;
 use App\Models\SourceSite;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Tests\TestCase;
 
 class AdminDatatablesTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_news_index_uses_datatables_instead_of_laravel_pagination(): void
+    public function test_news_index_uses_server_pagination_and_shows_the_exact_total(): void
     {
         $sourceSite = $this->createSourceSite();
 
@@ -37,17 +38,17 @@ class AdminDatatablesTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertSee('admin-datatable', false)
-            ->assertSee('data-page-length="50"', false)
+            ->assertDontSee('admin-datatable news-table', false)
             ->assertSee('Nota para DataTables')
             ->assertSee('Generar nota con IA')
             ->assertSee('Ir al post original')
+            ->assertSee('Mostrando 1 a 1 de 1 noticias')
+            ->assertSee('name="q"', false)
             ->assertDontSee('name="status"', false)
             ->assertDontSee('name="language"', false)
             ->assertDontSee('name="category"', false)
             ->assertDontSee('name="tag"', false)
-            ->assertDontSee('role="navigation"', false)
-            ->assertDontSee('Showing 1 to', false);
+            ->assertDontSee('role="navigation"', false);
     }
 
     public function test_news_index_can_be_filtered_with_the_single_source_site_selector(): void
@@ -85,6 +86,45 @@ class AdminDatatablesTest extends TestCase
             ->assertSee('Nota que debe mostrarse')
             ->assertDontSee('Nota que debe ocultarse')
             ->assertSee('value="'.$selectedSite->id.'" selected', false);
+    }
+
+    public function test_news_index_loads_only_one_page_while_preserving_the_total_count(): void
+    {
+        $sourceSite = $this->createSourceSite();
+        $firstPost = SourcePost::query()->create([
+            'source_site_id' => $sourceSite->id,
+            'title' => 'Noticia fuera de la primera página',
+            'url' => 'https://example.com/primera-fuera',
+            'hash' => hash('sha256', 'primera-fuera'),
+            'status' => SourcePost::STATUS_FETCHED,
+            'published_at' => now(),
+        ]);
+
+        foreach (range(1, 50) as $number) {
+            SourcePost::query()->create([
+                'source_site_id' => $sourceSite->id,
+                'title' => 'Noticia paginada '.$number,
+                'url' => 'https://example.com/noticia-'.$number,
+                'hash' => hash('sha256', 'noticia-'.$number),
+                'status' => SourcePost::STATUS_FETCHED,
+                'published_at' => now(),
+            ]);
+        }
+
+        $firstPage = $this->actingAs(User::factory()->create())->get(route('admin.news.index'));
+
+        $firstPage
+            ->assertOk()
+            ->assertSee('Mostrando 1 a 50 de 51 noticias')
+            ->assertSee('Noticia paginada 50')
+            ->assertDontSee('Noticia fuera de la primera página')
+            ->assertViewHas('sourcePosts', fn (LengthAwarePaginator $posts) => $posts->total() === 51 && $posts->count() === 50);
+
+        $this->actingAs(User::factory()->create())
+            ->get(route('admin.news.index', ['page' => 2]))
+            ->assertOk()
+            ->assertSee($firstPost->title)
+            ->assertSee('Mostrando 51 a 51 de 51 noticias');
     }
 
     public function test_source_sites_index_uses_datatables_instead_of_laravel_pagination(): void

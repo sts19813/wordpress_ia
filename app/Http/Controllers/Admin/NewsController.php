@@ -21,13 +21,16 @@ class NewsController extends Controller
     public function index(Request $request): View
     {
         $sourceSiteId = $request->integer('source_site_id') ?: null;
+        $search = trim((string) $request->query('q', ''));
 
         return view('admin.news.index', [
-            'sourcePosts' => $this->sourcePosts->getForAdmin([
+            'sourcePosts' => $this->sourcePosts->paginateForAdmin([
                 'source_site_id' => $sourceSiteId,
+                'search' => $search,
             ]),
             'sourceSites' => SourceSite::query()->orderBy('name')->pluck('name', 'id'),
             'selectedSourceSiteId' => $sourceSiteId,
+            'search' => $search,
         ]);
     }
 
