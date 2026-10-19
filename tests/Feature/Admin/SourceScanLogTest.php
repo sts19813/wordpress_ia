@@ -24,6 +24,31 @@ class SourceScanLogTest extends TestCase
             ->assertSee('disabled', false);
     }
 
+    public function test_index_only_loads_the_most_recent_two_hundred_logs(): void
+    {
+        $user = User::factory()->create();
+
+        foreach (range(1, 205) as $position) {
+            SourceScanLog::query()->create([
+                'title' => sprintf('Registro-%03d', $position),
+                'outcome' => SourceScanLog::OUTCOME_ACCEPTED,
+                'applies' => true,
+                'scanned_at' => now()->subSeconds(205 - $position),
+            ]);
+        }
+
+        $response = $this->actingAs($user)->get(route('admin.source-scan-logs.index'));
+        $logs = $response->viewData('logs');
+
+        $response
+            ->assertOk()
+            ->assertSee('Registro-205')
+            ->assertDontSee('Registro-001')
+            ->assertSee('últimos 200 registros');
+        $this->assertCount(200, $logs);
+        $this->assertSame(205, $response->viewData('logCount'));
+    }
+
     public function test_authenticated_user_can_clear_all_source_scan_logs(): void
     {
         $user = User::factory()->create();

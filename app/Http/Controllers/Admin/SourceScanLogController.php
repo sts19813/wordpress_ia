@@ -9,13 +9,18 @@ use Illuminate\Http\RedirectResponse;
 
 class SourceScanLogController extends Controller
 {
+    private const MAXIMUM_VISIBLE_LOGS = 200;
+
     public function __invoke(): View
     {
         return view('admin.source-scan-logs.index', [
             'logs' => SourceScanLog::query()
                 ->with(['sourceSite:id,name', 'sourcePost:id,title'])
                 ->latest('scanned_at')
+                ->limit(self::MAXIMUM_VISIBLE_LOGS)
                 ->get(),
+            'logCount' => SourceScanLog::query()->count(),
+            'maximumVisibleLogs' => self::MAXIMUM_VISIBLE_LOGS,
         ]);
     }
 
