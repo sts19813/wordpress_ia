@@ -165,9 +165,9 @@
                     <div class="card card-flush ops-usage-card h-100">
                         <div class="card-body">
                             <div class="ops-usage-icon bg-light-warning text-warning"><i class="ki-outline ki-calculator"></i></div>
-                            <div class="ops-usage-value">${{ number_format($aiUsageToday['average_cost'], 4) }}</div>
-                            <div class="ops-usage-label">Costo promedio por post</div>
-                            <div class="ops-usage-detail">A 100 posts: ~$${{ number_format($aiUsageToday['projected_100_cost'], 2) }} por día</div>
+                            <div class="ops-usage-value">${{ number_format($aiUsageToday['projected_100_cost'], 2) }}</div>
+                            <div class="ops-usage-label">Costo estimado por 100 posts</div>
+                            <div class="ops-usage-detail">${{ number_format($aiUsageToday['average_cost'], 4) }} por post</div>
                         </div>
                     </div>
                 </div>
