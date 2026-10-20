@@ -92,8 +92,7 @@
                 </button>
 
                 <a href="{{ route('admin.dashboard') }}" class="sidebar-brand-link text-decoration-none">
-                    <span class="sidebar-brand-mark">PS</span>
-                    <span class="sidebar-brand-wordmark">{{ config('app.name') }}</span>
+                    <img class="sidebar-brand-logo" src="{{ asset('assets/img/pulsosur-logo.png') }}" alt="{{ config('app.name') }}" />
                 </a>
             </div>
 

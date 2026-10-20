@@ -11,7 +11,8 @@
             body { margin: 0; background: #f5f7fb; color: #1f2937; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.65; }
             main { max-width: 850px; margin: 0 auto; padding: 56px 24px 72px; }
             article { padding: 42px; border: 1px solid #e5e7eb; border-radius: 18px; background: #fff; box-shadow: 0 12px 34px rgba(15, 23, 42, .07); }
-            .brand { color: #2563eb; font-size: .9rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+            .brand { display: inline-flex; padding: 4px 7px; border-radius: 7px; background: #fff; box-shadow: 0 1px 5px rgba(15, 23, 42, .12); }
+            .brand img { display: block; width: 150px; height: auto; }
             h1 { margin: 8px 0 4px; color: #111827; font-size: clamp(2rem, 5vw, 2.75rem); line-height: 1.15; }
             h2 { margin: 34px 0 10px; color: #111827; font-size: 1.25rem; line-height: 1.35; }
             p, li { font-size: 1rem; }
@@ -26,7 +27,7 @@
     <body>
         <main>
             <article>
-                <div class="brand">Pulsosur</div>
+                <div class="brand"><img src="{{ asset('assets/img/pulsosur-logo.png') }}" alt="Pulsosur"></div>
                 <h1>Política de privacidad</h1>
                 <p class="updated">Última actualización: 27 de agosto de 2026.</p>
 

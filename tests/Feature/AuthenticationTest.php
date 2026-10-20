@@ -17,7 +17,8 @@ class AuthenticationTest extends TestCase
             ->assertOk()
             ->assertSee('auth-login-shell', false)
             ->assertSee('auth-login-card', false)
-            ->assertSee('auth-login-brand', false);
+            ->assertSee('auth-login-brand', false)
+            ->assertSee('assets/img/pulsosur-logo.png', false);
     }
 
     public function test_a_user_can_register_and_reach_the_dashboard(): void

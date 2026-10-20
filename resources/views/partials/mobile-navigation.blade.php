@@ -17,8 +17,7 @@
     </button>
 
     <a href="{{ route('admin.dashboard') }}" class="mobile-app-brand text-decoration-none">
-        <span class="mobile-app-brand-mark">PS</span>
-        <span class="mobile-app-brand-name">{{ config('app.name') }}</span>
+        <img class="mobile-app-brand-logo" src="{{ asset('assets/img/pulsosur-logo.png') }}" alt="{{ config('app.name') }}" />
     </a>
 
     <a href="{{ route('admin.account.edit') }}" class="mobile-app-icon-button" aria-label="Mi perfil">

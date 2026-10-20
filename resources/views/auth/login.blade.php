@@ -70,7 +70,7 @@
     <div class="auth-login-shell d-flex flex-column-fluid flex-lg-row-auto justify-content-center justify-content-lg-end p-12 p-lg-20">
         <div class="auth-login-card bg-body d-flex flex-column align-items-stretch flex-center rounded-4 w-md-600px p-20">
             <div class="auth-login-inner d-flex flex-center flex-column flex-column-fluid px-lg-10 pb-15 pb-lg-20">
-                <img class="auth-login-brand d-lg-none mb-10" alt="{{ config('app.name') }}" src="{{ asset('assets/img/wordpress-ia-logo.svg') }}" />
+                <img class="auth-login-brand d-lg-none mb-10" alt="{{ config('app.name') }}" src="{{ asset('assets/img/pulsosur-logo.png') }}" />
 
                 <form method="POST" action="{{ route('login') }}" class="auth-login-form form w-100" novalidate>
                     @csrf

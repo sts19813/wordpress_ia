@@ -250,31 +250,17 @@
         .sidebar-brand-link {
             display: flex;
             align-items: center;
-            gap: 12px;
             min-width: 0;
+            padding: 4px 8px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, .94);
             text-decoration: none;
         }
 
-        .sidebar-brand-mark {
-            width: 36px;
-            height: 36px;
-            border-radius: 12px;
-            background: linear-gradient(135deg, #34a3ff 0%, #2f80ed 100%);
-            color: #fff;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 800;
-            font-size: 1rem;
-            letter-spacing: .02em;
-            flex-shrink: 0;
-        }
-
-        .sidebar-brand-wordmark {
-            color: #fff;
-            font-size: 1rem;
-            font-weight: 700;
-            white-space: nowrap;
+        .sidebar-brand-logo {
+            display: block;
+            width: 150px;
+            height: auto;
         }
 
         .sidebar-scroll {
@@ -893,13 +879,8 @@
                 border-radius: 12px;
             }
 
-            .sidebar-brand-mark {
-                width: 38px;
-                height: 38px;
-            }
-
-            .sidebar-brand-wordmark {
-                font-size: .96rem;
+            .sidebar-brand-logo {
+                width: 155px;
             }
 
             .sidebar-scroll {
@@ -1019,30 +1000,13 @@
             .mobile-app-brand {
                 display: flex;
                 align-items: center;
-                gap: 9px;
                 min-width: 0;
-                color: #1f2a44;
             }
 
-            .mobile-app-brand-mark {
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                width: 36px;
-                height: 36px;
-                flex: 0 0 36px;
-                border-radius: 11px;
-                background: linear-gradient(135deg, #34a3ff 0%, #2f80ed 100%);
-                color: #fff;
-                font-size: .92rem;
-                font-weight: 800;
-            }
-
-            .mobile-app-brand-name {
-                overflow: hidden;
-                font-weight: 800;
-                text-overflow: ellipsis;
-                white-space: nowrap;
+            .mobile-app-brand-logo {
+                display: block;
+                width: min(144px, 42vw);
+                height: auto;
             }
 
             .mobile-app-icon-button {
