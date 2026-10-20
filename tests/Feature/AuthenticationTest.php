@@ -11,6 +11,15 @@ class AuthenticationTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_login_screen_uses_the_compact_mobile_layout(): void
+    {
+        $this->get(route('login'))
+            ->assertOk()
+            ->assertSee('auth-login-shell', false)
+            ->assertSee('auth-login-card', false)
+            ->assertSee('auth-login-brand', false);
+    }
+
     public function test_a_user_can_register_and_reach_the_dashboard(): void
     {
         $response = $this->post(route('register'), [

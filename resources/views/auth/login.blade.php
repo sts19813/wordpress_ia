@@ -2,14 +2,80 @@
 
 @section('title', 'Iniciar sesión | '.config('app.name'))
 
+@push('styles')
+    <style>
+        @media (max-width: 991.98px) {
+            .auth-login-shell {
+                width: 100%;
+                min-height: 100dvh;
+                padding: 1.25rem !important;
+            }
+
+            .auth-login-card {
+                width: min(100%, 34rem) !important;
+                margin: auto;
+                padding: 2rem !important;
+                border-radius: 1.25rem !important;
+            }
+
+            .auth-login-inner {
+                flex: 0 0 auto !important;
+                padding: 0 !important;
+            }
+
+            .auth-login-language {
+                margin-top: 1.5rem;
+                padding: 0 !important;
+            }
+        }
+
+        @media (max-width: 575.98px) {
+            .auth-login-shell {
+                padding: 0 !important;
+            }
+
+            .auth-login-card {
+                min-height: 100dvh;
+                width: 100% !important;
+                margin: 0;
+                padding: max(1.5rem, env(safe-area-inset-top)) max(1.25rem, env(safe-area-inset-right)) max(1.5rem, env(safe-area-inset-bottom)) max(1.25rem, env(safe-area-inset-left)) !important;
+                border-radius: 0 !important;
+                box-shadow: none !important;
+                justify-content: flex-start !important;
+            }
+
+            .auth-login-brand {
+                max-width: 11rem;
+                max-height: 2.5rem;
+            }
+
+            .auth-login-heading {
+                margin-bottom: 2rem !important;
+                text-align: left !important;
+            }
+
+            .auth-login-heading h1 {
+                font-size: 1.75rem;
+            }
+
+            .auth-login-form .form-control,
+            .auth-login-form .btn {
+                min-height: 3.25rem;
+            }
+        }
+    </style>
+@endpush
+
 @section('content')
-    <div class="d-flex flex-column-fluid flex-lg-row-auto justify-content-center justify-content-lg-end p-12 p-lg-20">
-        <div class="bg-body d-flex flex-column align-items-stretch flex-center rounded-4 w-md-600px p-20">
-            <div class="d-flex flex-center flex-column flex-column-fluid px-lg-10 pb-15 pb-lg-20">
-                <form method="POST" action="{{ route('login') }}" class="form w-100" novalidate>
+    <div class="auth-login-shell d-flex flex-column-fluid flex-lg-row-auto justify-content-center justify-content-lg-end p-12 p-lg-20">
+        <div class="auth-login-card bg-body d-flex flex-column align-items-stretch flex-center rounded-4 w-md-600px p-20">
+            <div class="auth-login-inner d-flex flex-center flex-column flex-column-fluid px-lg-10 pb-15 pb-lg-20">
+                <img class="auth-login-brand d-lg-none mb-10" alt="{{ config('app.name') }}" src="{{ asset('assets/img/wordpress-ia-logo.svg') }}" />
+
+                <form method="POST" action="{{ route('login') }}" class="auth-login-form form w-100" novalidate>
                     @csrf
 
-                    <div class="text-center mb-11">
+                    <div class="auth-login-heading text-center mb-11">
                         <h1 class="text-gray-900 fw-bolder mb-3">
                             Iniciar sesión
                         </h1>
@@ -85,7 +151,7 @@
                 </form>
             </div>
 
-            <div class="d-flex flex-stack px-lg-10">
+            <div class="auth-login-language d-flex flex-stack px-lg-10">
                 <div class="me-0">
                     <button class="btn btn-flex btn-link btn-color-gray-700 btn-active-color-primary rotate fs-base"
                         data-kt-menu-trigger="click" data-kt-menu-placement="bottom-start" data-kt-menu-offset="0px, 0px">

@@ -50,7 +50,7 @@
         </style>
 
         <div class="d-flex flex-column flex-column-fluid flex-lg-row">
-            <div class="d-flex flex-center w-lg-50 pt-15 pt-lg-0 px-10">
+            <div class="auth-brand-panel d-none d-lg-flex flex-center w-lg-50 pt-15 pt-lg-0 px-10">
                 <div class="d-flex flex-center flex-lg-start flex-column">
                     <a href="{{ url('/') }}" class="mb-7">
                         <img width="400px" alt="{{ config('app.name') }}" src="{{ asset('assets/img/wordpress-ia-logo.svg') }}" />
