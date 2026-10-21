@@ -12,6 +12,12 @@ NPM=${NPM_BINARY:-/opt/alt/alt-nodejs22/root/usr/bin/npm}
 TS=$(date +%Y%m%d%H%M%S)
 RELEASE="$BASE/releases/release_$TS"
 PREVIOUS=$(readlink -f "$BASE/current" 2>/dev/null || true)
+RELEASES_TO_KEEP=${DEPLOY_RELEASES_TO_KEEP:-3}
+
+if ! [[ "$RELEASES_TO_KEEP" =~ ^[0-9]+$ ]] || [ "$RELEASES_TO_KEEP" -lt 3 ]; then
+    echo "DEPLOY_RELEASES_TO_KEEP debe ser un entero de al menos 3." >&2
+    exit 1
+fi
 
 # npm usa `env node` internamente; el binario de Node de Hostinger no está en
 # el PATH predeterminado de las sesiones SSH ni de cron.
@@ -20,6 +26,30 @@ export PATH="$(dirname "$NODE"):$PATH"
 # procesos/hilos puede impedir el pool predeterminado; un hilo basta para el
 # build y evita abortar el despliegue antes del cambio de release.
 export RAYON_NUM_THREADS="${RAYON_NUM_THREADS:-1}"
+
+cleanup_old_releases() {
+    local current_release
+    local release
+    local release_path
+    local -a releases
+
+    current_release=$(readlink -f "$BASE/current")
+    mapfile -t releases < <(find "$BASE/releases" -mindepth 1 -maxdepth 1 -type d -name 'release_*' -printf '%f\n' | sort)
+
+    while [ "${#releases[@]}" -gt "$RELEASES_TO_KEEP" ]; do
+        release="${releases[0]}"
+        releases=("${releases[@]:1}")
+        release_path="$BASE/releases/$release"
+
+        # Nunca se elimina el release al que apunta el sitio, aunque su fecha no sea la más reciente.
+        if [ "$(readlink -f "$release_path")" = "$current_release" ]; then
+            continue
+        fi
+
+        echo "==> Eliminando release anterior: $release"
+        rm -rf -- "$release_path"
+    done
+}
 
 mkdir -p "$BASE/releases" "$BASE/shared" "$BASE/backups"
 
@@ -70,5 +100,9 @@ fi
 "$PHP" artisan up || true
 find "$BASE/shared/storage" "$RELEASE/bootstrap/cache" -type d -exec chmod 755 {} \;
 find "$BASE/shared/storage" "$RELEASE/bootstrap/cache" -type f -exec chmod 644 {} \;
+
+# Cada release contiene las dependencias PHP completas. Mantener sólo tres
+# conserva dos puntos de reversión y evita agotar los inodos del plan.
+cleanup_old_releases
 
 echo "==> Deploy listo: $RELEASE"
