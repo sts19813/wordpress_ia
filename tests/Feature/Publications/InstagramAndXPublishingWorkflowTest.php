@@ -213,6 +213,68 @@ class InstagramAndXPublishingWorkflowTest extends TestCase
         Sleep::fake(false);
     }
 
+    public function test_instagram_retries_a_media_url_rejected_by_meta_before_creating_the_container(): void
+    {
+        Storage::fake('local');
+        Sleep::fake();
+        $containerAttempts = 0;
+        $mediaUrls = [];
+
+        Http::fake(function (Request $request) use (&$containerAttempts, &$mediaUrls) {
+            if (str_ends_with($request->url(), '/media_publish')) {
+                return Http::response(['id' => '180000000000003']);
+            }
+
+            if (str_ends_with($request->url(), '/media')) {
+                $containerAttempts++;
+                $mediaUrls[] = $request['image_url'];
+
+                if ($containerAttempts === 1) {
+                    return Http::response([
+                        'error' => [
+                            'message' => 'Only photo or video can be accepted as media type.',
+                            'code' => 9004,
+                            'error_subcode' => 2207052,
+                        ],
+                    ], 400);
+                }
+
+                return Http::response(['id' => 'container-789']);
+            }
+
+            if (str_contains($request->url(), '/container-789')) {
+                return Http::response(['status_code' => 'FINISHED']);
+            }
+
+            if (str_contains($request->url(), '/180000000000003')) {
+                return Http::response([
+                    'id' => '180000000000003',
+                    'permalink' => 'https://www.instagram.com/p/RETRY789/',
+                ]);
+            }
+
+            return Http::response([], 404);
+        });
+        $user = User::factory()->create();
+        $profile = $this->profile($user, [
+            'type' => WordPressSite::TYPE_INSTAGRAM,
+            'name' => 'Instagram con reintento de descarga',
+            'instagram_account_id' => '17841400000000000',
+            'instagram_access_token' => 'instagram-secret',
+            'instagram_api_version' => 'v24.0',
+        ]);
+        [$article, $image] = $this->articleWithImage($user);
+
+        $publication = app(PublicationService::class)
+            ->publishNow($profile, $article, $image);
+
+        $this->assertSame(Publication::STATUS_PUBLISHED, $publication->status);
+        $this->assertSame(2, $containerAttempts);
+        $this->assertCount(2, array_unique($mediaUrls));
+        Sleep::assertSleptTimes(1);
+        Sleep::fake(false);
+    }
+
     public function test_article_can_be_published_to_x_with_a_user_access_token(): void
     {
         Storage::fake('local');

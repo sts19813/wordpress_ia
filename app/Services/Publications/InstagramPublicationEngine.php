@@ -17,6 +17,8 @@ class InstagramPublicationEngine
 {
     private const CONTAINER_STATUS_ATTEMPTS = 12;
 
+    private const MEDIA_CONTAINER_ATTEMPTS = 3;
+
     private const MEDIA_PUBLISH_ATTEMPTS = 3;
 
     // Meta can retrieve the image asynchronously after the container is created.
@@ -37,9 +39,10 @@ class InstagramPublicationEngine
                 throw new RuntimeException('Instagram requiere una imagen generada disponible para publicar.');
             }
 
-            $imageUrl = $this->mediaUrl->temporary($image, now()->addDays(self::MEDIA_URL_EXPIRATION_DAYS));
             $caption = $this->caption($article);
-            $container = $this->client->createImageContainer($profile, $imageUrl, $caption);
+            $media = $this->createImageContainer($profile, $image, $caption);
+            $imageUrl = $media['image_url'];
+            $container = $media['response'];
             $creationId = (string) $container->json('id');
 
             if ($creationId === '') {
@@ -104,6 +107,35 @@ class InstagramPublicationEngine
         throw new RuntimeException('Instagram tardó demasiado en preparar la imagen. Intenta publicar nuevamente.');
     }
 
+    /**
+     * @return array{image_url: string, response: Response}
+     */
+    private function createImageContainer(WordPressSite $profile, AiImage $image, string $caption): array
+    {
+        for ($attempt = 1; $attempt <= self::MEDIA_CONTAINER_ATTEMPTS; $attempt++) {
+            // A distinct signed URL prevents Meta from reusing a failed crawl from its cache.
+            $imageUrl = $this->mediaUrl->temporary(
+                $image,
+                now()->addDays(self::MEDIA_URL_EXPIRATION_DAYS)->addSeconds($attempt),
+            );
+
+            try {
+                return [
+                    'image_url' => $imageUrl,
+                    'response' => $this->client->createImageContainer($profile, $imageUrl, $caption),
+                ];
+            } catch (RequestException $exception) {
+                if (! $this->mediaUrlWasRejected($exception) || $attempt === self::MEDIA_CONTAINER_ATTEMPTS) {
+                    throw $exception;
+                }
+
+                Sleep::for($attempt * 5)->seconds();
+            }
+        }
+
+        throw new RuntimeException('Instagram no confirmó el contenedor de la imagen.');
+    }
+
     private function publishReadyContainer(WordPressSite $profile, string $creationId): Response
     {
         for ($attempt = 1; $attempt <= self::MEDIA_PUBLISH_ATTEMPTS; $attempt++) {
@@ -131,6 +163,16 @@ class InstagramPublicationEngine
         return (int) data_get($response, 'error.error_subcode') === 2207027
             || str_contains($message, 'media id is not available')
             || str_contains($userMessage, 'no está listo');
+    }
+
+    private function mediaUrlWasRejected(RequestException $exception): bool
+    {
+        $response = $exception->response?->json() ?: [];
+        $message = mb_strtolower((string) data_get($response, 'error.message'));
+        $subcode = (int) data_get($response, 'error.error_subcode');
+
+        return ((int) data_get($response, 'error.code') === 9004 && $subcode === 2207052)
+            || str_contains($message, 'only photo or video can be accepted');
     }
 
     private function publication(WordPressSite $profile, AiArticle $article, ?AiImage $image): Publication
