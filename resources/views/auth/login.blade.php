@@ -142,12 +142,6 @@
                         </button>
                     </div>
 
-                    @if (Route::has('register'))
-                        <div class="text-gray-500 text-center fw-semibold fs-6">
-                            ¿No tienes una cuenta?
-                            <a href="{{ route('register') }}" class="link-primary">Regístrate</a>
-                        </div>
-                    @endif
                 </form>
             </div>
 

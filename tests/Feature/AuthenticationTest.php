@@ -18,21 +18,23 @@ class AuthenticationTest extends TestCase
             ->assertSee('auth-login-shell', false)
             ->assertSee('auth-login-card', false)
             ->assertSee('auth-login-brand', false)
-            ->assertSee('assets/img/pulsosur-logo.png', false);
+            ->assertSee('assets/img/pulsosur-logo.png', false)
+            ->assertDontSee('Regístrate')
+            ->assertDontSee('¿No tienes una cuenta?');
     }
 
-    public function test_a_user_can_register_and_reach_the_dashboard(): void
+    public function test_public_registration_is_not_available(): void
     {
-        $response = $this->post(route('register'), [
+        $response = $this->post('/register', [
             'name' => 'Usuario Prueba',
             'email' => 'usuario@example.com',
             'password' => 'password',
             'password_confirmation' => 'password',
         ]);
 
-        $response->assertRedirect(route('admin.dashboard'));
-        $this->assertAuthenticated();
-        $this->get(route('admin.dashboard'))->assertOk()->assertSee('Centro de operaciones');
+        $response->assertNotFound();
+        $this->assertGuest();
+        $this->assertDatabaseMissing('users', ['email' => 'usuario@example.com']);
     }
 
     public function test_a_user_can_login_and_logout(): void
