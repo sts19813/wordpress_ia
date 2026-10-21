@@ -31,14 +31,19 @@ cleanup_old_releases() {
     local current_release
     local release
     local release_path
-    local -a releases
+    local release_list
+    local releases_remaining
 
     current_release=$(readlink -f "$BASE/current")
-    mapfile -t releases < <(find "$BASE/releases" -mindepth 1 -maxdepth 1 -type d -name 'release_*' -printf '%f\n' | sort)
+    release_list=$(mktemp "$BASE/releases/.release-cleanup.XXXXXX")
+    find "$BASE/releases" -mindepth 1 -maxdepth 1 -type d -name 'release_*' -printf '%f\n' | sort > "$release_list"
+    releases_remaining=$(wc -l < "$release_list")
 
-    while [ "${#releases[@]}" -gt "$RELEASES_TO_KEEP" ]; do
-        release="${releases[0]}"
-        releases=("${releases[@]:1}")
+    while IFS= read -r release; do
+        if [ "$releases_remaining" -le "$RELEASES_TO_KEEP" ]; then
+            break
+        fi
+
         release_path="$BASE/releases/$release"
 
         # Nunca se elimina el release al que apunta el sitio, aunque su fecha no sea la más reciente.
@@ -48,7 +53,10 @@ cleanup_old_releases() {
 
         echo "==> Eliminando release anterior: $release"
         rm -rf -- "$release_path"
-    done
+        releases_remaining=$((releases_remaining - 1))
+    done < "$release_list"
+
+    rm -f "$release_list"
 }
 
 mkdir -p "$BASE/releases" "$BASE/shared" "$BASE/backups"
