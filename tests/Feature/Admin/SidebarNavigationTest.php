@@ -12,17 +12,18 @@ class SidebarNavigationTest extends TestCase
 
     public function test_sidebar_uses_collapsible_modules_in_workflow_order(): void
     {
-        $response = $this->actingAs(User::factory()->create())
+        $response = $this->actingAs(User::factory()->create(['is_admin' => true]))
             ->get(route('admin.dashboard'));
 
         $response
             ->assertOk()
             ->assertSeeInOrder([
                 'Dashboard',
+                'Post rápido',
+                'Generar post',
+                'Bitácora de publicación',
                 'Contenido',
                 'Notas obtenidas',
-                'Generar post',
-                'Historial de posts',
                 'Empresas y fuentes',
                 'Empresas',
                 'Sitios fuente',
@@ -51,7 +52,7 @@ class SidebarNavigationTest extends TestCase
 
     public function test_mobile_navigation_has_visible_app_shortcuts_and_a_shared_drawer_toggle(): void
     {
-        $response = $this->actingAs(User::factory()->create())
+        $response = $this->actingAs(User::factory()->create(['is_admin' => true]))
             ->get(route('admin.dashboard'));
 
         $response
@@ -63,5 +64,25 @@ class SidebarNavigationTest extends TestCase
             ->assertSee('Abrir menú principal')
             ->assertSee('Abrir todos los módulos')
             ->assertSee(route('admin.manual-posts.create'), false);
+    }
+
+    public function test_operator_navigation_only_shows_quick_post_and_account_access(): void
+    {
+        $operator = User::factory()->create(['is_admin' => false]);
+
+        $this->actingAs($operator)
+            ->get(route('admin.manual-posts.create'))
+            ->assertOk()
+            ->assertSee('Post rápido')
+            ->assertSee('Generar post')
+            ->assertSee('Bitácora de publicación')
+            ->assertSee('Mi perfil')
+            ->assertDontSee('Dashboard')
+            ->assertDontSee(route('admin.news.index'), false)
+            ->assertDontSee(route('admin.companies.index'), false)
+            ->assertDontSee(route('admin.ai-articles.index'), false)
+            ->assertDontSee(route('admin.settings.index'), false)
+            ->assertDontSee('Ayuda de esta página')
+            ->assertDontSee('Perfiles</a>', false);
     }
 }

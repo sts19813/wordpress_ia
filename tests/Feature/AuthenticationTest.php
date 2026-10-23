@@ -39,12 +39,12 @@ class AuthenticationTest extends TestCase
 
     public function test_a_user_can_login_and_logout(): void
     {
-        $user = User::factory()->create(['password' => Hash::make('password')]);
+        $user = User::factory()->create(['password' => Hash::make('password'), 'is_admin' => false]);
 
         $this->post(route('login'), [
             'email' => $user->email,
             'password' => 'password',
-        ])->assertRedirect(route('admin.dashboard'));
+        ])->assertRedirect(route('admin.manual-posts.create'));
 
         $this->assertAuthenticatedAs($user);
         $this->post(route('logout'))->assertRedirect(route('login'));

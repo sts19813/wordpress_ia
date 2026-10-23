@@ -6,6 +6,7 @@
                 <span class="form-check form-check-custom form-check-solid mt-1">
                     <input id="{{ $optionId }}" class="form-check-input" type="checkbox"
                         name="permission_names[]" value="{{ $permission->name }}"
+                        @disabled($readOnlyPermissions ?? false)
                         @checked(in_array($permission->name, $selectedPermissions, true))>
                 </span>
                 <span class="min-w-0">

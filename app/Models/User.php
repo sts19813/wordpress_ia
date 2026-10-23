@@ -71,6 +71,18 @@ class User extends Authenticatable
                 && $this->hasAnyRole(['Administrador', 'Admin']));
     }
 
+    public function isOperator(): bool
+    {
+        return ! $this->isAdmin()
+            && Schema::hasTable(config('permission.table_names.roles', 'roles'))
+            && $this->hasRole('Operador');
+    }
+
+    public function landingRouteName(): string
+    {
+        return $this->isOperator() ? 'admin.manual-posts.create' : 'admin.dashboard';
+    }
+
     /** @return Builder<Company> */
     public function accessibleCompanies(): Builder
     {

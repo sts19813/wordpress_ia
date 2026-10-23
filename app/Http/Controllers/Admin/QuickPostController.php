@@ -12,7 +12,12 @@ class QuickPostController extends Controller
     {
         return view('admin.quick-posts.index', [
             'tasks' => Scheduler::query()
-                ->with(['article.images', 'sourcePost.media'])
+                ->with([
+                    'user:id,name',
+                    'article.images',
+                    'article.publications.wordpressSite:id,name,type',
+                    'sourcePost.media',
+                ])
                 ->where('type', Scheduler::TYPE_QUICK_POST)
                 ->latest()
                 ->get(),

@@ -29,7 +29,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return auth()->check()
-        ? redirect()->route('admin.dashboard')
+        ? redirect()->route(auth()->user()->landingRouteName())
         : redirect()->route('login');
 });
 

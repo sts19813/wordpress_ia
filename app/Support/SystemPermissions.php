@@ -8,7 +8,8 @@ class SystemPermissions
     public static function labels(): array
     {
         return [
-            'contenido.gestionar' => 'Gestionar noticias y post rápido',
+            'post-rapido.gestionar' => 'Crear y publicar desde Post rápido',
+            'contenido.gestionar' => 'Gestionar noticias obtenidas',
             'empresas.gestionar' => 'Gestionar empresas y fuentes',
             'ia.gestionar' => 'Gestionar contenido generado por IA',
             'publicaciones.gestionar' => 'Gestionar publicaciones y programación',
@@ -27,7 +28,7 @@ class SystemPermissions
     /** @return list<string> */
     public static function operatorDefaults(): array
     {
-        return array_values(array_diff(self::names(), ['usuarios.gestionar']));
+        return ['post-rapido.gestionar'];
     }
 
     public static function label(string $permission): string
@@ -38,7 +39,11 @@ class SystemPermissions
     public static function forRoute(?string $routeName): ?string
     {
         $routes = [
-            'contenido.gestionar' => ['admin.news.', 'admin.quick-posts.', 'admin.source-post-media.'],
+            'post-rapido.gestionar' => [
+                'admin.manual-posts.',
+                'admin.quick-posts.',
+            ],
+            'contenido.gestionar' => ['admin.news.', 'admin.source-post-media.'],
             'empresas.gestionar' => ['admin.companies.', 'admin.source-sites.', 'admin.source-scan-logs.'],
             'ia.gestionar' => ['admin.ai-articles.', 'admin.ai-images.', 'admin.ai-production-report.'],
             'publicaciones.gestionar' => ['admin.publications.', 'admin.wordpress-sites.', 'admin.scheduler.', 'admin.x-oauth.'],

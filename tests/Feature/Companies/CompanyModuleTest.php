@@ -20,8 +20,10 @@ class CompanyModuleTest extends TestCase
 
     public function test_user_can_manage_companies_but_not_another_users_company(): void
     {
-        $user = User::factory()->create();
-        $otherCompany = User::factory()->create()->companies()->create([
+        $user = User::factory()->create(['is_admin' => false]);
+        $user->syncRoles([]);
+        $user->givePermissionTo('empresas.gestionar');
+        $otherCompany = User::factory()->create(['is_admin' => false])->companies()->create([
             'name' => 'Empresa ajena',
             'active' => true,
         ]);

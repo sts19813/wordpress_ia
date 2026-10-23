@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\WordPressSite;
 use App\Support\SocialPostUrl;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
@@ -56,7 +57,6 @@ class QuickPostRequest extends FormRequest
             'company_ids.*' => [
                 'integer',
                 Rule::exists('companies', 'id')->where(fn ($query) => $query
-                    ->where('user_id', $this->user()->id)
                     ->where('active', true)),
             ],
             'publication_profile_ids' => ['nullable', 'array'],
@@ -64,7 +64,6 @@ class QuickPostRequest extends FormRequest
                 'integer',
                 'distinct',
                 Rule::exists('wordpress_sites', 'id')->where(fn ($query) => $query
-                    ->where('user_id', $this->user()->id)
                     ->where('active', true)
                     ->where('status', 'active')),
             ],
@@ -96,7 +95,7 @@ class QuickPostRequest extends FormRequest
                 return;
             }
 
-            $profiles = $this->user()->wordpressSites()->whereIn('id', $profileIds)->get(['id', 'company_id']);
+            $profiles = WordPressSite::query()->whereIn('id', $profileIds)->get(['id', 'company_id']);
 
             if ($profiles->contains(fn ($profile): bool => ! in_array((int) $profile->company_id, $companyIds, true))) {
                 $validator->errors()->add('publication_profile_ids', 'Todos los destinos deben pertenecer a las empresas seleccionadas.');
@@ -119,7 +118,7 @@ class QuickPostRequest extends FormRequest
             return $profileIds;
         }
 
-        return $this->user()->wordpressSites()
+        return WordPressSite::query()
             ->whereIn('company_id', $this->companyIds())
             ->where('active', true)
             ->where('status', 'active')

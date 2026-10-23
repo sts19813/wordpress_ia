@@ -17,7 +17,7 @@ class AdministratorAccessTest extends TestCase
     {
         $admin = User::factory()->create(['is_admin' => true]);
         $owner = User::factory()->create();
-        $regularUser = User::factory()->create();
+        $regularUser = User::factory()->create(['is_admin' => false]);
         $company = $owner->companies()->create([
             'name' => 'Empresa visible para administración',
             'active' => true,
@@ -54,17 +54,15 @@ class AdministratorAccessTest extends TestCase
 
         $this->actingAs($regularUser)
             ->get(route('admin.companies.index'))
-            ->assertDontSee($company->name);
+            ->assertForbidden();
 
         $this->actingAs($regularUser)
             ->get(route('admin.wordpress-sites.index'))
-            ->assertDontSee($site->name);
+            ->assertForbidden();
 
         $this->actingAs($regularUser)
             ->get(route('admin.settings.index'))
-            ->assertSee($profile->name)
-            ->assertSee('Redes Sociales')
-            ->assertDontSee($owner->email);
+            ->assertForbidden();
     }
 
     public function test_administrator_can_manage_records_owned_by_another_user(): void

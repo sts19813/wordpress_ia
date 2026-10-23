@@ -9,12 +9,18 @@
 
     $menuModules = [
         [
+            'label' => 'Post rápido',
+            'icon' => 'ki-flash-circle',
+            'items' => [
+                ['label' => 'Generar post', 'route' => 'admin.manual-posts.create', 'active' => 'admin.manual-posts.*', 'permission' => 'post-rapido.gestionar'],
+                ['label' => 'Bitácora de publicación', 'route' => 'admin.quick-posts.index', 'active' => 'admin.quick-posts.*', 'permission' => 'post-rapido.gestionar'],
+            ],
+        ],
+        [
             'label' => 'Contenido',
             'icon' => 'ki-document',
             'items' => [
                 ['label' => 'Notas obtenidas', 'route' => 'admin.news.index', 'active' => 'admin.news.*', 'permission' => 'contenido.gestionar'],
-                ['label' => 'Generar post', 'route' => 'admin.manual-posts.create', 'active' => 'admin.manual-posts.*', 'permission' => 'contenido.gestionar'],
-                ['label' => 'Historial de posts', 'route' => 'admin.quick-posts.index', 'active' => 'admin.quick-posts.*', 'permission' => 'contenido.gestionar'],
             ],
         ],
         [
@@ -91,7 +97,7 @@
                     <i class="ki-outline ki-cross fs-2"></i>
                 </button>
 
-                <a href="{{ route('admin.dashboard') }}" class="sidebar-brand-link text-decoration-none">
+                <a href="{{ route($user->landingRouteName()) }}" class="sidebar-brand-link text-decoration-none">
                     <img class="sidebar-brand-logo" src="{{ asset('assets/img/pulsosur-logo.png') }}" alt="{{ config('app.name') }}" />
                 </a>
             </div>
@@ -100,16 +106,18 @@
                 <div id="kt_app_sidebar_menu" data-kt-menu="true" data-kt-menu-expand="false"
                     class="app-sidebar-menu-primary menu menu-column">
 
-                    <div class="menu-item pt-3">
-                        <a class="menu-link {{ request()->routeIs($dashboardItem['active']) ? 'active' : '' }}"
-                            href="{{ route($dashboardItem['route']) }}">
-                            <span class="menu-icon"><i class="ki-outline {{ $dashboardItem['icon'] }} fs-2"></i></span>
-                            <span class="menu-title">{{ $dashboardItem['label'] }}</span>
-                        </a>
-                        <div class="sidebar-hover-card">
-                            <a href="{{ route($dashboardItem['route']) }}" class="sidebar-hover-title">{{ $dashboardItem['label'] }}</a>
+                    @unless ($user->isOperator())
+                        <div class="menu-item pt-3">
+                            <a class="menu-link {{ request()->routeIs($dashboardItem['active']) ? 'active' : '' }}"
+                                href="{{ route($dashboardItem['route']) }}">
+                                <span class="menu-icon"><i class="ki-outline {{ $dashboardItem['icon'] }} fs-2"></i></span>
+                                <span class="menu-title">{{ $dashboardItem['label'] }}</span>
+                            </a>
+                            <div class="sidebar-hover-card">
+                                <a href="{{ route($dashboardItem['route']) }}" class="sidebar-hover-title">{{ $dashboardItem['label'] }}</a>
+                            </div>
                         </div>
-                    </div>
+                    @endunless
 
                     @foreach ($menuModules as $module)
                         @php
@@ -149,16 +157,18 @@
                         </div>
                     @endforeach
 
-                    <div class="menu-item pt-4 mt-2">
-                        <a class="menu-link {{ request()->routeIs('admin.help.*') ? 'active' : '' }}"
-                            href="{{ route('admin.help.index') }}">
-                            <span class="menu-icon"><i class="ki-outline ki-question-2 fs-2"></i></span>
-                            <span class="menu-title">Ayuda</span>
-                        </a>
-                        <div class="sidebar-hover-card">
-                            <a href="{{ route('admin.help.index') }}" class="sidebar-hover-title">Ayuda</a>
+                    @unless ($user->isOperator())
+                        <div class="menu-item pt-4 mt-2">
+                            <a class="menu-link {{ request()->routeIs('admin.help.*') ? 'active' : '' }}"
+                                href="{{ route('admin.help.index') }}">
+                                <span class="menu-icon"><i class="ki-outline ki-question-2 fs-2"></i></span>
+                                <span class="menu-title">Ayuda</span>
+                            </a>
+                            <div class="sidebar-hover-card">
+                                <a href="{{ route('admin.help.index') }}" class="sidebar-hover-title">Ayuda</a>
+                            </div>
                         </div>
-                    </div>
+                    @endunless
                 </div>
             </div>
 

@@ -6,7 +6,6 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Permission;
-use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class UserAccessModuleTest extends TestCase
@@ -28,14 +27,14 @@ class UserAccessModuleTest extends TestCase
 
     public function test_operator_cannot_manage_users_without_the_permission(): void
     {
-        $operator = User::factory()->create();
+        $operator = User::factory()->create(['is_admin' => false]);
 
         $this->actingAs($operator)
             ->get(route('admin.users.index'))
             ->assertForbidden();
     }
 
-    public function test_administrator_can_create_a_user_with_roles_and_direct_permissions(): void
+    public function test_operator_profiles_cannot_receive_direct_permissions(): void
     {
         $admin = User::factory()->create(['is_admin' => true]);
         Permission::findOrCreate('reportes.exportar');
@@ -56,13 +55,14 @@ class UserAccessModuleTest extends TestCase
         $user = User::query()->where('email', 'editora@example.com')->firstOrFail();
         $this->assertTrue(Hash::check('password-seguro', $user->password));
         $this->assertTrue($user->hasRole('Operador'));
-        $this->assertTrue($user->hasDirectPermission('reportes.exportar'));
+        $this->assertFalse($user->hasDirectPermission('reportes.exportar'));
+        $this->assertTrue($user->can('post-rapido.gestionar'));
     }
 
     public function test_administrator_can_delete_another_user_but_not_their_own_account(): void
     {
         $admin = User::factory()->create(['is_admin' => true]);
-        $managedUser = User::factory()->create(['name' => 'Usuario para eliminar']);
+        $managedUser = User::factory()->create(['name' => 'Usuario para eliminar', 'is_admin' => false]);
 
         $this->actingAs($admin)
             ->get(route('admin.users.index'))
@@ -87,9 +87,9 @@ class UserAccessModuleTest extends TestCase
 
     public function test_non_administrator_cannot_delete_users_even_with_user_management_permission(): void
     {
-        $nonAdmin = User::factory()->create();
+        $nonAdmin = User::factory()->create(['is_admin' => false]);
         $nonAdmin->givePermissionTo('usuarios.gestionar');
-        $managedUser = User::factory()->create();
+        $managedUser = User::factory()->create(['is_admin' => false]);
 
         $this->actingAs($nonAdmin)
             ->delete(route('admin.users.destroy', $managedUser))
@@ -98,15 +98,21 @@ class UserAccessModuleTest extends TestCase
         $this->assertDatabaseHas('users', ['id' => $managedUser->id]);
     }
 
-    public function test_module_permission_is_enforced_on_real_admin_routes(): void
+    public function test_operator_is_restricted_to_quick_post_routes(): void
     {
-        $operatorRole = Role::findByName('Operador');
-        $operatorRole->revokePermissionTo('contenido.gestionar');
-        $operator = User::factory()->create();
+        $operator = User::factory()->create(['is_admin' => false]);
 
-        $this->actingAs($operator)->get(route('admin.dashboard'))->assertOk();
+        $this->actingAs($operator)->get(route('admin.manual-posts.create'))->assertOk();
+        $this->actingAs($operator)->get(route('admin.quick-posts.index'))->assertOk();
+        $this->actingAs($operator)->get(route('admin.account.edit'))->assertOk();
+        $this->actingAs($operator)->get(route('admin.dashboard'))->assertForbidden();
         $this->actingAs($operator)->get(route('admin.news.index'))->assertForbidden();
-        $this->actingAs($operator)->get(route('admin.companies.index'))->assertOk();
+        $this->actingAs($operator)->get(route('admin.companies.index'))->assertForbidden();
+        $this->actingAs($operator)->get(route('admin.source-sites.index'))->assertForbidden();
+        $this->actingAs($operator)->get(route('admin.ai-articles.index'))->assertForbidden();
+        $this->actingAs($operator)->get(route('admin.scheduler.index'))->assertForbidden();
+        $this->actingAs($operator)->get(route('admin.settings.index'))->assertForbidden();
+        $this->actingAs($operator)->get(route('admin.system-logs.index'))->assertForbidden();
     }
 
     public function test_inactive_user_cannot_log_in(): void

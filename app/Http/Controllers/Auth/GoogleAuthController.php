@@ -66,7 +66,11 @@ class GoogleAuthController extends Controller
 
         Auth::login($user, true);
 
-        return redirect()->intended(route('admin.dashboard'));
+        $destination = route($user->landingRouteName());
+
+        return $user->isOperator()
+            ? redirect()->to($destination)
+            : redirect()->intended($destination);
     }
 
     private function isConfigured(): bool

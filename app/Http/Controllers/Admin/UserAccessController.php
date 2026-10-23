@@ -58,7 +58,9 @@ class UserAccessController extends Controller
             ]);
 
             $user->syncRoles($roleNames);
-            $user->syncPermissions($validated['permission_names'] ?? []);
+            $user->syncPermissions($this->containsOperatorRole($roleNames) && ! $user->is_admin
+                ? []
+                : ($validated['permission_names'] ?? []));
         });
 
         return back()->with('status', 'Usuario creado correctamente.');
@@ -96,7 +98,9 @@ class UserAccessController extends Controller
 
             $user->update($attributes);
             $user->syncRoles($roleNames);
-            $user->syncPermissions($validated['permission_names'] ?? []);
+            $user->syncPermissions($this->containsOperatorRole($roleNames) && ! $willBeAdmin
+                ? []
+                : ($validated['permission_names'] ?? []));
         });
 
         return back()->with('status', 'Usuario actualizado correctamente.');
@@ -135,7 +139,9 @@ class UserAccessController extends Controller
     {
         $validated = $this->validateRole($request);
         $role = Role::create(['name' => $validated['name'], 'guard_name' => 'web']);
-        $role->syncPermissions($validated['permission_names'] ?? []);
+        $role->syncPermissions($role->name === 'Operador'
+            ? SystemPermissions::operatorDefaults()
+            : ($validated['permission_names'] ?? []));
 
         return back()->with('status', 'Rol creado correctamente.');
     }
@@ -149,7 +155,9 @@ class UserAccessController extends Controller
         }
 
         $role->update(['name' => $validated['name']]);
-        $role->syncPermissions($validated['permission_names'] ?? []);
+        $role->syncPermissions($role->name === 'Operador'
+            ? SystemPermissions::operatorDefaults()
+            : ($validated['permission_names'] ?? []));
 
         return back()->with('status', 'Rol actualizado correctamente.');
     }
@@ -244,6 +252,12 @@ class UserAccessController extends Controller
     private function containsAdminRole(array $roles): bool
     {
         return collect($roles)->contains(fn (string $role) => in_array(mb_strtolower($role), ['administrador', 'admin'], true));
+    }
+
+    /** @param array<int, string> $roles */
+    private function containsOperatorRole(array $roles): bool
+    {
+        return collect($roles)->contains(fn (string $role) => mb_strtolower($role) === 'operador');
     }
 
     private function activeAdministratorCount(): int

@@ -104,7 +104,7 @@ class HelpCenterTest extends TestCase
 
     public function test_only_administrators_can_view_help_analytics(): void
     {
-        $operator = User::factory()->create();
+        $operator = User::factory()->create(['is_admin' => false]);
         $administrator = User::factory()->create(['is_admin' => true]);
         HelpSearch::query()->create(['user_id' => $administrator->id, 'term' => 'fuente', 'results_count' => 1]);
         HelpArticleView::query()->create(['user_id' => $administrator->id, 'article_slug' => 'crear-un-post']);

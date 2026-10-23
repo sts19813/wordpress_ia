@@ -8,6 +8,7 @@ use App\Http\Requests\QuickPostRequest;
 use App\Http\Requests\ReviewGeneratedPostRequest;
 use App\Models\AiImage;
 use App\Models\AiPromptProfile;
+use App\Models\Company;
 use App\Models\Scheduler;
 use App\Models\SourcePost;
 use App\Models\SourcePostMedia;
@@ -35,7 +36,7 @@ class ManualPostController extends Controller
     {
         $this->profiles->ensureDefaultFor($request->user());
 
-        $companies = $request->user()->companies()
+        $companies = Company::query()
             ->where('active', true)
             ->with(['publicationProfiles' => fn ($query) => $query
                 ->where('active', true)
@@ -135,7 +136,7 @@ class ManualPostController extends Controller
         }
 
         return redirect()
-            ->route('admin.scheduler.index', ['task' => $task->id])
+            ->route('admin.quick-posts.index')
             ->with('status', $message);
     }
 
@@ -174,7 +175,7 @@ class ManualPostController extends Controller
         }
 
         return redirect()
-            ->route('admin.scheduler.index', ['task' => $task->id])
+            ->route('admin.quick-posts.index')
             ->with('status', $message);
     }
 

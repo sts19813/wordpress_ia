@@ -92,7 +92,9 @@
                                     </select>
                                     @error('ai_prompt_profile_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                 </div>
-                                <div class="col-md-4 text-md-end"><a href="{{ route('admin.settings.index') }}" class="btn btn-light w-100 w-md-auto">Perfiles</a></div>
+                                @unless (auth()->user()->isOperator())
+                                    <div class="col-md-4 text-md-end"><a href="{{ route('admin.settings.index') }}" class="btn btn-light w-100 w-md-auto">Perfiles</a></div>
+                                @endunless
                             </div>
 
                             <div data-mode-media-workspace>
@@ -163,7 +165,7 @@
                             @endif
                         </div>
                         <div class="card-footer d-flex flex-column flex-sm-row justify-content-end gap-3">
-                            <a href="{{ route('admin.news.index') }}" class="btn btn-light">Cancelar</a>
+                            <a href="{{ route('admin.quick-posts.index') }}" class="btn btn-light">Cancelar</a>
                             <label class="manual-post-auto-publish d-flex align-items-center gap-2 cursor-pointer mb-0">
                                 <span class="text-end"><span class="fw-bold text-gray-900 d-block fs-8">Publicar sin revisar</span><span class="text-muted d-block fs-9">Autoriza publicación automática</span></span>
                                 <span class="form-check form-switch form-check-custom form-check-solid m-0"><input class="form-check-input" type="checkbox" name="publish_without_review" value="1" id="publish-without-review" @checked(old('publish_without_review'))></span>

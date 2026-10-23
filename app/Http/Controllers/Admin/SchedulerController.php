@@ -89,11 +89,20 @@ class SchedulerController extends Controller
 
     public function status(Request $request, Scheduler $scheduler): JsonResponse
     {
+        abort_unless(
+            $request->user()->isAdmin()
+                || ($scheduler->type === Scheduler::TYPE_QUICK_POST && $scheduler->user_id === $request->user()->id),
+            403,
+        );
+
         $scheduler->load([
             'article:id,user_id,title,status',
             'sourceSite:id,name',
             'publication:id,status,remote_url,error_message',
         ]);
+
+        $isQuickPost = $scheduler->type === Scheduler::TYPE_QUICK_POST;
+        $canReview = $request->user()->isAdmin() || $scheduler->user_id === $request->user()->id;
 
         return response()->json([
             'id' => $scheduler->id,
@@ -105,11 +114,13 @@ class SchedulerController extends Controller
             'max_attempts' => $scheduler->max_attempts,
             'last_error' => $scheduler->last_error,
             'events' => $scheduler->events ?: [],
-            'article_url' => $scheduler->article ? route('admin.ai-articles.show', $scheduler->article) : null,
-            'preview_url' => $scheduler->article && (bool) data_get($scheduler->payload, 'requires_review')
+            'article_url' => $scheduler->article
+                ? ($isQuickPost ? route('admin.quick-posts.index') : route('admin.ai-articles.show', $scheduler->article))
+                : null,
+            'preview_url' => ! $isQuickPost && $scheduler->article && (bool) data_get($scheduler->payload, 'requires_review')
                 ? route('admin.ai-articles.show', ['aiArticle' => $scheduler->article, 'review_task' => $scheduler->id])
                 : null,
-            'review_url' => $scheduler->article && (bool) data_get($scheduler->payload, 'requires_review')
+            'review_url' => $canReview && $scheduler->article && (bool) data_get($scheduler->payload, 'requires_review')
                 ? route('admin.manual-posts.create', ['review_task' => $scheduler->id])
                 : null,
             'publication_url' => $scheduler->publication?->remote_url,

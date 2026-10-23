@@ -38,7 +38,7 @@ class AiPromptProfileTest extends TestCase
     public function test_only_an_administrator_can_edit_a_global_profile(): void
     {
         $admin = User::factory()->create(['is_admin' => true]);
-        $operator = User::factory()->create();
+        $operator = User::factory()->create(['is_admin' => false]);
         $profile = app(AiPromptProfileService::class)->ensureDefaultFor($operator);
 
         $this->actingAs($operator)

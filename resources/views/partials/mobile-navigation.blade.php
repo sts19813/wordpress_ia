@@ -1,10 +1,15 @@
 @php
-    $mobileNavigation = [
-        ['label' => 'Inicio', 'route' => 'admin.dashboard', 'active' => 'admin.dashboard', 'icon' => 'ki-home-2', 'permission' => null],
-        ['label' => 'Noticias', 'route' => 'admin.news.index', 'active' => 'admin.news.*', 'icon' => 'ki-document', 'permission' => 'contenido.gestionar'],
-        ['label' => 'Crear', 'route' => 'admin.manual-posts.create', 'active' => 'admin.manual-posts.*', 'icon' => 'ki-flash-circle', 'permission' => 'contenido.gestionar'],
-        ['label' => 'IA', 'route' => 'admin.ai-articles.index', 'active' => 'admin.ai-articles.*', 'icon' => 'ki-abstract-26', 'permission' => 'ia.gestionar'],
-    ];
+    $mobileNavigation = auth()->user()->isOperator()
+        ? [
+            ['label' => 'Crear', 'route' => 'admin.manual-posts.create', 'active' => 'admin.manual-posts.*', 'icon' => 'ki-flash-circle', 'permission' => 'post-rapido.gestionar'],
+            ['label' => 'Bitácora', 'route' => 'admin.quick-posts.index', 'active' => 'admin.quick-posts.*', 'icon' => 'ki-time', 'permission' => 'post-rapido.gestionar'],
+        ]
+        : [
+            ['label' => 'Inicio', 'route' => 'admin.dashboard', 'active' => 'admin.dashboard', 'icon' => 'ki-home-2', 'permission' => null],
+            ['label' => 'Noticias', 'route' => 'admin.news.index', 'active' => 'admin.news.*', 'icon' => 'ki-document', 'permission' => 'contenido.gestionar'],
+            ['label' => 'Crear', 'route' => 'admin.manual-posts.create', 'active' => 'admin.manual-posts.*', 'icon' => 'ki-flash-circle', 'permission' => 'post-rapido.gestionar'],
+            ['label' => 'IA', 'route' => 'admin.ai-articles.index', 'active' => 'admin.ai-articles.*', 'icon' => 'ki-abstract-26', 'permission' => 'ia.gestionar'],
+        ];
 
     $mobileNavigation = collect($mobileNavigation)
         ->filter(fn (array $item) => ! $item['permission'] || auth()->user()->isAdmin() || auth()->user()->can($item['permission']))
@@ -16,7 +21,7 @@
         <i class="ki-outline ki-menu fs-2"></i>
     </button>
 
-    <a href="{{ route('admin.dashboard') }}" class="mobile-app-brand text-decoration-none">
+    <a href="{{ route(auth()->user()->landingRouteName()) }}" class="mobile-app-brand text-decoration-none">
         <img class="mobile-app-brand-logo" src="{{ asset('assets/img/pulsosur-logo.png') }}" alt="{{ config('app.name') }}" />
     </a>
 

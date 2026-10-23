@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\WordPressSite;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -28,7 +29,6 @@ class ReviewGeneratedPostRequest extends FormRequest
             'company_ids.*' => [
                 'integer',
                 Rule::exists('companies', 'id')->where(fn ($query) => $query
-                    ->where('user_id', $this->user()->id)
                     ->where('active', true)),
             ],
             'publication_profile_ids' => ['nullable', 'array'],
@@ -36,7 +36,6 @@ class ReviewGeneratedPostRequest extends FormRequest
                 'integer',
                 'distinct',
                 Rule::exists('wordpress_sites', 'id')->where(fn ($query) => $query
-                    ->where('user_id', $this->user()->id)
                     ->where('active', true)
                     ->where('status', 'active')),
             ],
@@ -55,7 +54,7 @@ class ReviewGeneratedPostRequest extends FormRequest
                 return;
             }
 
-            $invalid = $this->user()->wordpressSites()
+            $invalid = WordPressSite::query()
                 ->whereIn('id', $profileIds)
                 ->get(['company_id'])
                 ->contains(fn ($profile): bool => ! in_array((int) $profile->company_id, $companyIds, true));
@@ -76,7 +75,7 @@ class ReviewGeneratedPostRequest extends FormRequest
             return $profileIds;
         }
 
-        return $this->user()->wordpressSites()
+        return WordPressSite::query()
             ->whereIn('company_id', $companyIds)
             ->where('active', true)
             ->where('status', 'active')

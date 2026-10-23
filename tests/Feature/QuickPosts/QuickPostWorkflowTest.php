@@ -55,7 +55,7 @@ class QuickPostWorkflowTest extends TestCase
         ]);
 
         $task = Scheduler::query()->sole();
-        $response->assertRedirect(route('admin.scheduler.index', ['task' => $task->id]));
+        $response->assertRedirect(route('admin.quick-posts.index'));
         $this->assertSame($url, $task->payload['url']);
         $this->assertSame([], $task->payload['source_post_ids']);
         $this->assertSame('original', $task->payload['image_mode']);
@@ -96,7 +96,7 @@ class QuickPostWorkflowTest extends TestCase
 
         $task = Scheduler::query()->sole();
         $sourcePost = SourcePost::query()->sole();
-        $response->assertRedirect(route('admin.scheduler.index', ['task' => $task->id]));
+        $response->assertRedirect(route('admin.quick-posts.index'));
         $this->assertSame(SourcePost::ORIGIN_QUICK_POST, $sourcePost->origin_type);
         $this->assertSame('manual', $sourcePost->social_platform);
         $this->assertSame($sourcePost->id, $task->source_post_id);
@@ -343,13 +343,156 @@ class QuickPostWorkflowTest extends TestCase
         $this->assertDatabaseCount('schedulers', 1);
     }
 
+    public function test_operator_can_publish_to_companies_configured_by_an_administrator(): void
+    {
+        Queue::fake();
+        $admin = User::factory()->create(['is_admin' => true]);
+        $operator = User::factory()->create(['name' => 'Operadora Noticias', 'is_admin' => false]);
+        $profile = app(AiPromptProfileService::class)->ensureDefaultFor($admin);
+        $company = $admin->companies()->create(['name' => 'Empresa compartida', 'active' => true]);
+        $destination = $this->publicationProfile($admin, [
+            'company_id' => $company->id,
+            'name' => 'Sitio administrado',
+        ]);
+
+        $this->actingAs($operator)
+            ->get(route('admin.manual-posts.create'))
+            ->assertOk()
+            ->assertSee('Empresa compartida')
+            ->assertSee('Sitio administrado');
+
+        $this->actingAs($operator)
+            ->post(route('admin.manual-posts.store'), [
+                'content' => str_repeat('Información suficiente para crear una nota periodística con inteligencia artificial. ', 3),
+                'ai_prompt_profile_id' => $profile->id,
+                'company_ids' => [$company->id],
+                'publication_profile_ids' => [$destination->id],
+                'publish_without_review' => true,
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('admin.quick-posts.index'));
+
+        $task = Scheduler::query()->sole();
+        $this->assertSame($operator->id, $task->user_id);
+        $this->assertSame([$destination->id], $task->payload['publication_profile_ids']);
+        $this->assertFalse($task->payload['requires_review']);
+    }
+
+    public function test_operator_can_read_every_users_quick_post_log_but_not_review_their_drafts(): void
+    {
+        $operator = User::factory()->create(['name' => 'Operador lector', 'is_admin' => false]);
+        $author = User::factory()->create(['name' => 'Autora externa']);
+        $article = $author->aiArticles()->create([
+            'title' => 'Nota global en bitácora',
+            'content' => '<p>Contenido.</p>',
+            'status' => AiArticle::STATUS_DRAFT,
+        ]);
+        $task = Scheduler::query()->create([
+            'user_id' => $author->id,
+            'ai_article_id' => $article->id,
+            'type' => Scheduler::TYPE_QUICK_POST,
+            'name' => 'Generar post',
+            'status' => Scheduler::STATUS_COMPLETED,
+            'step' => 'Borrador listo para revisión',
+            'progress' => 100,
+            'max_attempts' => 3,
+            'payload' => ['requires_review' => true, 'publication_profile_ids' => []],
+            'events' => [],
+        ]);
+
+        $this->actingAs($operator)
+            ->get(route('admin.quick-posts.index'))
+            ->assertOk()
+            ->assertSee('Autora externa')
+            ->assertSee('Nota global en bitácora')
+            ->assertSee('Pendiente de revisión')
+            ->assertDontSee(route('admin.manual-posts.create', ['review_task' => $task->id]), false);
+
+        $this->actingAs($operator)
+            ->get(route('admin.manual-posts.create', ['review_task' => $task->id]))
+            ->assertOk()
+            ->assertDontSee('Nota global en bitácora');
+    }
+
+    public function test_operator_status_and_image_endpoints_are_limited_to_quick_posts(): void
+    {
+        Storage::fake('local');
+        $operator = User::factory()->create(['is_admin' => false]);
+        $author = User::factory()->create();
+        $quickArticle = $author->aiArticles()->create([
+            'title' => 'Nota rápida',
+            'content' => '<p>Contenido.</p>',
+            'status' => AiArticle::STATUS_DRAFT,
+        ]);
+        $regularArticle = $author->aiArticles()->create([
+            'title' => 'Nota privada de IA',
+            'content' => '<p>Contenido.</p>',
+            'status' => AiArticle::STATUS_DRAFT,
+        ]);
+        $quickTask = Scheduler::query()->create([
+            'user_id' => $operator->id,
+            'ai_article_id' => $quickArticle->id,
+            'type' => Scheduler::TYPE_QUICK_POST,
+            'name' => 'Post rápido',
+            'status' => Scheduler::STATUS_COMPLETED,
+            'progress' => 100,
+            'max_attempts' => 3,
+            'payload' => ['requires_review' => true],
+            'events' => [],
+        ]);
+        $regularTask = Scheduler::query()->create([
+            'user_id' => $author->id,
+            'ai_article_id' => $regularArticle->id,
+            'type' => Scheduler::TYPE_AI_ARTICLE,
+            'name' => 'Generación privada',
+            'status' => Scheduler::STATUS_COMPLETED,
+            'progress' => 100,
+            'max_attempts' => 3,
+            'payload' => [],
+            'events' => [],
+        ]);
+        Storage::disk('local')->put('ai-images/quick.jpg', 'quick-image');
+        Storage::disk('local')->put('ai-images/private.jpg', 'private-image');
+        $quickImage = $quickArticle->images()->create([
+            'type' => AiImage::TYPE_MAIN,
+            'prompt' => 'Prueba',
+            'model' => 'upload',
+            'status' => AiImage::STATUS_GENERATED,
+            'file_path' => 'ai-images/quick.jpg',
+            'mime_type' => 'image/jpeg',
+        ]);
+        $regularImage = $regularArticle->images()->create([
+            'type' => AiImage::TYPE_MAIN,
+            'prompt' => 'Prueba',
+            'model' => 'upload',
+            'status' => AiImage::STATUS_GENERATED,
+            'file_path' => 'ai-images/private.jpg',
+            'mime_type' => 'image/jpeg',
+        ]);
+
+        $this->actingAs($operator)
+            ->getJson(route('admin.scheduler.status', $quickTask))
+            ->assertOk()
+            ->assertJsonPath('article_url', route('admin.quick-posts.index'))
+            ->assertJsonPath('review_url', route('admin.manual-posts.create', ['review_task' => $quickTask->id]));
+        $this->actingAs($operator)
+            ->getJson(route('admin.scheduler.status', $regularTask))
+            ->assertForbidden();
+        $this->actingAs($operator)
+            ->get(route('admin.ai-images.file', $quickImage))
+            ->assertOk();
+        $this->actingAs($operator)
+            ->get(route('admin.ai-images.file', $regularImage))
+            ->assertForbidden();
+    }
+
     public function test_quick_post_cannot_use_an_unavailable_publication_profile(): void
     {
         Queue::fake();
         $user = User::factory()->create();
         $otherUser = User::factory()->create();
         $profile = app(AiPromptProfileService::class)->ensureDefaultFor($user);
-        $otherPublicationProfile = $this->publicationProfile($otherUser);
+        $otherPublicationProfile = $this->publicationProfile($otherUser, ['active' => false]);
 
         $this->actingAs($user)
             ->post(route('admin.manual-posts.store-url'), [
@@ -414,7 +557,7 @@ class QuickPostWorkflowTest extends TestCase
         $this->actingAs($user)
             ->get(route('admin.quick-posts.index'))
             ->assertOk()
-            ->assertSee('Historial de posts')
+            ->assertSee('Bitácora de publicación')
             ->assertSee('Post visual generado')
             ->assertSee('Revisar borrador')
             ->assertSee(route('admin.manual-posts.create', ['review_task' => $task->id]), false)

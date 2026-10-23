@@ -1229,7 +1229,9 @@
 
                         <div id="kt_app_content" class="app-content flex-column-fluid">
                             <div id="kt_app_content_container" class="app-container container-fluid">
-                                @include('partials.contextual-help')
+                                @unless (auth()->user()->isOperator())
+                                    @include('partials.contextual-help')
+                                @endunless
 
                                 @if (session('status'))
                                     <div class="alert alert-success d-flex align-items-center mb-6">

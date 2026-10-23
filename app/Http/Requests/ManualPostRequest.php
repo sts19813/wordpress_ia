@@ -35,7 +35,6 @@ class ManualPostRequest extends FormRequest
                 'integer',
                 'distinct',
                 Rule::exists('companies', 'id')->where(fn ($query) => $query
-                    ->where('user_id', $this->user()->id)
                     ->where('active', true)),
             ],
             'publication_profile_ids' => ['nullable', 'array'],
@@ -43,7 +42,6 @@ class ManualPostRequest extends FormRequest
                 'integer',
                 'distinct',
                 Rule::exists('wordpress_sites', 'id')->where(fn ($query) => $query
-                    ->where('user_id', $this->user()->id)
                     ->where('active', true)
                     ->where('status', WordPressSite::STATUS_ACTIVE)),
             ],
@@ -78,12 +76,12 @@ class ManualPostRequest extends FormRequest
                 return;
             }
 
-            $profiles = $this->user()->wordpressSites()
+            $profiles = WordPressSite::query()
                 ->whereIn('id', $profileIds)
                 ->get(['id', 'company_id']);
 
             if ($profiles->count() !== count($profileIds)) {
-                $validator->errors()->add('publication_profile_ids', 'Todos los destinos deben pertenecer a tu cuenta.');
+                $validator->errors()->add('publication_profile_ids', 'Todos los destinos deben estar disponibles.');
 
                 return;
             }
@@ -111,7 +109,7 @@ class ManualPostRequest extends FormRequest
             return $profileIds;
         }
 
-        return $this->user()->wordpressSites()
+        return WordPressSite::query()
             ->whereIn('company_id', $companyIds)
             ->where('active', true)
             ->where('status', WordPressSite::STATUS_ACTIVE)
