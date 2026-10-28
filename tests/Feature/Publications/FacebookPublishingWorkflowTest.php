@@ -4,6 +4,7 @@ namespace Tests\Feature\Publications;
 
 use App\Models\AiArticle;
 use App\Models\AiImage;
+use App\Models\Company;
 use App\Models\Publication;
 use App\Models\User;
 use App\Models\WordPressSite;
@@ -154,9 +155,12 @@ class FacebookPublishingWorkflowTest extends TestCase
         ]);
 
         $user = User::factory()->create();
-        $profile = $this->facebookProfile($user);
+        $company = $this->company($user, 'Cancún News');
+        $profile = $this->facebookProfile($user, $company);
         $article = $this->article($user);
-        $this->publishedWordPressPublication($user, $article);
+        $this->publishedWordPressPublication($user, $article, $company, 'https://cancunews.test/titulo-para-facebook', now()->subMinute());
+        $otherCompany = $this->company($user, 'Quinta Avenida');
+        $this->publishedWordPressPublication($user, $article, $otherCompany, 'https://5avnews.test/titulo-para-facebook');
 
         $response = $this->actingAs($user)->post(route('admin.publications.publish', $article), [
             'site_ids' => [$profile->id],
@@ -173,7 +177,7 @@ class FacebookPublishingWorkflowTest extends TestCase
             && str_contains((string) $request['message'], 'Título para Facebook')
             && str_contains((string) $request['message'], 'Resumen del artículo para la publicación.')
             && str_contains((string) $request['message'], '#Política')
-            && $request['link'] === 'https://noticias.test/titulo-para-facebook'
+            && $request['link'] === 'https://cancunews.test/titulo-para-facebook'
             && $request['access_token'] === 'page-token-secret');
     }
 
@@ -225,9 +229,10 @@ class FacebookPublishingWorkflowTest extends TestCase
         ]);
 
         $user = User::factory()->create();
-        $profile = $this->facebookProfile($user);
+        $company = $this->company($user, 'Cancún News');
+        $profile = $this->facebookProfile($user, $company);
         $article = $this->article($user);
-        $this->publishedWordPressPublication($user, $article);
+        $this->publishedWordPressPublication($user, $article, $company, 'https://cancunews.test/titulo-para-facebook');
         $image = AiImage::query()->create([
             'ai_article_id' => $article->id,
             'type' => AiImage::TYPE_MAIN,
@@ -252,7 +257,7 @@ class FacebookPublishingWorkflowTest extends TestCase
             && $request->hasFile('source', 'contenido-de-imagen', 'principal.png'));
         Http::assertSent(fn (Request $request) => $request->url() === 'https://graph.facebook.com/v24.0/123456789/feed'
             && ! isset($request['link'])
-            && str_contains((string) $request['message'], 'https://noticias.test/titulo-para-facebook')
+            && str_contains((string) $request['message'], 'https://cancunews.test/titulo-para-facebook')
             && $request['attached_media[0]'] === json_encode(['media_fbid' => 'photo-456'], JSON_THROW_ON_ERROR));
     }
 
@@ -274,9 +279,10 @@ class FacebookPublishingWorkflowTest extends TestCase
         ]);
 
         $user = User::factory()->create();
-        $profile = $this->facebookProfile($user);
+        $company = $this->company($user, 'Cancún News');
+        $profile = $this->facebookProfile($user, $company);
         $article = $this->article($user);
-        $this->publishedWordPressPublication($user, $article);
+        $this->publishedWordPressPublication($user, $article, $company, 'https://cancunews.test/titulo-para-facebook');
 
         $this->actingAs($user)
             ->post(route('admin.publications.publish', $article), ['site_ids' => [$profile->id]])
@@ -287,7 +293,7 @@ class FacebookPublishingWorkflowTest extends TestCase
             'last_action' => 'publish_facebook_link_post',
         ]);
         Http::assertSent(fn (Request $request) => $request->url() === 'https://graph.facebook.com/v24.0/123456789/feed'
-            && $request['link'] === 'https://noticias.test/titulo-para-facebook'
+            && $request['link'] === 'https://cancunews.test/titulo-para-facebook'
             && ! isset($request['attached_media[0]']));
         Http::assertNotSent(fn (Request $request) => $request->url() === 'https://graph.facebook.com/v24.0/123456789/photos');
     }
@@ -295,7 +301,7 @@ class FacebookPublishingWorkflowTest extends TestCase
     public function test_facebook_requires_a_published_wordpress_url(): void
     {
         $user = User::factory()->create();
-        $profile = $this->facebookProfile($user);
+        $profile = $this->facebookProfile($user, $this->company($user, 'Cancún News'));
         $article = $this->article($user);
 
         $this->actingAs($user)
@@ -314,9 +320,10 @@ class FacebookPublishingWorkflowTest extends TestCase
         Http::assertNothingSent();
     }
 
-    private function facebookProfile(User $user): WordPressSite
+    private function facebookProfile(User $user, ?Company $company = null): WordPressSite
     {
         return $user->wordpressSites()->create([
+            'company_id' => $company?->id,
             'type' => WordPressSite::TYPE_FACEBOOK_PAGE,
             'name' => 'Facebook Noticias',
             'facebook_page_id' => '123456789',
@@ -327,9 +334,16 @@ class FacebookPublishingWorkflowTest extends TestCase
         ]);
     }
 
-    private function publishedWordPressPublication(User $user, AiArticle $article): Publication
+    private function publishedWordPressPublication(
+        User $user,
+        AiArticle $article,
+        Company $company,
+        string $url,
+        mixed $publishedAt = null,
+    ): Publication
     {
         $site = $user->wordpressSites()->create([
+            'company_id' => $company->id,
             'type' => WordPressSite::TYPE_WORDPRESS,
             'name' => 'WordPress Noticias',
             'rest_api_url' => 'https://noticias.test',
@@ -345,8 +359,17 @@ class FacebookPublishingWorkflowTest extends TestCase
             'ai_article_id' => $article->id,
             'status' => Publication::STATUS_PUBLISHED,
             'remote_post_id' => 123,
-            'remote_url' => 'https://noticias.test/titulo-para-facebook',
-            'published_at' => now(),
+            'remote_url' => $url,
+            'published_at' => $publishedAt ?: now(),
+        ]);
+    }
+
+    private function company(User $user, string $name): Company
+    {
+        return Company::query()->create([
+            'user_id' => $user->id,
+            'name' => $name,
+            'active' => true,
         ]);
     }
 

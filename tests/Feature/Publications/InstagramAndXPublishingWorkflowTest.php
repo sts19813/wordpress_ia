@@ -4,6 +4,7 @@ namespace Tests\Feature\Publications;
 
 use App\Models\AiArticle;
 use App\Models\AiImage;
+use App\Models\Company;
 use App\Models\Publication;
 use App\Models\User;
 use App\Models\WordPressSite;
@@ -118,12 +119,13 @@ class InstagramAndXPublishingWorkflowTest extends TestCase
             'instagram_api_version' => 'v24.0',
         ]);
         [$article, $image] = $this->articleWithImage($user);
+        $articleUrl = $this->publishedCompanyWordPressArticle($user, $article, $profile);
 
         $this->actingAs($user)
             ->post(route('admin.publications.publish', $article), ['site_ids' => [$profile->id]])
             ->assertRedirect(route('admin.ai-articles.show', $article));
 
-        $publication = Publication::query()->sole();
+        $publication = Publication::query()->where('wordpress_site_id', $profile->id)->sole();
         $this->assertSame(Publication::STATUS_PUBLISHED, $publication->status);
         $this->assertSame('https://www.instagram.com/p/ABC123/', $publication->remote_url);
         $this->assertSame('publish_instagram_image', $publication->last_action);
@@ -143,7 +145,9 @@ class InstagramAndXPublishingWorkflowTest extends TestCase
         $this->assertLessThanOrEqual(1.91, $imageSize[0] / $imageSize[1]);
         $this->get(preg_replace('#/[a-f0-9]{64}/imagen\.jpg$#', '/'.str_repeat('0', 64).'/imagen.jpg', $mediaUrlBehindProxy))->assertForbidden();
         Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/media')
-            && str_contains((string) $request['caption'], 'Artículo para redes'));
+            && str_contains((string) $request['caption'], 'Artículo para redes')
+            && str_contains((string) $request['caption'], $articleUrl));
+        $this->assertSame($articleUrl, data_get($publication->request_payload, 'article_url'));
         $this->assertSame($image->id, $publication->ai_image_id);
     }
 
@@ -201,6 +205,7 @@ class InstagramAndXPublishingWorkflowTest extends TestCase
             'instagram_api_version' => 'v24.0',
         ]);
         [$article, $image] = $this->articleWithImage($user);
+        $this->publishedCompanyWordPressArticle($user, $article, $profile);
 
         $publication = app(PublicationService::class)
             ->publishNow($profile, $article, $image);
@@ -264,6 +269,7 @@ class InstagramAndXPublishingWorkflowTest extends TestCase
             'instagram_api_version' => 'v24.0',
         ]);
         [$article, $image] = $this->articleWithImage($user);
+        $this->publishedCompanyWordPressArticle($user, $article, $profile);
 
         $publication = app(PublicationService::class)
             ->publishNow($profile, $article, $image);
@@ -361,6 +367,38 @@ class InstagramAndXPublishingWorkflowTest extends TestCase
             'active' => true,
             ...$attributes,
         ]);
+    }
+
+    private function publishedCompanyWordPressArticle(User $user, AiArticle $article, WordPressSite $profile): string
+    {
+        $company = Company::query()->create([
+            'user_id' => $user->id,
+            'name' => 'Empresa de prueba '.uniqid(),
+            'active' => true,
+        ]);
+        $profile->update(['company_id' => $company->id]);
+        $url = 'https://empresa.test/'.$article->slug;
+        $site = $user->wordpressSites()->create([
+            'company_id' => $company->id,
+            'type' => WordPressSite::TYPE_WORDPRESS,
+            'name' => 'WordPress de la empresa',
+            'rest_api_url' => 'https://empresa.test',
+            'username' => 'editor',
+            'application_password' => 'application-password',
+            'status' => WordPressSite::STATUS_ACTIVE,
+            'active' => true,
+        ]);
+        Publication::query()->create([
+            'user_id' => $user->id,
+            'wordpress_site_id' => $site->id,
+            'ai_article_id' => $article->id,
+            'status' => Publication::STATUS_PUBLISHED,
+            'remote_post_id' => 123,
+            'remote_url' => $url,
+            'published_at' => now(),
+        ]);
+
+        return $url;
     }
 
     /**

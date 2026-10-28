@@ -15,6 +15,7 @@ class FacebookPublicationEngine
 {
     public function __construct(
         private readonly FacebookPageClient $client,
+        private readonly CompanyArticleUrlResolver $articleUrls,
     ) {}
 
     public function publishNow(WordPressSite $profile, AiArticle $article, ?AiImage $image = null): Publication
@@ -25,7 +26,7 @@ class FacebookPublicationEngine
             ->where('status', '!=', Publication::STATUS_DELETED)
             ->latest('id')
             ->first();
-        $link = $this->publishedArticleUrl($article);
+        $link = $this->articleUrls->resolve($profile, $article);
         $message = $this->message($article, $link);
         $hasLocalImage = (bool) ($image?->file_path && Storage::disk('local')->exists($image->file_path));
         $payload = [
@@ -127,16 +128,6 @@ class FacebookPublicationEngine
 
             return $publication->fresh();
         }
-    }
-
-    private function publishedArticleUrl(AiArticle $article): ?string
-    {
-        return $article->publications()
-            ->where('status', Publication::STATUS_PUBLISHED)
-            ->whereNotNull('remote_url')
-            ->whereHas('wordpressSite', fn ($query) => $query->where('type', WordPressSite::TYPE_WORDPRESS))
-            ->latest('published_at')
-            ->value('remote_url');
     }
 
     private function message(AiArticle $article, ?string $link): string
