@@ -159,15 +159,9 @@ class PublicationEngine
      */
     private function postPayload(AiArticle $article): array
     {
-        $content = $article->content;
-
-        if (filled($article->conclusion)) {
-            $content .= '<h2>Conclusión</h2><p>'.htmlspecialchars($article->conclusion, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').'</p>';
-        }
-
         return [
             'title' => $article->title,
-            'content' => $content,
+            'content' => $article->content,
             'excerpt' => $article->excerpt,
             'slug' => $article->slug,
             'status' => 'draft',

@@ -53,6 +53,7 @@ class WordPressPublishingWorkflowTest extends TestCase
         $user = User::factory()->create();
         $site = $this->site($user);
         $article = $this->article($user);
+        $article->update(['conclusion' => 'Este texto no debe enviarse a WordPress.']);
 
         Publication::query()->create([
             'user_id' => $user->id,
@@ -109,6 +110,9 @@ class WordPressPublishingWorkflowTest extends TestCase
         $this->assertSame($site->id, $publication->wordpress_site_id);
         $this->assertSame(Publication::STATUS_PUBLISHED, $publication->status);
         $this->assertSame(321, $publication->remote_post_id);
+        Http::assertSent(fn (Request $request) => $request->url() === 'https://wp.test/wp-json/wp/v2/posts'
+            && $request['content'] === '<p>Contenido del artículo.</p>'
+            && ! str_contains((string) $request['content'], 'Conclusión'));
     }
 
     public function test_multiple_sites_show_a_selector_and_publish_only_selected_destinations(): void
