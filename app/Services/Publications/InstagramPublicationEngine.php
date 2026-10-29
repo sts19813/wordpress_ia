@@ -28,7 +28,6 @@ class InstagramPublicationEngine
     public function __construct(
         private readonly InstagramClient $client,
         private readonly InstagramMediaUrl $mediaUrl,
-        private readonly CompanyArticleUrlResolver $articleUrls,
     ) {}
 
     public function publishNow(WordPressSite $profile, AiArticle $article, ?AiImage $image = null): Publication
@@ -40,13 +39,7 @@ class InstagramPublicationEngine
                 throw new RuntimeException('Instagram requiere una imagen generada disponible para publicar.');
             }
 
-            $articleUrl = $this->articleUrls->resolve($profile, $article);
-
-            if (blank($articleUrl)) {
-                throw new RuntimeException('Primero publica el artículo en el sitio WordPress de esta empresa. Instagram necesita esa URL para incluirla en la publicación.');
-            }
-
-            $caption = $this->caption($article, $articleUrl);
+            $caption = $this->caption($article);
             $media = $this->createImageContainer($profile, $image, $caption);
             $imageUrl = $media['image_url'];
             $container = $media['response'];
@@ -73,7 +66,6 @@ class InstagramPublicationEngine
                 'request_payload' => [
                     'platform' => WordPressSite::TYPE_INSTAGRAM,
                     'caption' => $caption,
-                    'article_url' => $articleUrl,
                     'image_url' => $imageUrl,
                     'creation_id' => $creationId,
                 ],
@@ -199,7 +191,7 @@ class InstagramPublicationEngine
         );
     }
 
-    private function caption(AiArticle $article, string $articleUrl): string
+    private function caption(AiArticle $article): string
     {
         $content = html_entity_decode(strip_tags((string) $article->content), ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $body = trim((string) ($article->excerpt ?: $content));
@@ -208,16 +200,10 @@ class InstagramPublicationEngine
             ->filter(fn (string $tag) => mb_strlen($tag) > 1)
             ->take(10)
             ->implode(' ');
-        $title = str(trim((string) $article->title))->limit(300, '…')->toString();
-        $fixedParts = collect([$title, $articleUrl, $tags])->filter()->values();
-        $fixedLength = mb_strlen($fixedParts->implode("\n\n"));
-        $bodyLimit = max(0, min(1800, 2200 - $fixedLength - ($body !== '' && $fixedLength > 0 ? 2 : 0)));
-        $excerpt = $bodyLimit > 0 ? str($body)->limit($bodyLimit, '…')->toString() : null;
 
         return str(collect([
-            $title,
-            $articleUrl,
-            $excerpt,
+            trim((string) $article->title),
+            str($body)->limit(1800, '…')->toString(),
             $tags,
         ])->filter()->implode("\n\n"))->limit(2200, '…')->toString();
     }
