@@ -42,9 +42,9 @@ class PublicationService
     }
 
     /** @param iterable<int, AiImage> $images */
-    public function uploadImages(Publication $publication, iterable $images): Publication
+    public function uploadImages(Publication $publication, iterable $images, bool $firstImageIsFeatured = true): Publication
     {
-        return $this->engine->uploadImages($publication, $images);
+        return $this->engine->uploadImages($publication, $images, $firstImageIsFeatured);
     }
 
     public function createCategory(WordPressSite $site, string $name): array
@@ -163,9 +163,13 @@ class PublicationService
             ->values();
         $image ??= $images->first();
 
-        if ($images->isNotEmpty() && ! $publication->remote_featured_media_id) {
+        $hasGallery = str_contains((string) data_get($publication->request_payload, 'content', ''), '<!-- pulsosur-gallery:start -->');
+        $needsFeaturedImage = ! $publication->remote_featured_media_id;
+        $galleryImages = $needsFeaturedImage ? $images : $images->skip(1)->values();
+
+        if ($galleryImages->isNotEmpty() && ($needsFeaturedImage || (! $hasGallery && $galleryImages->isNotEmpty()))) {
             try {
-                $publication = $this->uploadImages($publication, $images);
+                $publication = $this->uploadImages($publication, $galleryImages, $needsFeaturedImage);
             } catch (Throwable) {
                 // A missing media permission should not prevent publishing the text.
             }

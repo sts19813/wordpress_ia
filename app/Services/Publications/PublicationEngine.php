@@ -44,7 +44,7 @@ class PublicationEngine
      *
      * @param iterable<int, AiImage> $images
      */
-    public function uploadImages(Publication $publication, iterable $images): Publication
+    public function uploadImages(Publication $publication, iterable $images, bool $firstImageIsFeatured = true): Publication
     {
         $uploads = [];
 
@@ -72,9 +72,14 @@ class PublicationEngine
         }
 
         $payload = $publication->request_payload ?: $this->postPayload($publication->aiArticle);
-        $payload['content'] = $this->contentWithGallery((string) ($payload['content'] ?? ''), $uploads);
+        $payload['content'] = $this->contentWithGallery(
+            (string) ($payload['content'] ?? ''),
+            $uploads,
+            $firstImageIsFeatured,
+        );
         $publication->update([
-            'remote_featured_media_id' => $uploads[0]['id'] ?: $publication->remote_featured_media_id,
+            'remote_featured_media_id' => $publication->remote_featured_media_id
+                ?: ($firstImageIsFeatured ? $uploads[0]['id'] : null),
             'request_payload' => $payload,
             'last_action' => 'upload_images',
             'full_response' => ['media' => $uploads],
@@ -130,6 +135,10 @@ class PublicationEngine
         ];
 
         $payload = [...$payload, ...$this->taxonomyPayload($publication->wordpressSite, $publication->aiArticle)];
+
+        if ($publication->remote_featured_media_id) {
+            $payload['featured_media'] = $publication->remote_featured_media_id;
+        }
 
         $response = $this->client->put($publication->wordpressSite, "/wp-json/wp/v2/posts/{$publication->remote_post_id}", $payload);
 
@@ -222,10 +231,10 @@ class PublicationEngine
     }
 
     /** @param array<int, array{id:int, url:string, title:string, response:array<string,mixed>}> $uploads */
-    private function contentWithGallery(string $content, array $uploads): string
+    private function contentWithGallery(string $content, array $uploads, bool $firstImageIsFeatured): string
     {
         $content = preg_replace('/\s*<!-- pulsosur-gallery:start -->.*?<!-- pulsosur-gallery:end -->/s', '', $content) ?: $content;
-        $additionalImages = array_slice($uploads, 1);
+        $additionalImages = $firstImageIsFeatured ? array_slice($uploads, 1) : $uploads;
 
         if ($additionalImages === []) {
             return $content;

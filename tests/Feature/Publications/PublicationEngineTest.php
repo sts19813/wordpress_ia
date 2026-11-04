@@ -129,6 +129,50 @@ class PublicationEngineTest extends TestCase
             && str_contains((string) $request['content'], 'https://wp.test/media/2.jpg'));
     }
 
+    public function test_republishing_an_existing_wordpress_post_adds_a_missing_gallery_without_replacing_its_featured_image(): void
+    {
+        Storage::fake('local');
+        Http::fake([
+            'wp.test/wp-json/wp/v2/media' => Http::response(['id' => 99, 'source_url' => 'https://wp.test/media/second.jpg']),
+            'wp.test/wp-json/wp/v2/posts/124' => Http::response(['id' => 124, 'link' => 'https://wp.test/post', 'status' => 'publish']),
+        ]);
+        $site = $this->site();
+        $article = $this->article();
+        $main = $article->images()->create([
+            'type' => AiImage::TYPE_MAIN,
+            'prompt' => 'Principal',
+            'status' => AiImage::STATUS_GENERATED,
+            'file_path' => 'ai-images/main.jpg',
+            'mime_type' => 'image/jpeg',
+        ]);
+        $second = $article->images()->create([
+            'type' => AiImage::TYPE_VARIANT,
+            'prompt' => 'Secundaria',
+            'status' => AiImage::STATUS_GENERATED,
+            'file_path' => 'ai-images/second.jpg',
+            'mime_type' => 'image/jpeg',
+        ]);
+        Storage::disk('local')->put($main->file_path, 'main-image');
+        Storage::disk('local')->put($second->file_path, 'second-image');
+        $publication = Publication::query()->create([
+            'wordpress_site_id' => $site->id,
+            'ai_article_id' => $article->id,
+            'ai_image_id' => $main->id,
+            'remote_post_id' => 124,
+            'remote_featured_media_id' => 55,
+            'status' => Publication::STATUS_PUBLISHED,
+            'request_payload' => ['content' => '<p>Contenido</p>'],
+        ]);
+
+        $updated = app(PublicationService::class)->publishNow($site, $article, $main);
+
+        $this->assertSame(55, $updated->remote_featured_media_id);
+        Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/media'));
+        Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/posts/124')
+            && $request['featured_media'] === 55
+            && str_contains((string) $request['content'], 'https://wp.test/media/second.jpg'));
+    }
+
     private function site(): WordPressSite
     {
         return WordPressSite::query()->create([
