@@ -3,11 +3,14 @@
 namespace Tests\Feature\Publications;
 
 use App\Models\AiArticle;
+use App\Models\AiImage;
 use App\Models\Publication;
 use App\Models\WordPressSite;
 use App\Services\PublicationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class PublicationEngineTest extends TestCase
@@ -76,6 +79,54 @@ class PublicationEngineTest extends TestCase
         $this->assertSame(8, $tag['id']);
         $this->assertSame(Publication::STATUS_DELETED, $publication->status);
         $this->assertSame('delete_publication', $publication->last_action);
+    }
+
+    public function test_wordpress_uses_the_first_image_as_featured_and_includes_the_rest_in_the_post(): void
+    {
+        Storage::fake('local');
+        $mediaCount = 0;
+        Http::fake(function (Request $request) use (&$mediaCount) {
+            if (str_ends_with($request->url(), '/media')) {
+                $mediaCount++;
+
+                return Http::response([
+                    'id' => $mediaCount,
+                    'source_url' => "https://wp.test/media/{$mediaCount}.jpg",
+                ]);
+            }
+            if (str_ends_with($request->url(), '/posts')) {
+                return Http::response(['id' => 124, 'link' => 'https://wp.test/post', 'status' => 'publish'], 201);
+            }
+
+            return Http::response([], 404);
+        });
+        $site = $this->site();
+        $article = $this->article();
+        $main = $article->images()->create([
+            'type' => AiImage::TYPE_MAIN,
+            'prompt' => 'Imagen principal',
+            'status' => AiImage::STATUS_GENERATED,
+            'file_path' => 'ai-images/main.jpg',
+            'mime_type' => 'image/jpeg',
+        ]);
+        $second = $article->images()->create([
+            'type' => AiImage::TYPE_VARIANT,
+            'prompt' => 'Imagen secundaria',
+            'status' => AiImage::STATUS_GENERATED,
+            'file_path' => 'ai-images/second.jpg',
+            'mime_type' => 'image/jpeg',
+        ]);
+        Storage::disk('local')->put($main->file_path, 'main-image');
+        Storage::disk('local')->put($second->file_path, 'second-image');
+
+        $publication = app(PublicationService::class)->publishNow($site, $article, $main);
+
+        $this->assertSame(Publication::STATUS_PUBLISHED, $publication->status);
+        $this->assertSame(1, $publication->remote_featured_media_id);
+        $this->assertSame(2, $mediaCount);
+        Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/posts')
+            && $request['featured_media'] === 1
+            && str_contains((string) $request['content'], 'https://wp.test/media/2.jpg'));
     }
 
     private function site(): WordPressSite

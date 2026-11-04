@@ -147,6 +147,61 @@ class InstagramAndXPublishingWorkflowTest extends TestCase
         $this->assertSame($image->id, $publication->ai_image_id);
     }
 
+    public function test_instagram_publishes_multiple_images_as_one_carousel(): void
+    {
+        Storage::fake('local');
+        $childCount = 0;
+        Http::fake(function (Request $request) use (&$childCount) {
+            if (str_ends_with($request->url(), '/media_publish')) {
+                return Http::response(['id' => 'published-carousel']);
+            }
+            if (str_ends_with($request->url(), '/media')) {
+                if (($request['media_type'] ?? null) === 'CAROUSEL') {
+                    return Http::response(['id' => 'carousel-container']);
+                }
+                $childCount++;
+
+                return Http::response(['id' => 'child-'.$childCount]);
+            }
+            if (str_contains($request->url(), '/child-') || str_contains($request->url(), '/carousel-container')) {
+                return Http::response(['status_code' => 'FINISHED']);
+            }
+            if (str_contains($request->url(), '/published-carousel')) {
+                return Http::response(['id' => 'published-carousel', 'permalink' => 'https://instagram.test/p/carousel']);
+            }
+
+            return Http::response([], 404);
+        });
+        $user = User::factory()->create();
+        $profile = $this->profile($user, [
+            'type' => WordPressSite::TYPE_INSTAGRAM,
+            'name' => 'Instagram principal',
+            'instagram_account_id' => '17841400000000000',
+            'instagram_access_token' => 'instagram-secret',
+            'instagram_api_version' => 'v24.0',
+        ]);
+        [$article, $firstImage] = $this->articleWithImage($user);
+        $secondImage = $article->images()->create([
+            'type' => AiImage::TYPE_VARIANT,
+            'prompt' => 'Segunda imagen',
+            'status' => AiImage::STATUS_GENERATED,
+            'file_path' => 'ai-images/segunda.jpg',
+            'mime_type' => 'image/jpeg',
+        ]);
+        Storage::disk('local')->put($secondImage->file_path, "\xFF\xD8\xFF".str_repeat('a', 200));
+
+        $publication = app(PublicationService::class)->publishNow($profile, $article->fresh(), $firstImage);
+
+        $this->assertSame(Publication::STATUS_PUBLISHED, $publication->status);
+        $this->assertSame('publish_instagram_carousel', $publication->last_action);
+        $this->assertSame(2, $childCount);
+        Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/media')
+            && ($request['is_carousel_item'] ?? null) === 'true');
+        Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/media')
+            && ($request['media_type'] ?? null) === 'CAROUSEL'
+            && ($request['children'] ?? null) === json_encode(['child-1', 'child-2'], JSON_THROW_ON_ERROR));
+    }
+
     public function test_instagram_waits_for_media_and_retries_when_meta_reports_it_is_not_ready(): void
     {
         Storage::fake('local');

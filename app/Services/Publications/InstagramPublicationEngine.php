@@ -35,13 +35,18 @@ class InstagramPublicationEngine
         $publication = $this->publication($profile, $article, $image);
 
         try {
-            if (! $image?->file_path || ! Storage::disk('local')->exists($image->file_path)) {
+            $images = $this->imagesForPublication($article, $image);
+
+            if ($images->isEmpty()) {
                 throw new RuntimeException('Instagram requiere una imagen generada disponible para publicar.');
             }
 
             $caption = $this->caption($article);
-            $media = $this->createImageContainer($profile, $image, $caption);
-            $imageUrl = $media['image_url'];
+            $isCarousel = $images->count() > 1;
+            $media = $isCarousel
+                ? $this->createCarouselContainer($profile, $images, $caption)
+                : $this->createImageContainer($profile, $images->first(), $caption);
+            $imageUrls = $media['image_urls'];
             $container = $media['response'];
             $creationId = (string) $container->json('id');
 
@@ -62,11 +67,13 @@ class InstagramPublicationEngine
                 'remote_post_key' => $mediaId,
                 'remote_url' => $details->json('permalink'),
                 'status' => Publication::STATUS_PUBLISHED,
-                'last_action' => 'publish_instagram_image',
+                'ai_image_id' => $images->first()?->id,
+                'last_action' => $isCarousel ? 'publish_instagram_carousel' : 'publish_instagram_image',
                 'request_payload' => [
                     'platform' => WordPressSite::TYPE_INSTAGRAM,
                     'caption' => $caption,
-                    'image_url' => $imageUrl,
+                    'image_urls' => $imageUrls,
+                    'media_type' => $isCarousel ? 'CAROUSEL' : 'IMAGE',
                     'creation_id' => $creationId,
                 ],
                 'full_response' => [
@@ -107,10 +114,8 @@ class InstagramPublicationEngine
         throw new RuntimeException('Instagram tardó demasiado en preparar la imagen. Intenta publicar nuevamente.');
     }
 
-    /**
-     * @return array{image_url: string, response: Response}
-     */
-    private function createImageContainer(WordPressSite $profile, AiImage $image, string $caption): array
+    /** @return array{image_urls: array<int, string>, response: Response} */
+    private function createImageContainer(WordPressSite $profile, AiImage $image, string $caption, bool $isCarouselItem = false): array
     {
         for ($attempt = 1; $attempt <= self::MEDIA_CONTAINER_ATTEMPTS; $attempt++) {
             // A distinct signed URL prevents Meta from reusing a failed crawl from its cache.
@@ -121,8 +126,8 @@ class InstagramPublicationEngine
 
             try {
                 return [
-                    'image_url' => $imageUrl,
-                    'response' => $this->client->createImageContainer($profile, $imageUrl, $caption),
+                    'image_urls' => [$imageUrl],
+                    'response' => $this->client->createImageContainer($profile, $imageUrl, $caption, $isCarouselItem),
                 ];
             } catch (RequestException $exception) {
                 if (! $this->mediaUrlWasRejected($exception) || $attempt === self::MEDIA_CONTAINER_ATTEMPTS) {
@@ -134,6 +139,36 @@ class InstagramPublicationEngine
         }
 
         throw new RuntimeException('Instagram no confirmó el contenedor de la imagen.');
+    }
+
+    /**
+     * @param \Illuminate\Support\Collection<int, AiImage> $images
+     * @return array{image_urls: array<int, string>, response: Response}
+     */
+    private function createCarouselContainer(WordPressSite $profile, \Illuminate\Support\Collection $images, string $caption): array
+    {
+        $children = [];
+        $imageUrls = [];
+
+        foreach ($images as $image) {
+            $media = $this->createImageContainer($profile, $image, '', true);
+            $childId = (string) $media['response']->json('id');
+
+            if ($childId === '') {
+                throw new RuntimeException('Instagram no devolvió el identificador de una imagen del carrusel.');
+            }
+
+            $this->waitForContainer($profile, $childId);
+            $children[] = $childId;
+            $imageUrls[] = $media['image_urls'][0];
+        }
+
+        $response = $this->client->createCarouselContainer($profile, $children, $caption);
+
+        return [
+            'image_urls' => $imageUrls,
+            'response' => $response,
+        ];
     }
 
     private function publishReadyContainer(WordPressSite $profile, string $creationId): Response
@@ -189,6 +224,23 @@ class InstagramPublicationEngine
                 'last_action' => 'prepared_instagram',
             ],
         );
+    }
+
+    /** @return \Illuminate\Support\Collection<int, AiImage> */
+    private function imagesForPublication(AiArticle $article, ?AiImage $fallback): \Illuminate\Support\Collection
+    {
+        $images = $article->relationLoaded('images')
+            ? $article->images
+            : $article->images()->where('status', AiImage::STATUS_GENERATED)->get();
+
+        return collect($images)
+            ->when($fallback && ! $images->contains('id', $fallback->id), fn ($collection) => $collection->prepend($fallback))
+            ->filter(fn (AiImage $candidate): bool => $candidate->status === AiImage::STATUS_GENERATED
+                && filled($candidate->file_path)
+                && Storage::disk('local')->exists($candidate->file_path))
+            ->sortBy(fn (AiImage $candidate): int => $candidate->type === AiImage::TYPE_MAIN ? 0 : 1)
+            ->take(10)
+            ->values();
     }
 
     private function caption(AiArticle $article): string

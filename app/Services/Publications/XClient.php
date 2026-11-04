@@ -36,13 +36,14 @@ class XClient
             ->throw();
     }
 
-    public function publishPost(WordPressSite $profile, string $text, ?string $mediaId = null): Response
+    /** @param array<int, string> $mediaIds */
+    public function publishPost(WordPressSite $profile, string $text, array $mediaIds = []): Response
     {
         return $this->request($profile)
             ->asJson()
             ->post('https://api.x.com/2/tweets', [
                 'text' => $text,
-                ...($mediaId ? ['media' => ['media_ids' => [$mediaId]]] : []),
+                ...($mediaIds !== [] ? ['media' => ['media_ids' => array_values($mediaIds)]] : []),
             ])
             ->throw();
     }

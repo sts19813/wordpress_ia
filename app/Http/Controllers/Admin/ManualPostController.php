@@ -78,9 +78,9 @@ class ManualPostController extends Controller
     public function store(ManualPostRequest $request): RedirectResponse|JsonResponse
     {
         $validated = $request->validated();
-        $profile = $request->publishesAsIs()
-            ? null
-            : AiPromptProfile::query()->findOrFail($validated['ai_prompt_profile_id']);
+        $profile = (! $request->publishesAsIs() || $request->generatesImageIfMissing())
+            ? AiPromptProfile::query()->findOrFail($validated['ai_prompt_profile_id'])
+            : null;
 
         $sourcePost = DB::transaction(function () use ($request, $validated): SourcePost {
             $sourcePost = SourcePost::query()->create([
@@ -112,13 +112,14 @@ class ManualPostController extends Controller
         $publicationProfileIds = $request->publicationProfileIds();
         $companyIds = array_values(array_unique(array_map('intval', $validated['company_ids'] ?? [])));
         if ($request->publishesAsIs()) {
-            $article = $this->createDirectArticle($request->user(), $sourcePost, $companyIds);
+            $article = $this->createDirectArticle($request->user(), $sourcePost, $companyIds, $profile);
             $task = $this->scheduler->createDirectManualPublicationTask(
                 $request->user(),
                 $sourcePost,
                 $article,
                 $publicationProfileIds,
                 $companyIds,
+                $request->generatesImageIfMissing() ? $profile : null,
             );
         } else {
             $task = $this->scheduler->createManualPostTask(
@@ -128,13 +129,18 @@ class ManualPostController extends Controller
                 $publicationProfileIds,
                 $companyIds,
                 ! $request->publishesWithoutReview(),
+                $request->generatesImageIfMissing(),
             );
         }
 
         $imageCount = $sourcePost->media()->count();
         $imageMessage = $imageCount > 0
-            ? " Se usarán {$imageCount} imagen(es) subidas."
-            : ' Podrás agregar imágenes al revisar el borrador.';
+            ? " Se usarán las {$imageCount} imagen(es) subidas."
+            : ($request->generatesImageIfMissing()
+                ? ' Se generará una imagen principal con IA.'
+                : ($request->publishesAsIs()
+                    ? ' Se publicará sin imágenes.'
+                    : ' Podrás agregar imágenes al revisar el borrador.'));
         $publicationCount = count($publicationProfileIds);
         $publicationMessage = $publicationCount > 0
             ? ($request->publishesWithoutReview()
@@ -258,13 +264,14 @@ class ManualPostController extends Controller
      *
      * @param  array<int, int>  $companyIds
      */
-    private function createDirectArticle(User $user, SourcePost $sourcePost, array $companyIds): AiArticle
+    private function createDirectArticle(User $user, SourcePost $sourcePost, array $companyIds, ?AiPromptProfile $imageProfile): AiArticle
     {
         $content = trim((string) $sourcePost->content);
         $article = AiArticle::query()->create([
             'source_post_ids' => [$sourcePost->id],
             'user_id' => $user->id,
             'company_id' => count($companyIds) === 1 ? $companyIds[0] : null,
+            'ai_prompt_profile_id' => $imageProfile?->id,
             'title' => $this->titleFromContent($content),
             'content' => $this->manualContentAsHtml($content),
             'excerpt' => Str::limit(preg_replace('/\s+/', ' ', $content), 280, ''),

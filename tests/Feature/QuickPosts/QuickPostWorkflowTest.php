@@ -180,6 +180,38 @@ class QuickPostWorkflowTest extends TestCase
         $this->assertDatabaseCount('schedulers', 0);
     }
 
+    public function test_manual_content_can_generate_an_image_without_rewriting_its_text(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        $profile = app(AiPromptProfileService::class)->ensureDefaultFor($user);
+        $company = $user->companies()->create(['name' => 'Empresa con imagen IA', 'active' => true]);
+        $destination = $this->publicationProfile($user, ['company_id' => $company->id]);
+
+        $this->actingAs($user)
+            ->post(route('admin.manual-posts.store'), [
+                'content' => 'Contenido exacto que debe publicarse sin que la IA modifique el texto original.',
+                'publish_as_is' => true,
+                'generate_image_if_missing' => true,
+                'ai_prompt_profile_id' => $profile->id,
+                'company_ids' => [$company->id],
+                'publication_profile_ids' => [$destination->id],
+            ])
+            ->assertSessionHasNoErrors();
+
+        $task = Scheduler::query()->sole();
+        $article = AiArticle::query()->sole();
+
+        $this->assertTrue($task->payload['publish_as_is']);
+        $this->assertTrue($task->payload['generate_image']);
+        $this->assertSame('generate', $task->payload['image_mode']);
+        $this->assertSame($profile->id, $article->ai_prompt_profile_id);
+        $this->assertStringContainsString('Contenido exacto que debe publicarse', $article->content);
+        Queue::assertPushedOn('ai-image', GenerateAiImage::class);
+        Queue::assertNotPushed(GenerateAiArticle::class);
+        Queue::assertNotPushed(PublishQuickPost::class);
+    }
+
     public function test_unified_form_lists_all_generation_modes(): void
     {
         $user = User::factory()->create();

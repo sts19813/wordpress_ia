@@ -7,6 +7,7 @@ use App\Models\AiImage;
 use App\Models\Publication;
 use App\Models\WordPressSite;
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 class PublicationEngine
@@ -35,6 +36,51 @@ class PublicationEngine
         return $this->recordResponse($publication, 'upload_image', $response, [
             'remote_featured_media_id' => $response->json('id'),
         ]);
+    }
+
+    /**
+     * Uploads every local article image. The first one remains the featured
+     * image and the rest are appended as a gallery in the WordPress content.
+     *
+     * @param iterable<int, AiImage> $images
+     */
+    public function uploadImages(Publication $publication, iterable $images): Publication
+    {
+        $uploads = [];
+
+        foreach ($images as $image) {
+            if (! $image->file_path || ! Storage::disk('local')->exists($image->file_path)) {
+                continue;
+            }
+
+            $response = $this->client->uploadMedia(
+                $publication->wordpressSite,
+                Storage::disk('local')->get($image->file_path),
+                basename($image->file_path),
+                $image->mime_type ?: Storage::disk('local')->mimeType($image->file_path) ?: 'image/jpeg',
+            );
+            $uploads[] = [
+                'id' => (int) $response->json('id'),
+                'url' => (string) $response->json('source_url'),
+                'title' => (string) ($image->title ?: 'Imagen de la publicación'),
+                'response' => $response->json(),
+            ];
+        }
+
+        if ($uploads === []) {
+            return $publication;
+        }
+
+        $payload = $publication->request_payload ?: $this->postPayload($publication->aiArticle);
+        $payload['content'] = $this->contentWithGallery((string) ($payload['content'] ?? ''), $uploads);
+        $publication->update([
+            'remote_featured_media_id' => $uploads[0]['id'] ?: $publication->remote_featured_media_id,
+            'request_payload' => $payload,
+            'last_action' => 'upload_images',
+            'full_response' => ['media' => $uploads],
+        ]);
+
+        return $publication->fresh();
     }
 
     public function createCategory(WordPressSite $site, string $name): array
@@ -131,8 +177,15 @@ class PublicationEngine
 
     public function refreshPayload(Publication $publication): Publication
     {
+        $payload = $this->postPayload($publication->aiArticle);
+        $existingContent = (string) data_get($publication->request_payload, 'content', '');
+
+        if (preg_match('/<!-- pulsosur-gallery:start -->(.*?)<!-- pulsosur-gallery:end -->/s', $existingContent, $match)) {
+            $payload['content'] = trim((string) $payload['content'])."\n<!-- pulsosur-gallery:start -->{$match[1]}<!-- pulsosur-gallery:end -->";
+        }
+
         $publication->update([
-            'request_payload' => $this->postPayload($publication->aiArticle),
+            'request_payload' => $payload,
             'error_message' => null,
         ]);
 
@@ -166,6 +219,27 @@ class PublicationEngine
             'slug' => $article->slug,
             'status' => 'draft',
         ];
+    }
+
+    /** @param array<int, array{id:int, url:string, title:string, response:array<string,mixed>}> $uploads */
+    private function contentWithGallery(string $content, array $uploads): string
+    {
+        $content = preg_replace('/\s*<!-- pulsosur-gallery:start -->.*?<!-- pulsosur-gallery:end -->/s', '', $content) ?: $content;
+        $additionalImages = array_slice($uploads, 1);
+
+        if ($additionalImages === []) {
+            return $content;
+        }
+
+        $figures = collect($additionalImages)
+            ->filter(fn (array $image): bool => $image['url'] !== '')
+            ->map(fn (array $image): string => '<figure class="wp-block-image size-large"><img src="'
+                .e($image['url']).'" alt="'.e($image['title']).'" /></figure>')
+            ->implode("\n");
+
+        return $figures === ''
+            ? $content
+            : trim($content)."\n<!-- pulsosur-gallery:start -->\n<div class=\"pulsosur-gallery\">\n{$figures}\n</div>\n<!-- pulsosur-gallery:end -->";
     }
 
     /**

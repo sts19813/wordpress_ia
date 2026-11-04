@@ -261,6 +261,61 @@ class FacebookPublishingWorkflowTest extends TestCase
             && $request['attached_media[0]'] === json_encode(['media_fbid' => 'photo-456'], JSON_THROW_ON_ERROR));
     }
 
+    public function test_facebook_publishes_every_available_article_image_in_one_post(): void
+    {
+        Storage::fake('local');
+        $photoCount = 0;
+        Http::fake(function (Request $request) use (&$photoCount) {
+            if (str_contains($request->url(), '/me?')) {
+                return Http::response(['id' => '123456789', 'name' => 'Noticias Demo', 'category' => 'News']);
+            }
+            if (str_ends_with($request->url(), '/photos')) {
+                $photoCount++;
+
+                return Http::response(['id' => 'photo-'.$photoCount]);
+            }
+            if (str_ends_with($request->url(), '/feed')) {
+                return Http::response(['id' => '123456789_987654321']);
+            }
+            if (str_contains($request->url(), '123456789_987654321')) {
+                return Http::response(['permalink_url' => 'https://facebook.test/post']);
+            }
+
+            return Http::response([], 404);
+        });
+
+        $user = User::factory()->create();
+        $company = $this->company($user, 'Cancún News');
+        $profile = $this->facebookProfile($user, $company);
+        $article = $this->article($user);
+        $this->publishedWordPressPublication($user, $article, $company, 'https://cancunews.test/nota');
+        $main = $article->images()->create([
+            'type' => AiImage::TYPE_MAIN,
+            'prompt' => 'Principal',
+            'status' => AiImage::STATUS_GENERATED,
+            'file_path' => 'ai-images/principal.jpg',
+            'mime_type' => 'image/jpeg',
+        ]);
+        $second = $article->images()->create([
+            'type' => AiImage::TYPE_VARIANT,
+            'prompt' => 'Segunda',
+            'status' => AiImage::STATUS_GENERATED,
+            'file_path' => 'ai-images/segunda.jpg',
+            'mime_type' => 'image/jpeg',
+        ]);
+        Storage::disk('local')->put($main->file_path, 'principal');
+        Storage::disk('local')->put($second->file_path, 'segunda');
+
+        $this->actingAs($user)
+            ->post(route('admin.publications.publish', $article), ['site_ids' => [$profile->id]])
+            ->assertRedirect(route('admin.ai-articles.show', $article));
+
+        $this->assertSame(2, $photoCount);
+        Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/feed')
+            && $request['attached_media[0]'] === json_encode(['media_fbid' => 'photo-1'], JSON_THROW_ON_ERROR)
+            && $request['attached_media[1]'] === json_encode(['media_fbid' => 'photo-2'], JSON_THROW_ON_ERROR));
+    }
+
     public function test_facebook_falls_back_to_a_link_post_when_the_article_has_no_local_image(): void
     {
         Http::fake([

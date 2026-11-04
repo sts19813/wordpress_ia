@@ -98,7 +98,7 @@
                             <div class="separator my-7"></div>
                             <div class="row align-items-end g-4" data-ai-profile-workspace>
                                 <div class="col-md-8">
-                                    <label for="manual-post-profile" class="form-label required fw-bold">Perfil de generación</label>
+                                    <label for="manual-post-profile" class="form-label required fw-bold" data-ai-profile-label>Perfil de generación</label>
                                     <select id="manual-post-profile" name="ai_prompt_profile_id" class="form-select form-select-solid @error('ai_prompt_profile_id') is-invalid @enderror" required>
                                         @foreach ($profiles as $profile)
                                             <option value="{{ $profile->id }}" @selected((string) $defaultProfileId === (string) $profile->id)>{{ $profile->name }} · {{ \App\Models\AiPromptProfile::lengthOptions()[$profile->content_length] ?? $profile->content_length }}{{ $profile->is_default ? ' · predeterminado' : '' }}</option>
@@ -115,11 +115,15 @@
                                 <div class="separator my-7"></div>
                                 <label for="manual-post-images" class="form-label fw-bold">Imágenes</label>
                                 <label class="manual-post-upload d-flex flex-column align-items-center justify-content-center rounded border border-dashed p-6 cursor-pointer" for="manual-post-images">
-                                    <i class="ki-outline ki-picture fs-2x text-primary mb-2"></i><span class="fw-bold text-gray-900">Subir desde galería</span><span class="text-muted fs-8">Hasta 8 imágenes JPG, PNG o WebP.</span>
+                                    <i class="ki-outline ki-picture fs-2x text-primary mb-2"></i><span class="fw-bold text-gray-900">Subir desde galería</span><span class="text-muted fs-8">Hasta 8 imágenes JPG, PNG o WebP. Se publicarán todas.</span>
                                 </label>
                                 <input id="manual-post-images" class="d-none @error('images') is-invalid @enderror @error('images.*') is-invalid @enderror" type="file" name="images[]" accept="image/jpeg,image/png,image/webp" multiple>
                                 @error('images')<div class="text-danger fs-7 mt-3">{{ $message }}</div>@enderror
                                 @error('images.*')<div class="text-danger fs-7 mt-3">{{ $message }}</div>@enderror
+                                <label class="manual-post-image-ai-choice d-flex align-items-start gap-3 rounded border p-4 mt-4 cursor-pointer" data-image-ai-option>
+                                    <span class="form-check form-switch form-check-custom form-check-solid mt-1"><input class="form-check-input" type="checkbox" name="generate_image_if_missing" value="1" id="generate-image-if-missing" @checked(old('generate_image_if_missing'))></span>
+                                    <span><span class="fw-bold text-gray-900 d-block">Generar imagen con IA si no cargo imágenes</span><span class="text-muted fs-8">Solo se usará si esta publicación no tiene imágenes cargadas.</span></span>
+                                </label>
                                 <div id="manual-post-preview" class="manual-post-preview-grid mt-4"></div>
                             </div>
                         </div>
@@ -272,6 +276,7 @@
 .manual-post-preview-item img { width: 100%; height: 100%; object-fit: cover; }
 .manual-post-preview-item span { position: absolute; right: .35rem; bottom: .35rem; padding: .15rem .45rem; border-radius: .35rem; background: rgba(17, 24, 39, .76); color: #fff; font-size: .7rem; font-weight: 700; }
 .manual-post-choice:has(input:checked), .manual-post-company:has([data-company-toggle]:checked) { border-color: var(--bs-primary) !important; background: var(--bs-primary-light); }
+.manual-post-image-ai-choice:has(input:checked) { border-color: var(--bs-primary) !important; background: var(--bs-primary-light); }
 .manual-post-company, .manual-post-destination, .manual-post-choice { transition: border-color .18s ease, background-color .18s ease, box-shadow .18s ease; }
 .manual-post-destination:has(input:checked) { background: #fff; box-shadow: inset 0 0 0 1px var(--bs-primary); }
 .manual-post-destination-icon { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; flex: 0 0 36px; border-radius: 8px; color: #fff; font-size: 1rem; }
@@ -295,6 +300,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const textarea = document.getElementById('manual-post-content');
     const counter = document.getElementById('manual-post-count');
     const imageInput = document.getElementById('manual-post-images');
+    const generateImageIfMissing = document.getElementById('generate-image-if-missing');
+    const imageAiOption = document.querySelector('[data-image-ai-option]');
     const preview = document.getElementById('manual-post-preview');
     const urlInput = document.getElementById('quick-post-url');
     const urlWorkspace = document.querySelector('[data-mode-url-workspace]');
@@ -317,6 +324,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const directNote = document.querySelector('[data-publish-as-is-note]');
     const destinationHelp = document.querySelector('[data-destination-help]');
     const contentHelp = document.getElementById('manual-post-content-help');
+    const aiProfileLabel = document.querySelector('[data-ai-profile-label]');
     const submitLabel = document.querySelector('[data-submit-label]');
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
     let mode = form.dataset.initialMode || 'text';
@@ -333,6 +341,21 @@ document.addEventListener('DOMContentLoaded', function () {
             ? '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>' + (direct ? 'Publicando...' : 'Generando...')
             : '<i class="ki-outline ' + (direct ? 'ki-send' : 'ki-sparkles') + ' fs-2"></i><span data-submit-label>' + (direct ? 'Publicar contenido' : 'Generar post') + '</span>';
     };
+    const hasUploadedImages = () => (imageInput?.files?.length || 0) > 0;
+    const syncPublicationOptions = () => {
+        const direct = Boolean(publishAsIs?.checked);
+        const hasImages = hasUploadedImages();
+        const generateImage = Boolean(generateImageIfMissing?.checked) && !hasImages;
+        setHidden(imageAiOption, mode === 'url' || hasImages);
+        if (generateImageIfMissing) generateImageIfMissing.disabled = mode === 'url' || hasImages;
+        if (hasImages && generateImageIfMissing) generateImageIfMissing.checked = false;
+        setHidden(aiProfileWorkspace, direct && !generateImage);
+        if (profileSelect) {
+            profileSelect.disabled = direct && !generateImage;
+            profileSelect.required = !direct || generateImage;
+        }
+        if (aiProfileLabel) aiProfileLabel.textContent = direct && generateImage ? 'Perfil para la imagen con IA' : 'Perfil de generación';
+    };
     const setMode = (nextMode) => {
         if (publishAsIs?.checked && nextMode === 'url') nextMode = 'text';
         mode = nextMode;
@@ -346,6 +369,7 @@ document.addEventListener('DOMContentLoaded', function () {
         textarea.disabled = mode === 'url'; textarea.required = mode !== 'url';
         imageInput.disabled = mode === 'url';
         radioInputs.forEach((input) => { input.disabled = mode !== 'url'; });
+        syncPublicationOptions();
     };
     const setDirectPublication = () => {
         const direct = Boolean(publishAsIs?.checked);
@@ -356,8 +380,7 @@ document.addEventListener('DOMContentLoaded', function () {
             urlModeButton.classList.toggle('opacity-50', direct);
             urlModeButton.setAttribute('aria-disabled', direct ? 'true' : 'false');
         }
-        setHidden(aiProfileWorkspace, direct);
-        if (profileSelect) { profileSelect.disabled = direct; profileSelect.required = !direct; }
+        syncPublicationOptions();
         setHidden(autoPublishControl, direct);
         setHidden(directNote, !direct);
         if (contentHelp) contentHelp.textContent = direct ? 'El texto se conserva tal como lo escribes.' : 'Mínimo 80 caracteres.';
@@ -419,6 +442,7 @@ document.addEventListener('DOMContentLoaded', function () {
     textarea?.addEventListener('input', refreshCounter);
     modeButtons.forEach((item) => item.addEventListener('click', () => setMode(item.dataset.postMode)));
     publishAsIs?.addEventListener('change', setDirectPublication);
+    generateImageIfMissing?.addEventListener('change', syncPublicationOptions);
     companyToggles.forEach((toggle) => toggle.addEventListener('change', () => syncCompany(toggle.dataset.companyToggle, toggle.checked)));
     destinationChecks.forEach((input) => input.addEventListener('change', () => syncCompanyFromDestinations(input.dataset.companyDestination)));
     selectAll?.addEventListener('click', () => { const shouldCheck = destinationChecks.some((input) => !input.checked); companyToggles.forEach((input) => { input.checked = shouldCheck; }); destinationChecks.forEach((input) => { input.checked = shouldCheck; }); });
@@ -426,6 +450,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const files = Array.from(imageInput.files || []).slice(0, 8); preview.innerHTML = '';
         if ((imageInput.files || []).length > 8) { const transfer = new DataTransfer(); files.forEach((file) => transfer.items.add(file)); imageInput.files = transfer.files; }
         files.forEach((file, index) => { const item = document.createElement('div'); const img = document.createElement('img'); const label = document.createElement('span'); item.className = 'manual-post-preview-item'; img.alt = ''; img.src = URL.createObjectURL(file); img.onload = () => URL.revokeObjectURL(img.src); label.textContent = String(index + 1); item.append(img, label); preview.appendChild(item); });
+        syncPublicationOptions();
     });
     audioInput?.addEventListener('change', () => transcribeAudio(audioInput.files?.[0]));
     recordButton?.addEventListener('click', async () => {

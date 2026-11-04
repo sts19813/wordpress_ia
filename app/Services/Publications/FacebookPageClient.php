@@ -33,7 +33,7 @@ class FacebookPageClient
         WordPressSite $profile,
         string $message,
         ?string $link = null,
-        ?string $photoId = null,
+        array $photoIds = [],
     ): Response {
         $credentials = $this->pageCredentials($profile);
 
@@ -43,8 +43,8 @@ class FacebookPageClient
             'access_token' => $credentials['access_token'],
         ]);
 
-        if (filled($photoId)) {
-            $payload['attached_media[0]'] = json_encode(['media_fbid' => $photoId], JSON_THROW_ON_ERROR);
+        foreach (array_values(array_filter($photoIds)) as $index => $photoId) {
+            $payload["attached_media[{$index}]"] = json_encode(['media_fbid' => $photoId], JSON_THROW_ON_ERROR);
         }
 
         return $this->request()

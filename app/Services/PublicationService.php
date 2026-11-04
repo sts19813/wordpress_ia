@@ -41,6 +41,12 @@ class PublicationService
         return $this->engine->uploadImage($publication, $contents, $filename, $mimeType);
     }
 
+    /** @param iterable<int, AiImage> $images */
+    public function uploadImages(Publication $publication, iterable $images): Publication
+    {
+        return $this->engine->uploadImages($publication, $images);
+    }
+
     public function createCategory(WordPressSite $site, string $name): array
     {
         return $this->engine->createCategory($site, $name);
@@ -146,17 +152,20 @@ class PublicationService
             $publication->update(['ai_image_id' => $image?->id]);
         }
 
-        $publication->load(['wordpressSite', 'aiArticle']);
+        $publication->load(['wordpressSite', 'aiArticle.images']);
         $this->engine->refreshPayload($publication);
 
-        if ($image?->file_path && ! $publication->remote_featured_media_id && Storage::disk('local')->exists($image->file_path)) {
+        $images = $publication->aiArticle->images
+            ->filter(fn (AiImage $candidate): bool => $candidate->status === AiImage::STATUS_GENERATED
+                && filled($candidate->file_path)
+                && Storage::disk('local')->exists($candidate->file_path))
+            ->sortBy(fn (AiImage $candidate): int => $candidate->type === AiImage::TYPE_MAIN ? 0 : 1)
+            ->values();
+        $image ??= $images->first();
+
+        if ($images->isNotEmpty() && ! $publication->remote_featured_media_id) {
             try {
-                $this->uploadImage(
-                    $publication,
-                    Storage::disk('local')->get($image->file_path),
-                    basename($image->file_path),
-                    $image->mime_type ?: Storage::disk('local')->mimeType($image->file_path) ?: 'image/jpeg',
-                );
+                $publication = $this->uploadImages($publication, $images);
             } catch (Throwable) {
                 // A missing media permission should not prevent publishing the text.
             }

@@ -28,7 +28,8 @@ class FacebookPublicationEngine
             ->first();
         $link = $this->articleUrls->resolve($profile, $article);
         $message = $this->message($article, $link);
-        $hasLocalImage = (bool) ($image?->file_path && Storage::disk('local')->exists($image->file_path));
+        $images = $this->imagesForPublication($article, $image);
+        $hasLocalImage = $images->isNotEmpty();
         $payload = [
             'platform' => WordPressSite::TYPE_FACEBOOK_PAGE,
             'message' => $message,
@@ -41,14 +42,14 @@ class FacebookPublicationEngine
                 'user_id' => $article->user_id ?: $profile->user_id,
                 'wordpress_site_id' => $profile->id,
                 'ai_article_id' => $article->id,
-                'ai_image_id' => $image?->id,
+                'ai_image_id' => $images->first()?->id,
                 'status' => Publication::STATUS_DRAFT,
                 'last_action' => 'prepared_facebook',
                 'request_payload' => $payload,
             ]);
         } else {
             $publication->update([
-                'ai_image_id' => $image?->id,
+                'ai_image_id' => $images->first()?->id,
                 'request_payload' => $payload,
                 'error_message' => null,
             ]);
@@ -65,21 +66,24 @@ class FacebookPublicationEngine
         }
 
         try {
-            $photoResponse = null;
-            $photoId = null;
+            $photoResponses = [];
+            $photoIds = [];
 
-            if ($hasLocalImage) {
+            foreach ($images as $uploadedImage) {
                 $photoResponse = $this->client->uploadPhoto(
                     $profile,
-                    Storage::disk('local')->get($image->file_path),
-                    basename($image->file_path),
-                    $image->mime_type ?: Storage::disk('local')->mimeType($image->file_path) ?: 'image/jpeg',
+                    Storage::disk('local')->get($uploadedImage->file_path),
+                    basename($uploadedImage->file_path),
+                    $uploadedImage->mime_type ?: Storage::disk('local')->mimeType($uploadedImage->file_path) ?: 'image/jpeg',
                 );
                 $photoId = (string) $photoResponse->json('id');
 
                 if ($photoId === '') {
                     throw new RuntimeException('Facebook no devolvió el identificador de la imagen subida.');
                 }
+
+                $photoIds[] = $photoId;
+                $photoResponses[] = $photoResponse->json();
             }
 
             // A photo post makes the image independent from Facebook's Open Graph
@@ -88,13 +92,13 @@ class FacebookPublicationEngine
                 $profile,
                 $message,
                 $hasLocalImage ? null : $link,
-                $photoId,
+                $photoIds,
             );
             $remoteKey = (string) $response->json('id');
             $remoteUrl = $remoteKey !== '' ? 'https://www.facebook.com/'.$remoteKey : null;
 
             try {
-                $remoteUrl = $this->client->publicationUrl($profile, $remoteKey, $photoId) ?: $remoteUrl;
+                $remoteUrl = $this->client->publicationUrl($profile, $remoteKey, $photoIds[0] ?? null) ?: $remoteUrl;
             } catch (Throwable) {
                 // La publicación ya existe; una consulta de permalink no debe marcarla como fallida.
             }
@@ -105,7 +109,7 @@ class FacebookPublicationEngine
                 'status' => Publication::STATUS_PUBLISHED,
                 'last_action' => $hasLocalImage ? 'publish_facebook_photo_post' : 'publish_facebook_link_post',
                 'full_response' => [
-                    'photo' => $photoResponse?->json(),
+                    'photos' => $photoResponses,
                     'post' => $response->json(),
                 ],
                 'published_at' => now(),
@@ -149,6 +153,23 @@ class FacebookPublicationEngine
             $link,
             $tags,
         ])->filter()->implode("\n\n");
+    }
+
+    /** @return \Illuminate\Support\Collection<int, AiImage> */
+    private function imagesForPublication(AiArticle $article, ?AiImage $fallback): \Illuminate\Support\Collection
+    {
+        $images = $article->relationLoaded('images')
+            ? $article->images
+            : $article->images()->where('status', AiImage::STATUS_GENERATED)->get();
+
+        return collect($images)
+            ->when($fallback && ! $images->contains('id', $fallback->id), fn ($collection) => $collection->prepend($fallback))
+            ->filter(fn (AiImage $candidate): bool => $candidate->status === AiImage::STATUS_GENERATED
+                && filled($candidate->file_path)
+                && Storage::disk('local')->exists($candidate->file_path))
+            ->sortBy(fn (AiImage $candidate): int => $candidate->type === AiImage::TYPE_MAIN ? 0 : 1)
+            ->take(10)
+            ->values();
     }
 
     private function plainText(string $html): string

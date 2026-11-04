@@ -100,11 +100,12 @@ class SchedulerService
         array $publicationProfileIds = [],
         array $companyIds = [],
         bool $requiresReview = true,
+        bool $generateImageIfMissing = false,
     ): Scheduler {
         $publicationProfileIds = array_values(array_unique(array_map('intval', $publicationProfileIds)));
         $companyIds = array_values(array_unique(array_map('intval', $companyIds)));
         $hasOriginalImages = $sourcePost->media()->exists();
-        $imageMode = $hasOriginalImages ? 'original' : 'none';
+        $imageMode = $hasOriginalImages ? 'original' : ($generateImageIfMissing ? 'generate' : 'none');
 
         $task = Scheduler::query()->create([
             'user_id' => $user->id,
@@ -120,7 +121,7 @@ class SchedulerService
                 'source_post_ids' => [$sourcePost->id],
                 'origin' => 'manual_post',
                 'image_mode' => $imageMode,
-                'generate_image' => false,
+                'generate_image' => ! $hasOriginalImages && $generateImageIfMissing,
                 'company_id' => count($companyIds) === 1 ? $companyIds[0] : null,
                 'company_ids' => $companyIds,
                 'publication_profile_ids' => $publicationProfileIds,
@@ -149,10 +150,12 @@ class SchedulerService
         AiArticle $article,
         array $publicationProfileIds,
         array $companyIds = [],
+        ?AiPromptProfile $imageProfile = null,
     ): Scheduler {
         $publicationProfileIds = array_values(array_unique(array_map('intval', $publicationProfileIds)));
         $companyIds = array_values(array_unique(array_map('intval', $companyIds)));
 
+        $generateImage = ! $sourcePost->media()->exists() && $imageProfile !== null;
         $task = Scheduler::query()->create([
             'user_id' => $user->id,
             'source_post_id' => $sourcePost->id,
@@ -160,15 +163,16 @@ class SchedulerService
             'type' => Scheduler::TYPE_QUICK_POST,
             'name' => 'Publicar contenido manual',
             'status' => Scheduler::STATUS_QUEUED,
-            'step' => 'Contenido listo; publicación en cola',
-            'progress' => 90,
+            'step' => $generateImage ? 'Contenido listo; imagen en cola' : 'Contenido listo; publicación en cola',
+            'progress' => $generateImage ? 70 : 90,
             'max_attempts' => 3,
             'payload' => [
                 'source_post_ids' => [$sourcePost->id],
                 'origin' => 'manual_post',
                 'publish_as_is' => true,
-                'image_mode' => $sourcePost->media()->exists() ? 'original' : 'none',
-                'generate_image' => false,
+                'profile_id' => $imageProfile?->id,
+                'image_mode' => $sourcePost->media()->exists() ? 'original' : ($generateImage ? 'generate' : 'none'),
+                'generate_image' => $generateImage,
                 'company_id' => count($companyIds) === 1 ? $companyIds[0] : null,
                 'company_ids' => $companyIds,
                 'publication_profile_ids' => $publicationProfileIds,
@@ -179,9 +183,14 @@ class SchedulerService
             'events' => [],
         ]);
 
-        $this->addEvent($task, 'info', 'Contenido manual listo; se omitió la generación con IA.');
-        $this->addEvent($task, 'info', 'El post se enviará a '.count($publicationProfileIds).' destino(s).');
-        PublishQuickPost::dispatch($task->id)->onQueue('publication');
+        $this->addEvent($task, 'info', 'Contenido manual listo; se omitió la generación de texto con IA.');
+        if ($generateImage) {
+            $this->addEvent($task, 'info', 'No se cargaron imágenes; se generará una imagen principal antes de publicar.');
+            GenerateAiImage::dispatch($task->id)->onQueue('ai-image');
+        } else {
+            $this->addEvent($task, 'info', 'El post se enviará a '.count($publicationProfileIds).' destino(s).');
+            PublishQuickPost::dispatch($task->id)->onQueue('publication');
+        }
 
         return $task->fresh();
     }

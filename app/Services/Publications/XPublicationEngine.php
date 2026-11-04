@@ -31,8 +31,9 @@ class XPublicationEngine
             ],
         );
         $text = $this->postText($article);
+        $images = $this->imagesForPublication($article, $image);
         $publication->update([
-            'ai_image_id' => $image?->id,
+            'ai_image_id' => $images->first()?->id,
             'request_payload' => [
                 'platform' => WordPressSite::TYPE_X,
                 'text' => $text,
@@ -41,29 +42,33 @@ class XPublicationEngine
         ]);
 
         try {
-            $hasLocalImage = (bool) ($image?->file_path && Storage::disk('local')->exists($image->file_path));
-            $mediaResponse = null;
-            $mediaError = null;
+            $mediaResponses = [];
+            $mediaErrors = [];
+            $mediaIds = [];
 
-            if ($hasLocalImage) {
+            foreach ($images as $uploadedImage) {
                 try {
                     $mediaResponse = $this->client->uploadImage(
                         $profile,
-                        Storage::disk('local')->get($image->file_path),
-                        basename($image->file_path),
-                        $image->mime_type ?: Storage::disk('local')->mimeType($image->file_path) ?: 'image/png',
+                        Storage::disk('local')->get($uploadedImage->file_path),
+                        basename($uploadedImage->file_path),
+                        $uploadedImage->mime_type ?: Storage::disk('local')->mimeType($uploadedImage->file_path) ?: 'image/png',
                     );
+                    $mediaId = (string) $mediaResponse->json('data.id');
+                    if ($mediaId !== '') {
+                        $mediaIds[] = $mediaId;
+                        $mediaResponses[] = $mediaResponse->json();
+                    }
                 } catch (Throwable $exception) {
                     $errorResponse = $exception instanceof RequestException ? ($exception->response?->json() ?: []) : [];
-                    $mediaError = data_get($errorResponse, 'detail')
+                    $mediaErrors[] = data_get($errorResponse, 'detail')
                         ?: data_get($errorResponse, 'errors.0.detail')
                         ?: $exception->getMessage()
                         ?: 'X rechazó la imagen; se publicó únicamente el texto.';
                 }
             }
 
-            $mediaId = $mediaResponse ? (string) $mediaResponse->json('data.id') : null;
-            $response = $this->client->publishPost($profile, $text, $mediaId ?: null);
+            $response = $this->client->publishPost($profile, $text, $mediaIds);
             $postId = (string) $response->json('data.id');
 
             $publication->update([
@@ -72,9 +77,9 @@ class XPublicationEngine
                 'status' => Publication::STATUS_PUBLISHED,
                 'last_action' => 'publish_x_post',
                 'full_response' => [
-                    'media' => $mediaResponse?->json() ?: ($mediaError ? [
+                    'media' => $mediaResponses !== [] ? $mediaResponses : ($mediaErrors !== [] ? [
                         'omitted' => true,
-                        'error' => $mediaError,
+                        'error' => implode(' ', $mediaErrors),
                     ] : null),
                     'post' => $response->json(),
                 ],
@@ -118,5 +123,22 @@ class XPublicationEngine
         ])->filter()->implode("\n\n"))->limit($limit, '…')->toString();
 
         return $text.$suffix;
+    }
+
+    /** @return \Illuminate\Support\Collection<int, AiImage> */
+    private function imagesForPublication(AiArticle $article, ?AiImage $fallback): \Illuminate\Support\Collection
+    {
+        $images = $article->relationLoaded('images')
+            ? $article->images
+            : $article->images()->where('status', AiImage::STATUS_GENERATED)->get();
+
+        return collect($images)
+            ->when($fallback && ! $images->contains('id', $fallback->id), fn ($collection) => $collection->prepend($fallback))
+            ->filter(fn (AiImage $candidate): bool => $candidate->status === AiImage::STATUS_GENERATED
+                && filled($candidate->file_path)
+                && Storage::disk('local')->exists($candidate->file_path))
+            ->sortBy(fn (AiImage $candidate): int => $candidate->type === AiImage::TYPE_MAIN ? 0 : 1)
+            ->take(4)
+            ->values();
     }
 }

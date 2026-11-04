@@ -18,14 +18,42 @@ class InstagramClient
             ->throw();
     }
 
-    public function createImageContainer(WordPressSite $profile, string $imageUrl, string $caption): Response
+    public function createImageContainer(
+        WordPressSite $profile,
+        string $imageUrl,
+        string $caption = '',
+        bool $isCarouselItem = false,
+    ): Response
     {
+        $payload = [
+            'image_url' => $imageUrl,
+            'caption' => $caption,
+        ];
+
+        if ($isCarouselItem) {
+            $payload['is_carousel_item'] = 'true';
+            unset($payload['caption']);
+        }
+
         return $this->request($profile)
             ->asForm()
-            ->post($this->endpoint($profile, 'media'), [
-                'image_url' => $imageUrl,
-                'caption' => $caption,
-            ])
+            ->post($this->endpoint($profile, 'media'), $payload)
+            ->throw();
+    }
+
+    /** @param array<int, string> $children */
+    public function createCarouselContainer(WordPressSite $profile, array $children, string $caption): Response
+    {
+        $payload = [
+            'media_type' => 'CAROUSEL',
+            'caption' => $caption,
+        ];
+
+        $payload['children'] = json_encode(array_values($children), JSON_THROW_ON_ERROR);
+
+        return $this->request($profile)
+            ->asForm()
+            ->post($this->endpoint($profile, 'media'), $payload)
             ->throw();
     }
 

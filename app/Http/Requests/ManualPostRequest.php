@@ -19,6 +19,7 @@ class ManualPostRequest extends FormRequest
         $this->merge([
             'content' => trim((string) $this->input('content')),
             'publish_as_is' => $this->boolean('publish_as_is'),
+            'generate_image_if_missing' => $this->boolean('generate_image_if_missing'),
             'publish_without_review' => $this->boolean('publish_without_review'),
             'company_ids' => array_values(array_unique(array_map('intval', (array) $this->input('company_ids', [])))),
             'publication_profile_ids' => array_values(array_unique(array_map('intval', (array) $this->input('publication_profile_ids', [])))),
@@ -30,8 +31,9 @@ class ManualPostRequest extends FormRequest
         return [
             'content' => ['required', 'string', $this->boolean('publish_as_is') ? 'min:1' : 'min:80', 'max:20000'],
             'publish_as_is' => ['boolean'],
+            'generate_image_if_missing' => ['boolean'],
             'ai_prompt_profile_id' => [
-                $this->boolean('publish_as_is') ? 'nullable' : 'required',
+                $this->needsAiProfile() ? 'required' : 'nullable',
                 'integer',
                 Rule::exists('ai_prompt_profiles', 'id'),
             ],
@@ -116,7 +118,7 @@ class ManualPostRequest extends FormRequest
 
             if ($this->boolean('publish_as_is')
                 && WordPressSite::query()->whereIn('id', $profileIds)->where('type', WordPressSite::TYPE_INSTAGRAM)->exists()
-                && count($this->file('images', [])) === 0) {
+                && ! $this->generatesImageIfMissing()) {
                 $validator->errors()->add('images', 'Agrega al menos una imagen para publicar directamente en Instagram.');
             }
         }];
@@ -152,5 +154,17 @@ class ManualPostRequest extends FormRequest
     public function publishesAsIs(): bool
     {
         return (bool) $this->validated('publish_as_is', false);
+    }
+
+    public function generatesImageIfMissing(): bool
+    {
+        return (bool) $this->validated('generate_image_if_missing', false)
+            && count($this->file('images', [])) === 0;
+    }
+
+    private function needsAiProfile(): bool
+    {
+        return ! $this->boolean('publish_as_is')
+            || ($this->boolean('generate_image_if_missing') && count($this->file('images', [])) === 0);
     }
 }
