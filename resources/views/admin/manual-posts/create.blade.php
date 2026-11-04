@@ -54,11 +54,11 @@
                                     <div class="d-flex flex-column gap-3">
                                         <label class="manual-post-choice d-flex align-items-start gap-3 rounded border p-4 cursor-pointer">
                                             <input class="form-check-input mt-1" type="radio" name="image_mode" value="generate" checked>
-                                            <span><span class="fw-bold text-gray-900 d-block">Generar con IA</span><span class="text-muted fs-8">Se crea una imagen nueva para la nota.</span></span>
+                                            <span class="fw-bold text-gray-900">Generar con IA</span>
                                         </label>
                                         <label class="manual-post-choice d-flex align-items-start gap-3 rounded border p-4 cursor-pointer">
                                             <input class="form-check-input mt-1" type="radio" name="image_mode" value="original" @checked(old('image_mode') === 'original')>
-                                            <span><span class="fw-bold text-gray-900 d-block">Conservar imágenes originales</span><span class="text-muted fs-8">Se intentarán usar las imágenes públicas del enlace.</span></span>
+                                            <span class="fw-bold text-gray-900">Conservar imágenes originales</span>
                                         </label>
                                     </div>
                                 </div>
@@ -85,12 +85,10 @@
                                 <div class="d-flex align-items-start gap-3">
                                     <span class="manual-post-direct-icon"><i class="ki-outline ki-send fs-2 text-primary"></i></span>
                                     <div class="min-w-0 flex-grow-1">
-                                        <label for="publish-as-is" class="fw-bold text-gray-900 cursor-pointer d-block mb-1">Publicar contenido tal cual</label>
-                                        <div class="text-muted fs-8" id="publish-as-is-description">Omite la redacción con IA. Se enviarán este texto y estas imágenes directamente a los destinos que selecciones.</div>
-                                        <div class="text-primary fw-semibold fs-8 mt-2 d-none" data-publish-as-is-note><i class="ki-outline ki-information-5 me-1"></i>La publicación será directa; no habrá borrador de IA.</div>
+                                        <label for="publish-as-is" class="fw-bold text-gray-900 cursor-pointer d-block">Publicar contenido tal cual</label>
                                     </div>
                                     <span class="form-check form-switch form-check-custom form-check-solid m-0 flex-shrink-0">
-                                        <input class="form-check-input" type="checkbox" name="publish_as_is" value="1" id="publish-as-is" @checked(old('publish_as_is')) aria-describedby="publish-as-is-description">
+                                        <input class="form-check-input" type="checkbox" name="publish_as_is" value="1" id="publish-as-is" @checked(old('publish_as_is'))>
                                     </span>
                                 </div>
                             </div>
@@ -115,14 +113,14 @@
                                 <div class="separator my-7"></div>
                                 <label for="manual-post-images" class="form-label fw-bold">Imágenes</label>
                                 <label class="manual-post-upload d-flex flex-column align-items-center justify-content-center rounded border border-dashed p-6 cursor-pointer" for="manual-post-images">
-                                    <i class="ki-outline ki-picture fs-2x text-primary mb-2"></i><span class="fw-bold text-gray-900">Subir desde galería</span><span class="text-muted fs-8">Hasta 8 imágenes JPG, PNG o WebP. Se publicarán todas.</span>
+                                    <i class="ki-outline ki-picture fs-2x text-primary mb-2"></i><span class="fw-bold text-gray-900">Subir desde galería</span><span class="text-muted fs-8">Hasta 8 imágenes.</span>
                                 </label>
                                 <input id="manual-post-images" class="d-none @error('images') is-invalid @enderror @error('images.*') is-invalid @enderror" type="file" name="images[]" accept="image/jpeg,image/png,image/webp" multiple>
                                 @error('images')<div class="text-danger fs-7 mt-3">{{ $message }}</div>@enderror
                                 @error('images.*')<div class="text-danger fs-7 mt-3">{{ $message }}</div>@enderror
                                 <label class="manual-post-image-ai-choice d-flex align-items-start gap-3 rounded border p-4 mt-4 cursor-pointer" data-image-ai-option>
                                     <span class="form-check form-switch form-check-custom form-check-solid mt-1"><input class="form-check-input" type="checkbox" name="generate_image_if_missing" value="1" id="generate-image-if-missing" @checked(old('generate_image_if_missing'))></span>
-                                    <span><span class="fw-bold text-gray-900 d-block">Generar imagen con IA si no cargo imágenes</span><span class="text-muted fs-8">Solo se usará si esta publicación no tiene imágenes cargadas.</span></span>
+                                    <span class="fw-bold text-gray-900">Generar imágenes con IA</span>
                                 </label>
                                 <div id="manual-post-preview" class="manual-post-preview-grid mt-4"></div>
                             </div>
@@ -134,7 +132,7 @@
                     <div class="card card-flush h-100">
                         <div class="card-body p-lg-8">
                             <div class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3 mb-5">
-                                <div><h2 class="fw-bold text-gray-900 fs-4 mb-1">Empresas y destinos</h2><div class="text-muted fs-7" data-destination-help>Elige dónde se publicará después de tu revisión.</div></div>
+                                <h2 class="fw-bold text-gray-900 fs-4 mb-1">Empresas y destinos</h2>
                                 <button type="button" class="btn btn-sm btn-light-primary" id="manual-post-select-all"><i class="ki-outline ki-check-square fs-3"></i>Todas</button>
                             </div>
                             @if ($companies->isNotEmpty())
@@ -185,7 +183,7 @@
                         <div class="card-footer d-flex flex-column flex-sm-row justify-content-end gap-3">
                             <a href="{{ route('admin.quick-posts.index') }}" class="btn btn-light">Cancelar</a>
                             <label class="manual-post-auto-publish d-flex align-items-center gap-2 cursor-pointer mb-0" data-auto-publish-control>
-                                <span class="text-end"><span class="fw-bold text-gray-900 d-block fs-8">Publicar sin revisar</span><span class="text-muted d-block fs-9">Autoriza publicación automática</span></span>
+                                <span class="text-end"><span class="fw-bold text-gray-900 d-block fs-8">Publicar sin revisar</span></span>
                                 <span class="form-check form-switch form-check-custom form-check-solid m-0"><input class="form-check-input" type="checkbox" name="publish_without_review" value="1" id="publish-without-review" @checked(old('publish_without_review'))></span>
                             </label>
                             <button type="submit" class="btn btn-primary" id="manual-post-submit"><i class="ki-outline ki-sparkles fs-2"></i><span data-submit-label>Generar post</span></button>
@@ -321,8 +319,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const aiProfileWorkspace = document.querySelector('[data-ai-profile-workspace]');
     const profileSelect = document.getElementById('manual-post-profile');
     const autoPublishControl = document.querySelector('[data-auto-publish-control]');
-    const directNote = document.querySelector('[data-publish-as-is-note]');
-    const destinationHelp = document.querySelector('[data-destination-help]');
     const contentHelp = document.getElementById('manual-post-content-help');
     const aiProfileLabel = document.querySelector('[data-ai-profile-label]');
     const submitLabel = document.querySelector('[data-submit-label]');
@@ -382,11 +378,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         syncPublicationOptions();
         setHidden(autoPublishControl, direct);
-        setHidden(directNote, !direct);
         if (contentHelp) contentHelp.textContent = direct ? 'El texto se conserva tal como lo escribes.' : 'Mínimo 80 caracteres.';
-        if (destinationHelp) destinationHelp.textContent = direct
-            ? 'Se publicará directamente en los destinos seleccionados.'
-            : 'Elige dónde se publicará después de tu revisión.';
         if (submitLabel) submitLabel.textContent = direct ? 'Publicar contenido' : 'Generar post';
         button?.querySelector('i')?.classList.toggle('ki-send', direct);
         button?.querySelector('i')?.classList.toggle('ki-sparkles', !direct);
