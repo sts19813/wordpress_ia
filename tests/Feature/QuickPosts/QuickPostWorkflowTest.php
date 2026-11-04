@@ -111,6 +111,75 @@ class QuickPostWorkflowTest extends TestCase
         Queue::assertPushedOn('ai-text', GenerateAiArticle::class);
     }
 
+    public function test_manual_post_can_publish_supplied_content_and_images_without_ai_generation(): void
+    {
+        Queue::fake();
+        Storage::fake('local');
+        $user = User::factory()->create();
+        $company = $user->companies()->create(['name' => 'Empresa directa', 'active' => true]);
+        $destination = $this->publicationProfile($user, [
+            'company_id' => $company->id,
+            'name' => 'Sitio directo',
+        ]);
+
+        $content = "Título escrito por la persona\n\nEste texto debe conservarse tal cual y enviarse sin que la inteligencia artificial lo reescriba.";
+
+        $this->actingAs($user)
+            ->post(route('admin.manual-posts.store'), [
+                'content' => $content,
+                'publish_as_is' => true,
+                'company_ids' => [$company->id],
+                'publication_profile_ids' => [$destination->id],
+                'images' => [UploadedFile::fake()->image('foto-directa.jpg', 1200, 630)],
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('admin.quick-posts.index'));
+
+        $task = Scheduler::query()->sole();
+        $article = AiArticle::query()->sole();
+
+        $this->assertSame('Publicar contenido manual', $task->name);
+        $this->assertTrue($task->payload['publish_as_is']);
+        $this->assertFalse($task->payload['requires_review']);
+        $this->assertTrue($task->payload['review_approved']);
+        $this->assertSame([$destination->id], $task->payload['publication_profile_ids']);
+        $this->assertSame(AiArticle::STATUS_DRAFT, $article->status);
+        $this->assertSame('manual', $article->model);
+        $this->assertStringContainsString('Este texto debe conservarse tal cual', $article->content);
+        $this->assertNull($article->ai_prompt_profile_id);
+        $this->assertSame(1, $article->images()->count());
+        $this->assertSame('original', $article->images()->sole()->model);
+        Queue::assertPushedOn('publication', PublishQuickPost::class);
+        Queue::assertNotPushed(GenerateAiArticle::class);
+    }
+
+    public function test_manual_content_published_directly_requires_an_image_for_instagram(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        $company = $user->companies()->create(['name' => 'Empresa Instagram', 'active' => true]);
+        $instagram = $this->publicationProfile($user, [
+            'company_id' => $company->id,
+            'type' => WordPressSite::TYPE_INSTAGRAM,
+            'rest_api_url' => '',
+            'username' => '',
+            'application_password' => '',
+            'instagram_account_id' => '17841400000000000',
+            'instagram_access_token' => 'instagram-token',
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('admin.manual-posts.store'), [
+                'content' => 'Texto breve para una publicación manual de Instagram.',
+                'publish_as_is' => true,
+                'company_ids' => [$company->id],
+                'publication_profile_ids' => [$instagram->id],
+            ])
+            ->assertSessionHasErrors('images');
+
+        $this->assertDatabaseCount('schedulers', 0);
+    }
+
     public function test_unified_form_lists_all_generation_modes(): void
     {
         $user = User::factory()->create();
@@ -146,6 +215,7 @@ class QuickPostWorkflowTest extends TestCase
             ->assertSee('Cargar audio')
             ->assertSee('Generar con IA')
             ->assertSee('Conservar imágenes originales')
+            ->assertSee('Publicar contenido tal cual')
             ->assertSee('name="image_mode"', false)
             ->assertSee('name="ai_prompt_profile_id"', false)
             ->assertSee('Perfil para redes')

@@ -78,11 +78,25 @@
                                 <label for="manual-post-content" class="form-label required fw-bold">Contenido</label>
                                 <textarea id="manual-post-content" name="content" class="form-control form-control-solid manual-post-textarea @error('content') is-invalid @enderror" rows="18" maxlength="20000" placeholder="Pega aquí la información de la nota..." autofocus>{{ old('content') }}</textarea>
                                 @error('content')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                                <div class="d-flex justify-content-between gap-3 mt-2"><div class="form-text">Mínimo 80 caracteres.</div><div class="text-muted fs-8"><span id="manual-post-count">0</span>/20000</div></div>
+                                <div class="d-flex justify-content-between gap-3 mt-2"><div class="form-text" id="manual-post-content-help">Mínimo 80 caracteres.</div><div class="text-muted fs-8"><span id="manual-post-count">0</span>/20000</div></div>
+                            </div>
+
+                            <div class="manual-post-direct-card rounded border border-dashed p-4 mt-6" data-publish-as-is-card>
+                                <div class="d-flex align-items-start gap-3">
+                                    <span class="manual-post-direct-icon"><i class="ki-outline ki-send fs-2 text-primary"></i></span>
+                                    <div class="min-w-0 flex-grow-1">
+                                        <label for="publish-as-is" class="fw-bold text-gray-900 cursor-pointer d-block mb-1">Publicar contenido tal cual</label>
+                                        <div class="text-muted fs-8" id="publish-as-is-description">Omite la redacción con IA. Se enviarán este texto y estas imágenes directamente a los destinos que selecciones.</div>
+                                        <div class="text-primary fw-semibold fs-8 mt-2 d-none" data-publish-as-is-note><i class="ki-outline ki-information-5 me-1"></i>La publicación será directa; no habrá borrador de IA.</div>
+                                    </div>
+                                    <span class="form-check form-switch form-check-custom form-check-solid m-0 flex-shrink-0">
+                                        <input class="form-check-input" type="checkbox" name="publish_as_is" value="1" id="publish-as-is" @checked(old('publish_as_is')) aria-describedby="publish-as-is-description">
+                                    </span>
+                                </div>
                             </div>
 
                             <div class="separator my-7"></div>
-                            <div class="row align-items-end g-4">
+                            <div class="row align-items-end g-4" data-ai-profile-workspace>
                                 <div class="col-md-8">
                                     <label for="manual-post-profile" class="form-label required fw-bold">Perfil de generación</label>
                                     <select id="manual-post-profile" name="ai_prompt_profile_id" class="form-select form-select-solid @error('ai_prompt_profile_id') is-invalid @enderror" required>
@@ -116,7 +130,7 @@
                     <div class="card card-flush h-100">
                         <div class="card-body p-lg-8">
                             <div class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3 mb-5">
-                                <div><h2 class="fw-bold text-gray-900 fs-4 mb-1">Empresas y destinos</h2><div class="text-muted fs-7">Elige dónde se publicará después de tu revisión.</div></div>
+                                <div><h2 class="fw-bold text-gray-900 fs-4 mb-1">Empresas y destinos</h2><div class="text-muted fs-7" data-destination-help>Elige dónde se publicará después de tu revisión.</div></div>
                                 <button type="button" class="btn btn-sm btn-light-primary" id="manual-post-select-all"><i class="ki-outline ki-check-square fs-3"></i>Todas</button>
                             </div>
                             @if ($companies->isNotEmpty())
@@ -166,11 +180,11 @@
                         </div>
                         <div class="card-footer d-flex flex-column flex-sm-row justify-content-end gap-3">
                             <a href="{{ route('admin.quick-posts.index') }}" class="btn btn-light">Cancelar</a>
-                            <label class="manual-post-auto-publish d-flex align-items-center gap-2 cursor-pointer mb-0">
+                            <label class="manual-post-auto-publish d-flex align-items-center gap-2 cursor-pointer mb-0" data-auto-publish-control>
                                 <span class="text-end"><span class="fw-bold text-gray-900 d-block fs-8">Publicar sin revisar</span><span class="text-muted d-block fs-9">Autoriza publicación automática</span></span>
                                 <span class="form-check form-switch form-check-custom form-check-solid m-0"><input class="form-check-input" type="checkbox" name="publish_without_review" value="1" id="publish-without-review" @checked(old('publish_without_review'))></span>
                             </label>
-                            <button type="submit" class="btn btn-primary" id="manual-post-submit"><i class="ki-outline ki-sparkles fs-2"></i>Generar post</button>
+                            <button type="submit" class="btn btn-primary" id="manual-post-submit"><i class="ki-outline ki-sparkles fs-2"></i><span data-submit-label>Generar post</span></button>
                         </div>
                     </div>
                 </div>
@@ -264,8 +278,11 @@
 .manual-post-destination-icon.is-facebook { background: #1877f2; }.manual-post-destination-icon.is-instagram { background: #c13584; }.manual-post-destination-icon.is-x { background: #111; }.manual-post-destination-icon.is-wordpress { background: #28799e; }
 .manual-post-voice { padding: 1rem; border: 1px dashed var(--bs-primary); border-radius: .5rem; background: var(--bs-primary-light); }.manual-post-voice-controls { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .65rem; }
 .manual-post-auto-publish { min-height: 42px; }
+.manual-post-direct-card { background: var(--bs-gray-100); transition: border-color .18s ease, background-color .18s ease; }
+.manual-post-direct-card:has(#publish-as-is:checked) { border-color: var(--bs-primary) !important; background: var(--bs-primary-light); }
+.manual-post-direct-icon { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 40px; width: 40px; height: 40px; border-radius: .5rem; background: #fff; }
 .review-post-image { width: 100%; max-height: 420px; object-fit: cover; }.review-image-empty { display: flex; align-items: center; gap: 1rem; padding: 1rem; border: 1px dashed var(--bs-primary); border-radius: .5rem; background: var(--bs-primary-light); }
-@media (max-width: 767.98px) { .manual-post-page .row { --bs-gutter-y: 1rem; }.manual-post-page .card-body { padding: 1.15rem; }.manual-post-mode-button { flex-direction: column; gap: .1rem; font-size: .75rem; }.manual-post-textarea { min-height: 320px; font-size: 1rem; }.manual-post-preview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.manual-post-company { padding: 1rem !important; }.manual-post-destination { align-items: flex-start !important; }.manual-post-page .card-footer { padding: 1rem 1.15rem; }.manual-post-page .card-footer .btn, .manual-post-page .btn-light-primary { width: 100%; }.manual-post-auto-publish { width: 100%; justify-content: space-between; padding: .2rem 0; }.manual-post-voice-controls .btn { flex: 1 1 auto; } }
+@media (max-width: 767.98px) { .manual-post-page .row { --bs-gutter-y: 1rem; }.manual-post-page .card-body { padding: 1.15rem; }.manual-post-mode-button { flex-direction: column; gap: .1rem; font-size: .75rem; }.manual-post-textarea { min-height: 320px; font-size: 1rem; }.manual-post-preview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.manual-post-company { padding: 1rem !important; }.manual-post-destination { align-items: flex-start !important; }.manual-post-page .card-footer { padding: 1rem 1.15rem; }.manual-post-page .card-footer .btn, .manual-post-page .btn-light-primary { width: 100%; }.manual-post-auto-publish { width: 100%; justify-content: space-between; padding: .2rem 0; }.manual-post-voice-controls .btn { flex: 1 1 auto; }.manual-post-direct-card { padding: 1rem !important; }.manual-post-direct-icon { flex-basis: 36px; width: 36px; height: 36px; } }
 </style>
 @endpush
 
@@ -293,6 +310,14 @@ document.addEventListener('DOMContentLoaded', function () {
     const stopButton = document.getElementById('voice-stop-button');
     const audioInput = document.getElementById('manual-post-audio');
     const voiceStatus = document.getElementById('voice-status');
+    const publishAsIs = document.getElementById('publish-as-is');
+    const aiProfileWorkspace = document.querySelector('[data-ai-profile-workspace]');
+    const profileSelect = document.getElementById('manual-post-profile');
+    const autoPublishControl = document.querySelector('[data-auto-publish-control]');
+    const directNote = document.querySelector('[data-publish-as-is-note]');
+    const destinationHelp = document.querySelector('[data-destination-help]');
+    const contentHelp = document.getElementById('manual-post-content-help');
+    const submitLabel = document.querySelector('[data-submit-label]');
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
     let mode = form.dataset.initialMode || 'text';
     let mediaRecorder = null;
@@ -303,11 +328,13 @@ document.addEventListener('DOMContentLoaded', function () {
     const refreshCounter = () => { if (counter && textarea) counter.textContent = String(textarea.value.length); };
     const setButton = (busy) => {
         button.disabled = busy;
+        const direct = Boolean(publishAsIs?.checked);
         button.innerHTML = busy
-            ? '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Generando...'
-            : '<i class="ki-outline ki-sparkles fs-2"></i>Generar post';
+            ? '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>' + (direct ? 'Publicando...' : 'Generando...')
+            : '<i class="ki-outline ' + (direct ? 'ki-send' : 'ki-sparkles') + ' fs-2"></i><span data-submit-label>' + (direct ? 'Publicar contenido' : 'Generar post') + '</span>';
     };
     const setMode = (nextMode) => {
+        if (publishAsIs?.checked && nextMode === 'url') nextMode = 'text';
         mode = nextMode;
         form.action = mode === 'url' ? form.dataset.urlAction : form.dataset.manualAction;
         modeButtons.forEach((item) => { item.classList.toggle('is-active', item.dataset.postMode === mode); item.setAttribute('aria-selected', item.dataset.postMode === mode ? 'true' : 'false'); });
@@ -319,6 +346,27 @@ document.addEventListener('DOMContentLoaded', function () {
         textarea.disabled = mode === 'url'; textarea.required = mode !== 'url';
         imageInput.disabled = mode === 'url';
         radioInputs.forEach((input) => { input.disabled = mode !== 'url'; });
+    };
+    const setDirectPublication = () => {
+        const direct = Boolean(publishAsIs?.checked);
+        const urlModeButton = modeButtons.find((item) => item.dataset.postMode === 'url');
+        if (direct && mode === 'url') setMode('text');
+        if (urlModeButton) {
+            urlModeButton.disabled = direct;
+            urlModeButton.classList.toggle('opacity-50', direct);
+            urlModeButton.setAttribute('aria-disabled', direct ? 'true' : 'false');
+        }
+        setHidden(aiProfileWorkspace, direct);
+        if (profileSelect) { profileSelect.disabled = direct; profileSelect.required = !direct; }
+        setHidden(autoPublishControl, direct);
+        setHidden(directNote, !direct);
+        if (contentHelp) contentHelp.textContent = direct ? 'El texto se conserva tal como lo escribes.' : 'Mínimo 80 caracteres.';
+        if (destinationHelp) destinationHelp.textContent = direct
+            ? 'Se publicará directamente en los destinos seleccionados.'
+            : 'Elige dónde se publicará después de tu revisión.';
+        if (submitLabel) submitLabel.textContent = direct ? 'Publicar contenido' : 'Generar post';
+        button?.querySelector('i')?.classList.toggle('ki-send', direct);
+        button?.querySelector('i')?.classList.toggle('ki-sparkles', !direct);
     };
     const syncCompany = (companyId, checked) => destinationChecks.filter((input) => Number(input.dataset.companyDestination) === Number(companyId)).forEach((input) => { input.checked = checked; });
     const syncCompanyFromDestinations = (companyId) => {
@@ -370,6 +418,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     textarea?.addEventListener('input', refreshCounter);
     modeButtons.forEach((item) => item.addEventListener('click', () => setMode(item.dataset.postMode)));
+    publishAsIs?.addEventListener('change', setDirectPublication);
     companyToggles.forEach((toggle) => toggle.addEventListener('change', () => syncCompany(toggle.dataset.companyToggle, toggle.checked)));
     destinationChecks.forEach((input) => input.addEventListener('change', () => syncCompanyFromDestinations(input.dataset.companyDestination)));
     selectAll?.addEventListener('click', () => { const shouldCheck = destinationChecks.some((input) => !input.checked); companyToggles.forEach((input) => { input.checked = shouldCheck; }); destinationChecks.forEach((input) => { input.checked = shouldCheck; }); });
@@ -406,7 +455,8 @@ document.addEventListener('DOMContentLoaded', function () {
         event.preventDefault();
         if (!form.reportValidity()) return;
         setButton(true);
-        Swal.fire({ title: 'Generando post', html: '<div class="text-muted">Enviando la información...</div><div class="progress h-8px mt-4"><div class="progress-bar progress-bar-striped progress-bar-animated" style="width:5%"></div></div>', allowEscapeKey: false, allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+        const direct = Boolean(publishAsIs?.checked);
+        Swal.fire({ title: direct ? 'Publicando contenido' : 'Generando post', html: '<div class="text-muted">Enviando la información...</div><div class="progress h-8px mt-4"><div class="progress-bar progress-bar-striped progress-bar-animated" style="width:5%"></div></div>', allowEscapeKey: false, allowOutsideClick: false, didOpen: () => Swal.showLoading() });
         try {
             const response = await fetch(form.action, { method: 'POST', body: new FormData(form), headers: { 'X-CSRF-TOKEN': csrfToken, Accept: 'application/json' }, credentials: 'same-origin' });
             const body = await response.json();
@@ -431,7 +481,7 @@ document.addEventListener('DOMContentLoaded', function () {
             reviewForm.submit();
         });
     }
-    refreshCounter(); setMode(mode);
+    refreshCounter(); setMode(mode); setDirectPublication();
 });
 </script>
 @endpush

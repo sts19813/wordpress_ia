@@ -6,14 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\ManualPostRequest;
 use App\Http\Requests\QuickPostRequest;
 use App\Http\Requests\ReviewGeneratedPostRequest;
+use App\Models\AiArticle;
 use App\Models\AiImage;
 use App\Models\AiPromptProfile;
 use App\Models\Company;
 use App\Models\Scheduler;
 use App\Models\SourcePost;
 use App\Models\SourcePostMedia;
+use App\Models\User;
 use App\Services\AiPromptProfileService;
 use App\Services\OpenAI\AudioTranscriptionService;
+use App\Services\QuickPosts\OriginalPostImageService;
 use App\Services\SchedulerService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -30,6 +33,7 @@ class ManualPostController extends Controller
     public function __construct(
         private readonly AiPromptProfileService $profiles,
         private readonly SchedulerService $scheduler,
+        private readonly OriginalPostImageService $originalImages,
     ) {}
 
     public function create(Request $request): View
@@ -74,7 +78,9 @@ class ManualPostController extends Controller
     public function store(ManualPostRequest $request): RedirectResponse|JsonResponse
     {
         $validated = $request->validated();
-        $profile = AiPromptProfile::query()->findOrFail($validated['ai_prompt_profile_id']);
+        $profile = $request->publishesAsIs()
+            ? null
+            : AiPromptProfile::query()->findOrFail($validated['ai_prompt_profile_id']);
 
         $sourcePost = DB::transaction(function () use ($request, $validated): SourcePost {
             $sourcePost = SourcePost::query()->create([
@@ -105,14 +111,25 @@ class ManualPostController extends Controller
 
         $publicationProfileIds = $request->publicationProfileIds();
         $companyIds = array_values(array_unique(array_map('intval', $validated['company_ids'] ?? [])));
-        $task = $this->scheduler->createManualPostTask(
-            $request->user(),
-            $profile,
-            $sourcePost,
-            $publicationProfileIds,
-            $companyIds,
-            ! $request->publishesWithoutReview(),
-        );
+        if ($request->publishesAsIs()) {
+            $article = $this->createDirectArticle($request->user(), $sourcePost, $companyIds);
+            $task = $this->scheduler->createDirectManualPublicationTask(
+                $request->user(),
+                $sourcePost,
+                $article,
+                $publicationProfileIds,
+                $companyIds,
+            );
+        } else {
+            $task = $this->scheduler->createManualPostTask(
+                $request->user(),
+                $profile,
+                $sourcePost,
+                $publicationProfileIds,
+                $companyIds,
+                ! $request->publishesWithoutReview(),
+            );
+        }
 
         $imageCount = $sourcePost->media()->count();
         $imageMessage = $imageCount > 0
@@ -125,7 +142,9 @@ class ManualPostController extends Controller
                 : " Podrás revisarlo antes de publicarlo en {$publicationCount} destino(s).")
             : ' El resultado quedará como borrador.';
 
-        $message = 'El post se añadió a la cola de generación.'.$imageMessage.$publicationMessage;
+        $message = $request->publishesAsIs()
+            ? 'El contenido se añadió directamente a la cola de publicación.'.$imageMessage.$publicationMessage
+            : 'El post se añadió a la cola de generación.'.$imageMessage.$publicationMessage;
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -231,6 +250,54 @@ class ManualPostController extends Controller
             ->first(fn (string $line): bool => $line !== '');
 
         return Str::limit($firstLine ?: 'Post generado manualmente', 180, '');
+    }
+
+    /**
+     * Creates the publication-ready article from the supplied text and images.
+     * No AI service is invoked on this path.
+     *
+     * @param  array<int, int>  $companyIds
+     */
+    private function createDirectArticle(User $user, SourcePost $sourcePost, array $companyIds): AiArticle
+    {
+        $content = trim((string) $sourcePost->content);
+        $article = AiArticle::query()->create([
+            'source_post_ids' => [$sourcePost->id],
+            'user_id' => $user->id,
+            'company_id' => count($companyIds) === 1 ? $companyIds[0] : null,
+            'title' => $this->titleFromContent($content),
+            'content' => $this->manualContentAsHtml($content),
+            'excerpt' => Str::limit(preg_replace('/\s+/', ' ', $content), 280, ''),
+            'slug' => Str::slug($this->titleFromContent($content)),
+            'categories' => [],
+            'tags' => [],
+            'seo_keywords' => [],
+            'faqs' => [],
+            'prompt_used' => 'Contenido publicado tal como fue proporcionado, sin generación con IA.',
+            'full_response' => 'manual_direct_publication',
+            'tokens' => [],
+            'cost' => 0,
+            'duration_ms' => 0,
+            'model' => 'manual',
+            'status' => AiArticle::STATUS_DRAFT,
+            'generated_at' => now(),
+        ]);
+
+        if ($sourcePost->media()->exists()) {
+            $this->originalImages->attach($article, $sourcePost->load('media'));
+        }
+
+        return $article->fresh('images');
+    }
+
+    private function manualContentAsHtml(string $content): string
+    {
+        $paragraphs = collect(preg_split('/\R{2,}/', $content))
+            ->map(fn (string $paragraph): string => trim($paragraph))
+            ->filter()
+            ->map(fn (string $paragraph): string => '<p>'.nl2br(e($paragraph)).'</p>');
+
+        return $paragraphs->isNotEmpty() ? $paragraphs->implode("\n") : '<p></p>';
     }
 
     private function storeImage(SourcePost $sourcePost, UploadedFile $image, int $position): void

@@ -18,6 +18,7 @@ class ManualPostRequest extends FormRequest
     {
         $this->merge([
             'content' => trim((string) $this->input('content')),
+            'publish_as_is' => $this->boolean('publish_as_is'),
             'publish_without_review' => $this->boolean('publish_without_review'),
             'company_ids' => array_values(array_unique(array_map('intval', (array) $this->input('company_ids', [])))),
             'publication_profile_ids' => array_values(array_unique(array_map('intval', (array) $this->input('publication_profile_ids', [])))),
@@ -27,8 +28,13 @@ class ManualPostRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'content' => ['required', 'string', 'min:80', 'max:20000'],
-            'ai_prompt_profile_id' => ['required', 'integer', Rule::exists('ai_prompt_profiles', 'id')],
+            'content' => ['required', 'string', $this->boolean('publish_as_is') ? 'min:1' : 'min:80', 'max:20000'],
+            'publish_as_is' => ['boolean'],
+            'ai_prompt_profile_id' => [
+                $this->boolean('publish_as_is') ? 'nullable' : 'required',
+                'integer',
+                Rule::exists('ai_prompt_profiles', 'id'),
+            ],
             'publish_without_review' => ['boolean'],
             'company_ids' => ['nullable', 'array'],
             'company_ids.*' => [
@@ -53,7 +59,9 @@ class ManualPostRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'content.min' => 'Agrega al menos 80 caracteres para que la IA tenga contexto suficiente.',
+            'content.min' => $this->boolean('publish_as_is')
+                ? 'Agrega el contenido que deseas publicar.'
+                : 'Agrega al menos 80 caracteres para que la IA tenga contexto suficiente.',
             'images.max' => 'Puedes subir hasta 8 imágenes.',
             'images.*.image' => 'Cada archivo debe ser una imagen válida.',
             'images.*.mimes' => 'Las imágenes deben ser JPG, PNG o WebP.',
@@ -68,9 +76,21 @@ class ManualPostRequest extends FormRequest
             $profileIds = array_values(array_unique(array_map('intval', (array) $this->input('publication_profile_ids', []))));
             $companyIds = array_values(array_unique(array_map('intval', (array) $this->input('company_ids', []))));
 
+            if ($profileIds === [] && $this->boolean('publish_as_is') && $companyIds !== []) {
+                $profileIds = WordPressSite::query()
+                    ->whereIn('company_id', $companyIds)
+                    ->where('active', true)
+                    ->where('status', WordPressSite::STATUS_ACTIVE)
+                    ->pluck('id')
+                    ->map(fn ($id): int => (int) $id)
+                    ->all();
+            }
+
             if ($profileIds === []) {
-                if ($this->boolean('publish_without_review') && $companyIds === []) {
-                    $validator->errors()->add('publication_profile_ids', 'Selecciona al menos un destino para publicar sin revisar.');
+                if (($this->boolean('publish_without_review') || $this->boolean('publish_as_is')) && $companyIds === []) {
+                    $validator->errors()->add('publication_profile_ids', 'Selecciona al menos un destino para publicar directamente.');
+                } elseif ($this->boolean('publish_as_is')) {
+                    $validator->errors()->add('publication_profile_ids', 'Las empresas seleccionadas no tienen destinos activos para publicar directamente.');
                 }
 
                 return;
@@ -92,6 +112,12 @@ class ManualPostRequest extends FormRequest
                 if ($invalid) {
                     $validator->errors()->add('publication_profile_ids', 'Los destinos seleccionados deben pertenecer a las empresas marcadas.');
                 }
+            }
+
+            if ($this->boolean('publish_as_is')
+                && WordPressSite::query()->whereIn('id', $profileIds)->where('type', WordPressSite::TYPE_INSTAGRAM)->exists()
+                && count($this->file('images', [])) === 0) {
+                $validator->errors()->add('images', 'Agrega al menos una imagen para publicar directamente en Instagram.');
             }
         }];
     }
@@ -120,6 +146,11 @@ class ManualPostRequest extends FormRequest
 
     public function publishesWithoutReview(): bool
     {
-        return (bool) $this->validated('publish_without_review', false);
+        return $this->publishesAsIs() || (bool) $this->validated('publish_without_review', false);
+    }
+
+    public function publishesAsIs(): bool
+    {
+        return (bool) $this->validated('publish_as_is', false);
     }
 }

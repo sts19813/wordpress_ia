@@ -137,6 +137,55 @@ class SchedulerService
         return $task->fresh();
     }
 
+    /**
+     * Queues content supplied by the user without sending it to the AI writer.
+     *
+     * @param  array<int, int>  $publicationProfileIds
+     * @param  array<int, int>  $companyIds
+     */
+    public function createDirectManualPublicationTask(
+        User $user,
+        SourcePost $sourcePost,
+        AiArticle $article,
+        array $publicationProfileIds,
+        array $companyIds = [],
+    ): Scheduler {
+        $publicationProfileIds = array_values(array_unique(array_map('intval', $publicationProfileIds)));
+        $companyIds = array_values(array_unique(array_map('intval', $companyIds)));
+
+        $task = Scheduler::query()->create([
+            'user_id' => $user->id,
+            'source_post_id' => $sourcePost->id,
+            'ai_article_id' => $article->id,
+            'type' => Scheduler::TYPE_QUICK_POST,
+            'name' => 'Publicar contenido manual',
+            'status' => Scheduler::STATUS_QUEUED,
+            'step' => 'Contenido listo; publicación en cola',
+            'progress' => 90,
+            'max_attempts' => 3,
+            'payload' => [
+                'source_post_ids' => [$sourcePost->id],
+                'origin' => 'manual_post',
+                'publish_as_is' => true,
+                'image_mode' => $sourcePost->media()->exists() ? 'original' : 'none',
+                'generate_image' => false,
+                'company_id' => count($companyIds) === 1 ? $companyIds[0] : null,
+                'company_ids' => $companyIds,
+                'publication_profile_ids' => $publicationProfileIds,
+                'requires_review' => false,
+                'review_approved' => true,
+                'publication_ready' => true,
+            ],
+            'events' => [],
+        ]);
+
+        $this->addEvent($task, 'info', 'Contenido manual listo; se omitió la generación con IA.');
+        $this->addEvent($task, 'info', 'El post se enviará a '.count($publicationProfileIds).' destino(s).');
+        PublishQuickPost::dispatch($task->id)->onQueue('publication');
+
+        return $task->fresh();
+    }
+
     public function approvePublication(Scheduler $task): Scheduler
     {
         $payload = $task->payload ?: [];
