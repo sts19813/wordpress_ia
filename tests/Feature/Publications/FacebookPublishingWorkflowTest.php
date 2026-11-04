@@ -353,6 +353,35 @@ class FacebookPublishingWorkflowTest extends TestCase
         Http::assertNotSent(fn (Request $request) => $request->url() === 'https://graph.facebook.com/v24.0/123456789/photos');
     }
 
+    public function test_facebook_uses_the_configured_page_id_when_meta_cannot_read_the_permalink(): void
+    {
+        Http::fake([
+            'graph.facebook.com/v24.0/me*' => Http::response([
+                'id' => '123456789',
+                'name' => 'Noticias Demo',
+                'category' => 'News & media website',
+            ]),
+            'graph.facebook.com/v24.0/123456789/feed' => Http::response([
+                'id' => '123456789_987654321',
+            ]),
+            'graph.facebook.com/v24.0/123456789_987654321*' => Http::response([
+                'error' => ['message' => 'Missing pages_read_engagement'],
+            ], 400),
+        ]);
+        $user = User::factory()->create();
+        $company = $this->company($user, 'Cancún News');
+        $profile = $this->facebookProfile($user, $company);
+        $article = $this->article($user);
+        $this->publishedWordPressPublication($user, $article, $company, 'https://cancunews.test/nota');
+
+        $publication = app(\App\Services\PublicationService::class)->publishNow($profile, $article);
+
+        $this->assertSame(
+            'https://www.facebook.com/123456789/posts/987654321',
+            $publication->remote_url,
+        );
+    }
+
     public function test_facebook_requires_a_published_wordpress_url(): void
     {
         $user = User::factory()->create();

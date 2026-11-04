@@ -73,7 +73,6 @@ class FacebookPageClient
     public function publicationUrl(
         WordPressSite $profile,
         string $postId,
-        ?string $photoId = null,
     ): ?string {
         $credentials = $this->pageCredentials($profile);
 
@@ -90,20 +89,7 @@ class FacebookPageClient
             }
         }
 
-        if (blank($photoId)) {
-            return null;
-        }
-
-        $photo = $this->request()
-            ->get($this->graphEndpoint($profile, $photoId), [
-                'fields' => 'id,link',
-                'access_token' => $credentials['access_token'],
-            ]);
-        $this->guardApiAccess($photo);
-
-        return $photo->successful() && filled($photo->json('link'))
-            ? (string) $photo->json('link')
-            : null;
+        return null;
     }
 
     /**

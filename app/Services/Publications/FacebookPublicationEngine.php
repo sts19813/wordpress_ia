@@ -95,10 +95,10 @@ class FacebookPublicationEngine
                 $photoIds,
             );
             $remoteKey = (string) $response->json('id');
-            $remoteUrl = $remoteKey !== '' ? 'https://www.facebook.com/'.$remoteKey : null;
+            $remoteUrl = $this->postUrl($profile, $remoteKey);
 
             try {
-                $remoteUrl = $this->client->publicationUrl($profile, $remoteKey, $photoIds[0] ?? null) ?: $remoteUrl;
+                $remoteUrl = $this->client->publicationUrl($profile, $remoteKey) ?: $remoteUrl;
             } catch (Throwable) {
                 // La publicación ya existe; una consulta de permalink no debe marcarla como fallida.
             }
@@ -153,6 +153,19 @@ class FacebookPublicationEngine
             $link,
             $tags,
         ])->filter()->implode("\n\n");
+    }
+
+    private function postUrl(WordPressSite $profile, string $remoteKey): ?string
+    {
+        if ($remoteKey === '' || blank($profile->facebook_page_id)) {
+            return null;
+        }
+
+        $postId = str_contains($remoteKey, '_')
+            ? str($remoteKey)->afterLast('_')->toString()
+            : $remoteKey;
+
+        return 'https://www.facebook.com/'.trim((string) $profile->facebook_page_id).'/posts/'.$postId;
     }
 
     /** @return \Illuminate\Support\Collection<int, AiImage> */
