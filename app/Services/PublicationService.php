@@ -158,6 +158,8 @@ class PublicationService
         $images = $publication->aiArticle->images
             ->filter(fn (AiImage $candidate): bool => $candidate->status === AiImage::STATUS_GENERATED
                 && filled($candidate->file_path)
+                && $candidate->type !== AiImage::TYPE_VIDEO
+                && ! str_starts_with((string) $candidate->mime_type, 'video/')
                 && Storage::disk('local')->exists($candidate->file_path))
             ->sortBy(fn (AiImage $candidate): int => $candidate->type === AiImage::TYPE_MAIN ? 0 : 1)
             ->values();

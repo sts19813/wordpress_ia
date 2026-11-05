@@ -261,6 +261,41 @@ class FacebookPublishingWorkflowTest extends TestCase
             && $request['attached_media[0]'] === json_encode(['media_fbid' => 'photo-456'], JSON_THROW_ON_ERROR));
     }
 
+    public function test_facebook_publishes_an_original_video_without_requiring_an_article_link(): void
+    {
+        Storage::fake('local');
+        Http::fake([
+            'graph.facebook.com/v24.0/me*' => Http::response([
+                'id' => '123456789',
+                'name' => 'Noticias Demo',
+                'category' => 'News & media website',
+            ]),
+            'graph.facebook.com/v24.0/123456789/videos' => Http::response(['id' => 'video-456']),
+            'graph.facebook.com/v24.0/video-456*' => Http::response([
+                'id' => 'video-456',
+                'permalink_url' => 'https://www.facebook.com/NoticiasDemo/videos/video-456',
+            ]),
+        ]);
+        $user = User::factory()->create();
+        $profile = $this->facebookProfile($user, $this->company($user, 'Cancún News'));
+        $article = $this->article($user);
+        $video = $article->images()->create([
+            'type' => AiImage::TYPE_VIDEO,
+            'prompt' => 'Video original',
+            'status' => AiImage::STATUS_GENERATED,
+            'file_path' => 'ai-images/video-original.mp4',
+            'mime_type' => 'video/mp4',
+        ]);
+        Storage::disk('local')->put($video->file_path, 'contenido-de-video');
+
+        $publication = app(\App\Services\PublicationService::class)->publishNow($profile, $article);
+
+        $this->assertSame(Publication::STATUS_PUBLISHED, $publication->status);
+        $this->assertSame('publish_facebook_video', $publication->last_action);
+        $this->assertSame('video-456', $publication->remote_post_key);
+        Http::assertSent(fn (Request $request) => $request->url() === 'https://graph.facebook.com/v24.0/123456789/videos');
+    }
+
     public function test_facebook_publishes_every_available_article_image_in_one_post(): void
     {
         Storage::fake('local');

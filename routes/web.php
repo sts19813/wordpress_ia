@@ -25,6 +25,7 @@ use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\PublicationMediaController;
+use App\Http\Controllers\PublicationVideoController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -39,6 +40,11 @@ Route::get('medios-publicacion/{aiImage}/{expires}/{token}/imagen.jpg', Publicat
     ->whereNumber('expires')
     ->where('token', '[a-f0-9]{64}')
     ->name('publication-media.show');
+
+Route::get('medios-publicacion/{aiImage}/{expires}/{token}/video.mp4', PublicationVideoController::class)
+    ->whereNumber('expires')
+    ->where('token', '[a-f0-9]{64}')
+    ->name('publication-video.show');
 
 Route::middleware('guest')->group(function () {
     Route::get('login', [AuthenticatedSessionController::class, 'create'])->name('login');

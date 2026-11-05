@@ -83,11 +83,11 @@
 
                             <div data-mode-media-workspace>
                                 <div class="separator my-7"></div>
-                                <label for="manual-post-images" class="form-label fw-bold">Imágenes</label>
+                                <label for="manual-post-images" class="form-label fw-bold">Imágenes o video</label>
                                 <label class="manual-post-upload d-flex flex-column align-items-center justify-content-center rounded border border-dashed p-6 cursor-pointer" for="manual-post-images">
-                                    <i class="ki-outline ki-picture fs-2x text-primary mb-2"></i><span class="fw-bold text-gray-900">Subir desde galería</span><span class="text-muted fs-8">Hasta 8 imágenes.</span>
+                                    <i class="ki-outline ki-picture fs-2x text-primary mb-2"></i><span class="fw-bold text-gray-900">Subir desde galería</span><span class="text-muted fs-8">Hasta 8 imágenes o 1 video.</span>
                                 </label>
-                                <input id="manual-post-images" class="d-none @error('images') is-invalid @enderror @error('images.*') is-invalid @enderror" type="file" name="images[]" accept="image/jpeg,image/png,image/webp" multiple>
+                                <input id="manual-post-images" class="d-none @error('images') is-invalid @enderror @error('images.*') is-invalid @enderror" type="file" name="images[]" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime" multiple>
                                 @error('images')<div class="text-danger fs-7 mt-3">{{ $message }}</div>@enderror
                                 @error('images.*')<div class="text-danger fs-7 mt-3">{{ $message }}</div>@enderror
                                 <label class="manual-post-image-ai-choice d-flex align-items-start gap-3 rounded border p-4 mt-4 cursor-pointer" data-image-ai-option>
@@ -255,7 +255,7 @@
 .manual-post-upload:hover { border-color: var(--bs-primary) !important; background: var(--bs-primary-light); }
 .manual-post-preview-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem; }
 .manual-post-preview-item { position: relative; overflow: hidden; aspect-ratio: 1 / 1; border-radius: .5rem; background: var(--bs-gray-100); }
-.manual-post-preview-item img { width: 100%; height: 100%; object-fit: cover; }
+.manual-post-preview-item img, .manual-post-preview-item video { width: 100%; height: 100%; object-fit: cover; }
 .manual-post-preview-item span { position: absolute; right: .35rem; bottom: .35rem; padding: .15rem .45rem; border-radius: .35rem; background: rgba(17, 24, 39, .76); color: #fff; font-size: .7rem; font-weight: 700; }
 .manual-post-choice:has(input:checked), .manual-post-company:has([data-company-toggle]:checked) { border-color: var(--bs-primary) !important; background: var(--bs-primary-light); }
 .manual-post-image-ai-choice:has(input:checked) { border-color: var(--bs-primary) !important; background: var(--bs-primary-light); }
@@ -312,7 +312,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const setHidden = (element, hidden) => element?.classList.toggle('d-none', hidden);
     const refreshCounter = () => { if (counter && textarea) counter.textContent = String(textarea.value.length); };
     const setButton = (busy) => {
-        submitButtons.forEach((submitButton) => { submitButton.disabled = busy || (submitButton === directSubmitButton && mode === 'url'); });
+        submitButtons.forEach((submitButton) => {
+            submitButton.disabled = busy
+                || (submitButton === directSubmitButton && mode === 'url')
+                || (submitButton === aiSubmitButton && hasUploadedVideo());
+        });
         if (busy && activeSubmitButton) {
             activeSubmitButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>' + (directSubmission ? 'Publicando...' : 'Generando...');
         }
@@ -322,11 +326,14 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     };
     const hasUploadedImages = () => (imageInput?.files?.length || 0) > 0;
+    const hasUploadedVideo = () => Array.from(imageInput?.files || []).some((file) => file.type.startsWith('video/'));
     const syncPublicationOptions = () => {
         const hasImages = hasUploadedImages();
+        const hasVideo = hasUploadedVideo();
         setHidden(imageAiOption, mode === 'url' || hasImages);
         if (generateImageIfMissing) generateImageIfMissing.disabled = mode === 'url' || hasImages;
         if (hasImages && generateImageIfMissing) generateImageIfMissing.checked = false;
+        if (aiSubmitButton) aiSubmitButton.disabled = hasVideo;
         if (profileSelect) {
             profileSelect.disabled = false;
             profileSelect.required = true;
@@ -405,7 +412,10 @@ document.addEventListener('DOMContentLoaded', function () {
     imageInput?.addEventListener('change', () => {
         const files = Array.from(imageInput.files || []).slice(0, 8); preview.innerHTML = '';
         if ((imageInput.files || []).length > 8) { const transfer = new DataTransfer(); files.forEach((file) => transfer.items.add(file)); imageInput.files = transfer.files; }
-        files.forEach((file, index) => { const item = document.createElement('div'); const img = document.createElement('img'); const label = document.createElement('span'); item.className = 'manual-post-preview-item'; img.alt = ''; img.src = URL.createObjectURL(file); img.onload = () => URL.revokeObjectURL(img.src); label.textContent = String(index + 1); item.append(img, label); preview.appendChild(item); });
+        const selectedFiles = Array.from(imageInput.files || []);
+        const videoFiles = selectedFiles.filter((file) => file.type.startsWith('video/'));
+        imageInput.setCustomValidity(videoFiles.length > 0 && selectedFiles.length > 1 ? 'Agrega un solo video o varias imágenes, no ambos.' : '');
+        selectedFiles.forEach((file, index) => { const item = document.createElement('div'); const media = document.createElement(file.type.startsWith('video/') ? 'video' : 'img'); const label = document.createElement('span'); item.className = 'manual-post-preview-item'; media.src = URL.createObjectURL(file); if (media instanceof HTMLVideoElement) { media.muted = true; media.playsInline = true; media.controls = true; media.onloadeddata = () => URL.revokeObjectURL(media.src); } else { media.alt = ''; media.onload = () => URL.revokeObjectURL(media.src); } label.textContent = file.type.startsWith('video/') ? 'Video' : String(index + 1); item.append(media, label); preview.appendChild(item); });
         syncPublicationOptions();
     });
     audioInput?.addEventListener('change', () => transcribeAudio(audioInput.files?.[0]));

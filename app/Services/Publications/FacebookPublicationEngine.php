@@ -29,12 +29,14 @@ class FacebookPublicationEngine
         $link = $this->articleUrls->resolve($profile, $article);
         $message = $this->message($article, $link);
         $images = $this->imagesForPublication($article, $image);
+        $videos = $this->videosForPublication($article, $image);
         $hasLocalImage = $images->isNotEmpty();
+        $hasVideo = $videos->isNotEmpty();
         $payload = [
             'platform' => WordPressSite::TYPE_FACEBOOK_PAGE,
             'message' => $message,
             'article_url' => $link,
-            'publication_type' => $hasLocalImage ? 'photo' : 'link',
+            'publication_type' => $hasVideo ? 'video' : ($hasLocalImage ? 'photo' : 'link'),
         ];
 
         if (! $publication) {
@@ -42,20 +44,20 @@ class FacebookPublicationEngine
                 'user_id' => $article->user_id ?: $profile->user_id,
                 'wordpress_site_id' => $profile->id,
                 'ai_article_id' => $article->id,
-                'ai_image_id' => $images->first()?->id,
+                'ai_image_id' => $hasVideo ? $videos->first()?->id : $images->first()?->id,
                 'status' => Publication::STATUS_DRAFT,
                 'last_action' => 'prepared_facebook',
                 'request_payload' => $payload,
             ]);
         } else {
             $publication->update([
-                'ai_image_id' => $images->first()?->id,
+                'ai_image_id' => $hasVideo ? $videos->first()?->id : $images->first()?->id,
                 'request_payload' => $payload,
                 'error_message' => null,
             ]);
         }
 
-        if (blank($link)) {
+        if (blank($link) && ! $hasVideo) {
             $publication->update([
                 'status' => Publication::STATUS_FAILED,
                 'last_action' => 'publish_facebook_failed',
@@ -66,6 +68,41 @@ class FacebookPublicationEngine
         }
 
         try {
+            if ($hasVideo) {
+                $video = $videos->first();
+                $response = $this->client->uploadVideo(
+                    $profile,
+                    $video->file_path,
+                    basename($video->file_path),
+                    $video->mime_type ?: Storage::disk('local')->mimeType($video->file_path) ?: 'video/mp4',
+                    $message,
+                );
+                $remoteKey = (string) $response->json('id');
+
+                if ($remoteKey === '') {
+                    throw new RuntimeException('Facebook no devolvió el identificador del video subido.');
+                }
+
+                $remoteUrl = $this->postUrl($profile, $remoteKey);
+                try {
+                    $remoteUrl = $this->client->publicationUrl($profile, $remoteKey) ?: $remoteUrl;
+                } catch (Throwable) {
+                    // El video ya fue recibido; la consulta de permalink puede tardar durante el procesamiento.
+                }
+
+                $publication->update([
+                    'remote_post_key' => $remoteKey,
+                    'remote_url' => $remoteUrl,
+                    'status' => Publication::STATUS_PUBLISHED,
+                    'last_action' => 'publish_facebook_video',
+                    'full_response' => ['video' => $response->json()],
+                    'published_at' => now(),
+                    'error_message' => null,
+                ]);
+
+                return $publication->fresh();
+            }
+
             $photoResponses = [];
             $photoIds = [];
 
@@ -179,9 +216,28 @@ class FacebookPublicationEngine
             ->when($fallback && ! $images->contains('id', $fallback->id), fn ($collection) => $collection->prepend($fallback))
             ->filter(fn (AiImage $candidate): bool => $candidate->status === AiImage::STATUS_GENERATED
                 && filled($candidate->file_path)
+                && $candidate->type !== AiImage::TYPE_VIDEO
+                && ! str_starts_with((string) $candidate->mime_type, 'video/')
                 && Storage::disk('local')->exists($candidate->file_path))
             ->sortBy(fn (AiImage $candidate): int => $candidate->type === AiImage::TYPE_MAIN ? 0 : 1)
             ->take(10)
+            ->values();
+    }
+
+    /** @return \Illuminate\Support\Collection<int, AiImage> */
+    private function videosForPublication(AiArticle $article, ?AiImage $fallback): \Illuminate\Support\Collection
+    {
+        $media = $article->relationLoaded('images')
+            ? $article->images
+            : $article->images()->where('status', AiImage::STATUS_GENERATED)->get();
+
+        return collect($media)
+            ->when($fallback && ! $media->contains('id', $fallback->id), fn ($collection) => $collection->prepend($fallback))
+            ->filter(fn (AiImage $candidate): bool => $candidate->status === AiImage::STATUS_GENERATED
+                && filled($candidate->file_path)
+                && str_starts_with((string) $candidate->mime_type, 'video/')
+                && Storage::disk('local')->exists($candidate->file_path))
+            ->take(1)
             ->values();
     }
 

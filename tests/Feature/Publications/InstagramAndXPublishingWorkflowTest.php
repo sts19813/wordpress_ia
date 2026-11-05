@@ -147,6 +147,62 @@ class InstagramAndXPublishingWorkflowTest extends TestCase
         $this->assertSame($image->id, $publication->ai_image_id);
     }
 
+    public function test_instagram_publishes_an_original_video_as_a_reel(): void
+    {
+        Storage::fake('local');
+        $videoUrl = null;
+        Http::fake(function (Request $request) use (&$videoUrl) {
+            if (str_ends_with($request->url(), '/media_publish')) {
+                return Http::response(['id' => 'published-video']);
+            }
+            if (str_ends_with($request->url(), '/media')) {
+                $videoUrl = $request['video_url'];
+
+                return Http::response(['id' => 'video-container']);
+            }
+            if (str_contains($request->url(), '/video-container')) {
+                return Http::response(['status_code' => 'FINISHED']);
+            }
+            if (str_contains($request->url(), '/published-video')) {
+                return Http::response(['id' => 'published-video', 'permalink' => 'https://instagram.test/reel/video']);
+            }
+
+            return Http::response([], 404);
+        });
+        $user = User::factory()->create();
+        $profile = $this->profile($user, [
+            'type' => WordPressSite::TYPE_INSTAGRAM,
+            'name' => 'Instagram principal',
+            'instagram_account_id' => '17841400000000000',
+            'instagram_access_token' => 'instagram-secret',
+            'instagram_api_version' => 'v24.0',
+        ]);
+        [$article] = $this->articleWithImage($user);
+        $video = $article->images()->create([
+            'type' => AiImage::TYPE_VIDEO,
+            'title' => 'Video original',
+            'prompt' => 'Video original conservado sin IA',
+            'status' => AiImage::STATUS_GENERATED,
+            'file_path' => 'ai-images/video-original.mp4',
+            'mime_type' => 'video/mp4',
+        ]);
+        Storage::disk('local')->put($video->file_path, 'contenido-de-video');
+
+        $publication = app(PublicationService::class)->publishNow($profile, $article);
+
+        $this->assertSame(Publication::STATUS_PUBLISHED, $publication->status);
+        $this->assertSame('publish_instagram_reel', $publication->last_action);
+        $this->assertSame($video->id, $publication->ai_image_id);
+        $this->assertNotNull($videoUrl);
+        $this->assertStringEndsWith('/video.mp4', parse_url($videoUrl, PHP_URL_PATH));
+        $videoResponse = $this->get(preg_replace('#^https?://[^/]+#', 'https://media-proxy.example', $videoUrl));
+        $videoResponse->assertOk()->assertHeader('Content-Type', 'video/mp4');
+        $this->assertSame('contenido-de-video', file_get_contents($videoResponse->baseResponse->getFile()->getPathname()));
+        Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/media')
+            && $request['media_type'] === 'REELS'
+            && $request['share_to_feed'] === 'true');
+    }
+
     public function test_instagram_publishes_multiple_images_as_one_carousel(): void
     {
         Storage::fake('local');

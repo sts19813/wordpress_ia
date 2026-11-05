@@ -24,6 +24,7 @@ class OriginalPostImageService
 
         foreach ($mediaItems as $index => $media) {
             $path = "ai-images/{$article->id}/original-{$media->id}-".basename((string) $media->file_path);
+            $isVideo = $media->type === 'video' || str_starts_with((string) $media->mime_type, 'video/');
 
             if (! Storage::disk('local')->exists($path)) {
                 Storage::disk('local')->copy((string) $media->file_path, $path);
@@ -37,11 +38,15 @@ class OriginalPostImageService
 
             $image->fill([
                 'ai_article_id' => $article->id,
-                'type' => $index === 0 ? AiImage::TYPE_MAIN : AiImage::TYPE_VARIANT,
-                'title' => $index === 0
-                    ? 'Imagen principal original'
-                    : 'Imagen original '.($index + 1),
-                'prompt' => 'Imagen original conservada sin generación ni modificación por IA.',
+                'type' => $isVideo
+                    ? AiImage::TYPE_VIDEO
+                    : ($index === 0 ? AiImage::TYPE_MAIN : AiImage::TYPE_VARIANT),
+                'title' => $isVideo
+                    ? 'Video original'
+                    : ($index === 0 ? 'Imagen principal original' : 'Imagen original '.($index + 1)),
+                'prompt' => $isVideo
+                    ? 'Video original conservado sin generación ni modificación por IA.'
+                    : 'Imagen original conservada sin generación ni modificación por IA.',
                 'model' => 'original',
                 'cost' => 0,
                 'duration_ms' => 0,

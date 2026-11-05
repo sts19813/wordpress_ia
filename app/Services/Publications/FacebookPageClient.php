@@ -6,6 +6,7 @@ use App\Models\WordPressSite;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
 class FacebookPageClient
@@ -68,6 +69,35 @@ class FacebookPageClient
                 'access_token' => $credentials['access_token'],
             ])
             ->throw();
+    }
+
+    public function uploadVideo(
+        WordPressSite $profile,
+        string $path,
+        string $filename,
+        string $mimeType,
+        string $description,
+    ): Response {
+        $credentials = $this->pageCredentials($profile);
+        $stream = Storage::disk('local')->readStream($path);
+
+        if (! is_resource($stream)) {
+            throw new RuntimeException('No fue posible abrir el video para Facebook.');
+        }
+
+        try {
+            return $this->request()
+                ->timeout(600)
+                ->attach('source', $stream, $filename, ['Content-Type' => $mimeType])
+                ->post($this->endpoint($profile, 'videos', $credentials['page_id']), [
+                    'description' => $description,
+                    'published' => 'true',
+                    'access_token' => $credentials['access_token'],
+                ])
+                ->throw();
+        } finally {
+            fclose($stream);
+        }
     }
 
     public function publicationUrl(

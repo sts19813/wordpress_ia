@@ -41,6 +41,22 @@ class InstagramClient
             ->throw();
     }
 
+    public function createVideoContainer(
+        WordPressSite $profile,
+        string $videoUrl,
+        string $caption,
+    ): Response {
+        return $this->request($profile)
+            ->asForm()
+            ->post($this->endpoint($profile, 'media'), [
+                'media_type' => 'REELS',
+                'video_url' => $videoUrl,
+                'caption' => $caption,
+                'share_to_feed' => 'true',
+            ])
+            ->throw();
+    }
+
     /** @param array<int, string> $children */
     public function createCarouselContainer(WordPressSite $profile, array $children, string $caption): Response
     {

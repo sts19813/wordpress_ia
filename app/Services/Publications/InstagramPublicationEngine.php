@@ -17,6 +17,8 @@ class InstagramPublicationEngine
 {
     private const CONTAINER_STATUS_ATTEMPTS = 12;
 
+    private const VIDEO_CONTAINER_STATUS_ATTEMPTS = 36;
+
     private const MEDIA_CONTAINER_ATTEMPTS = 3;
 
     private const MEDIA_PUBLISH_ATTEMPTS = 3;
@@ -28,6 +30,7 @@ class InstagramPublicationEngine
     public function __construct(
         private readonly InstagramClient $client,
         private readonly InstagramMediaUrl $mediaUrl,
+        private readonly InstagramVideoUrl $videoUrl,
     ) {}
 
     public function publishNow(WordPressSite $profile, AiArticle $article, ?AiImage $image = null): Publication
@@ -36,17 +39,21 @@ class InstagramPublicationEngine
 
         try {
             $images = $this->imagesForPublication($article, $image);
+            $videos = $this->videosForPublication($article, $image);
 
-            if ($images->isEmpty()) {
+            if ($images->isEmpty() && $videos->isEmpty()) {
                 throw new RuntimeException('Instagram requiere una imagen generada disponible para publicar.');
             }
 
             $caption = $this->caption($article);
-            $isCarousel = $images->count() > 1;
-            $media = $isCarousel
-                ? $this->createCarouselContainer($profile, $images, $caption)
-                : $this->createImageContainer($profile, $images->first(), $caption);
-            $imageUrls = $media['image_urls'];
+            $hasVideo = $videos->isNotEmpty();
+            $isCarousel = ! $hasVideo && $images->count() > 1;
+            $media = $hasVideo
+                ? $this->createVideoContainer($profile, $videos->first(), $caption)
+                : ($isCarousel
+                    ? $this->createCarouselContainer($profile, $images, $caption)
+                    : $this->createImageContainer($profile, $images->first(), $caption));
+            $mediaUrls = $hasVideo ? $media['video_urls'] : $media['image_urls'];
             $container = $media['response'];
             $creationId = (string) $container->json('id');
 
@@ -54,7 +61,11 @@ class InstagramPublicationEngine
                 throw new RuntimeException('Instagram no devolvió el identificador del contenido.');
             }
 
-            $containerStatus = $this->waitForContainer($profile, $creationId);
+            $containerStatus = $this->waitForContainer(
+                $profile,
+                $creationId,
+                $hasVideo ? self::VIDEO_CONTAINER_STATUS_ATTEMPTS : self::CONTAINER_STATUS_ATTEMPTS,
+            );
             $published = $this->publishReadyContainer($profile, $creationId);
             $mediaId = (string) $published->json('id');
 
@@ -67,13 +78,13 @@ class InstagramPublicationEngine
                 'remote_post_key' => $mediaId,
                 'remote_url' => $details->json('permalink'),
                 'status' => Publication::STATUS_PUBLISHED,
-                'ai_image_id' => $images->first()?->id,
-                'last_action' => $isCarousel ? 'publish_instagram_carousel' : 'publish_instagram_image',
+                'ai_image_id' => $hasVideo ? $videos->first()?->id : $images->first()?->id,
+                'last_action' => $hasVideo ? 'publish_instagram_reel' : ($isCarousel ? 'publish_instagram_carousel' : 'publish_instagram_image'),
                 'request_payload' => [
                     'platform' => WordPressSite::TYPE_INSTAGRAM,
                     'caption' => $caption,
-                    'image_urls' => $imageUrls,
-                    'media_type' => $isCarousel ? 'CAROUSEL' : 'IMAGE',
+                    $hasVideo ? 'video_urls' : 'image_urls' => $mediaUrls,
+                    'media_type' => $hasVideo ? 'REELS' : ($isCarousel ? 'CAROUSEL' : 'IMAGE'),
                     'creation_id' => $creationId,
                 ],
                 'full_response' => [
@@ -92,9 +103,9 @@ class InstagramPublicationEngine
         }
     }
 
-    private function waitForContainer(WordPressSite $profile, string $creationId): Response
+    private function waitForContainer(WordPressSite $profile, string $creationId, int $attempts = self::CONTAINER_STATUS_ATTEMPTS): Response
     {
-        for ($attempt = 1; $attempt <= self::CONTAINER_STATUS_ATTEMPTS; $attempt++) {
+        for ($attempt = 1; $attempt <= $attempts; $attempt++) {
             $status = $this->client->containerStatus($profile, $creationId);
             $statusCode = strtoupper(trim((string) $status->json('status_code')));
 
@@ -103,15 +114,29 @@ class InstagramPublicationEngine
             }
 
             if (in_array($statusCode, ['ERROR', 'EXPIRED'], true)) {
-                throw new RuntimeException("Instagram no pudo procesar la imagen ({$statusCode}).");
+                throw new RuntimeException("Instagram no pudo procesar el medio ({$statusCode}).");
             }
 
-            if ($attempt < self::CONTAINER_STATUS_ATTEMPTS) {
+            if ($attempt < $attempts) {
                 Sleep::for(min(5, $attempt))->seconds();
             }
         }
 
-        throw new RuntimeException('Instagram tardó demasiado en preparar la imagen. Intenta publicar nuevamente.');
+        throw new RuntimeException('Instagram tardó demasiado en preparar el medio. Intenta publicar nuevamente.');
+    }
+
+    /** @return array{video_urls: array<int, string>, response: Response} */
+    private function createVideoContainer(WordPressSite $profile, AiImage $video, string $caption): array
+    {
+        $videoUrl = $this->videoUrl->temporary(
+            $video,
+            now()->addDays(self::MEDIA_URL_EXPIRATION_DAYS),
+        );
+
+        return [
+            'video_urls' => [$videoUrl],
+            'response' => $this->client->createVideoContainer($profile, $videoUrl, $caption),
+        ];
     }
 
     /** @return array{image_urls: array<int, string>, response: Response} */
@@ -237,9 +262,28 @@ class InstagramPublicationEngine
             ->when($fallback && ! $images->contains('id', $fallback->id), fn ($collection) => $collection->prepend($fallback))
             ->filter(fn (AiImage $candidate): bool => $candidate->status === AiImage::STATUS_GENERATED
                 && filled($candidate->file_path)
+                && $candidate->type !== AiImage::TYPE_VIDEO
+                && ! str_starts_with((string) $candidate->mime_type, 'video/')
                 && Storage::disk('local')->exists($candidate->file_path))
             ->sortBy(fn (AiImage $candidate): int => $candidate->type === AiImage::TYPE_MAIN ? 0 : 1)
             ->take(10)
+            ->values();
+    }
+
+    /** @return \Illuminate\Support\Collection<int, AiImage> */
+    private function videosForPublication(AiArticle $article, ?AiImage $fallback): \Illuminate\Support\Collection
+    {
+        $media = $article->relationLoaded('images')
+            ? $article->images
+            : $article->images()->where('status', AiImage::STATUS_GENERATED)->get();
+
+        return collect($media)
+            ->when($fallback && ! $media->contains('id', $fallback->id), fn ($collection) => $collection->prepend($fallback))
+            ->filter(fn (AiImage $candidate): bool => $candidate->status === AiImage::STATUS_GENERATED
+                && filled($candidate->file_path)
+                && str_starts_with((string) $candidate->mime_type, 'video/')
+                && Storage::disk('local')->exists($candidate->file_path))
+            ->take(1)
             ->values();
     }
 

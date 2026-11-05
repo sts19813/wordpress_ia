@@ -153,6 +153,50 @@ class QuickPostWorkflowTest extends TestCase
         Queue::assertNotPushed(GenerateAiArticle::class);
     }
 
+    public function test_manual_video_is_kept_original_and_is_only_accepted_for_direct_publication(): void
+    {
+        Queue::fake();
+        Storage::fake('local');
+        $user = User::factory()->create();
+        $company = $user->companies()->create(['name' => 'Empresa de video', 'active' => true]);
+        $destination = $this->publicationProfile($user, ['company_id' => $company->id]);
+        $video = UploadedFile::fake()->create('video-original.mp4', 1024, 'video/mp4');
+
+        $this->actingAs($user)
+            ->post(route('admin.manual-posts.store'), [
+                'content' => 'Video original para enviar directamente a las redes sociales.',
+                'publish_as_is' => true,
+                'company_ids' => [$company->id],
+                'publication_profile_ids' => [$destination->id],
+                'images' => [$video],
+            ])
+            ->assertSessionHasNoErrors();
+
+        $article = AiArticle::query()->sole();
+        $this->assertSame(AiImage::TYPE_VIDEO, $article->images()->sole()->type);
+        $this->assertSame('video/mp4', $article->images()->sole()->mime_type);
+        Queue::assertPushedOn('publication', PublishQuickPost::class);
+        Queue::assertNotPushed(GenerateAiArticle::class);
+    }
+
+    public function test_manual_video_cannot_enter_the_ai_generation_flow(): void
+    {
+        Storage::fake('local');
+        $user = User::factory()->create();
+        $profile = app(AiPromptProfileService::class)->ensureDefaultFor($user);
+        $video = UploadedFile::fake()->create('video-original.mp4', 1024, 'video/mp4');
+
+        $this->actingAs($user)
+            ->post(route('admin.manual-posts.store'), [
+                'content' => str_repeat('Texto suficiente para intentar una generación que debe rechazarse cuando contiene video. ', 2),
+                'ai_prompt_profile_id' => $profile->id,
+                'images' => [$video],
+            ])
+            ->assertSessionHasErrors('images');
+
+        $this->assertDatabaseCount('schedulers', 0);
+    }
+
     public function test_manual_content_published_directly_requires_an_image_for_instagram(): void
     {
         Queue::fake();

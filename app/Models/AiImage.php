@@ -18,6 +18,9 @@ class AiImage extends Model
 
     public const TYPE_OG = 'og';
 
+    /** Archivo de video original, conservado sin generación por IA. */
+    public const TYPE_VIDEO = 'video';
+
     public const STATUS_PENDING = 'pending_generation';
 
     public const STATUS_GENERATED = 'generated';
@@ -67,6 +70,7 @@ class AiImage extends Model
             self::TYPE_THUMBNAIL => 'Miniatura',
             self::TYPE_BANNER => 'Banner',
             self::TYPE_OG => 'Imagen OG',
+            self::TYPE_VIDEO => 'Video original',
         ];
     }
 

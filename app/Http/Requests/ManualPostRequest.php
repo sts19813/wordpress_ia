@@ -54,7 +54,7 @@ class ManualPostRequest extends FormRequest
                     ->where('status', WordPressSite::STATUS_ACTIVE)),
             ],
             'images' => ['nullable', 'array', 'max:8'],
-            'images.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+            'images.*' => ['file', 'mimes:jpg,jpeg,png,webp,mp4,mov', 'max:245760'],
         ];
     }
 
@@ -64,10 +64,10 @@ class ManualPostRequest extends FormRequest
             'content.min' => $this->boolean('publish_as_is')
                 ? 'Agrega el contenido que deseas publicar.'
                 : 'Agrega al menos 80 caracteres para que la IA tenga contexto suficiente.',
-            'images.max' => 'Puedes subir hasta 8 imágenes.',
-            'images.*.image' => 'Cada archivo debe ser una imagen válida.',
-            'images.*.mimes' => 'Las imágenes deben ser JPG, PNG o WebP.',
-            'images.*.max' => 'Cada imagen puede pesar máximo 10 MB.',
+            'images.max' => 'Puedes subir hasta 8 imágenes o 1 video.',
+            'images.*.file' => 'Cada archivo debe ser válido.',
+            'images.*.mimes' => 'Usa imágenes JPG, PNG o WebP, o un video MP4 o MOV.',
+            'images.*.max' => 'Cada imagen puede pesar máximo 10 MB y el video hasta 240 MB.',
             'publication_profile_ids.*.exists' => 'Uno de los destinos seleccionados ya no está disponible.',
         ];
     }
@@ -77,6 +77,26 @@ class ManualPostRequest extends FormRequest
         return [function (Validator $validator): void {
             $profileIds = array_values(array_unique(array_map('intval', (array) $this->input('publication_profile_ids', []))));
             $companyIds = array_values(array_unique(array_map('intval', (array) $this->input('company_ids', []))));
+            $videos = collect($this->file('images', []))
+                ->filter(fn ($file): bool => str_starts_with((string) $file?->getClientMimeType(), 'video/')
+                    || str_starts_with((string) $file?->getMimeType(), 'video/'));
+            $oversizedImage = collect($this->file('images', []))
+                ->reject(fn ($file): bool => $videos->contains($file))
+                ->contains(fn ($file): bool => (int) $file?->getSize() > 10 * 1024 * 1024);
+
+            if ($oversizedImage) {
+                $validator->errors()->add('images', 'Cada imagen puede pesar máximo 10 MB.');
+            }
+
+            if ($videos->isNotEmpty()) {
+                if ($videos->count() > 1 || count($this->file('images', [])) > 1) {
+                    $validator->errors()->add('images', 'Por ahora agrega un solo video o varias imágenes, no ambos en la misma publicación.');
+                }
+
+                if (! $this->boolean('publish_as_is')) {
+                    $validator->errors()->add('images', 'Los videos se publican sin IA. Usa “Publicar sin IA” para conservar el video original.');
+                }
+            }
 
             if ($profileIds === [] && $this->boolean('publish_as_is') && $companyIds !== []) {
                 $profileIds = WordPressSite::query()

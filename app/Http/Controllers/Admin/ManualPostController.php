@@ -133,14 +133,17 @@ class ManualPostController extends Controller
             );
         }
 
-        $imageCount = $sourcePost->media()->count();
-        $imageMessage = $imageCount > 0
-            ? " Se usarán las {$imageCount} imagen(es) subidas."
+        $imageCount = $sourcePost->media()->where('type', 'image')->count();
+        $videoCount = $sourcePost->media()->where('type', 'video')->count();
+        $imageMessage = $videoCount > 0
+            ? ' Se usará el video original sin IA.'
+            : ($imageCount > 0
+                ? " Se usarán las {$imageCount} imagen(es) subidas."
             : ($request->generatesImageIfMissing()
                 ? ' Se generará una imagen principal con IA.'
                 : ($request->publishesAsIs()
                     ? ' Se publicará sin imágenes.'
-                    : ' Podrás agregar imágenes al revisar el borrador.'));
+                    : ' Podrás agregar imágenes al revisar el borrador.')));
         $publicationCount = count($publicationProfileIds);
         $publicationMessage = $publicationCount > 0
             ? ($request->publishesWithoutReview()
@@ -313,16 +316,22 @@ class ManualPostController extends Controller
         $filename = Str::uuid().'.'.$extension;
         $path = $image->storeAs("source-post-media/manual/{$sourcePost->id}", $filename, 'local');
         $absolutePath = Storage::disk('local')->path($path);
-        $size = @getimagesize($absolutePath);
+        $detectedMimeType = (string) $image->getMimeType();
+        $clientMimeType = (string) $image->getClientMimeType();
+        $mimeType = str_starts_with($clientMimeType, 'video/')
+            ? $clientMimeType
+            : ($detectedMimeType ?: 'application/octet-stream');
+        $isVideo = str_starts_with($mimeType, 'video/');
+        $size = $isVideo ? null : @getimagesize($absolutePath);
 
         SourcePostMedia::query()->create([
             'source_post_id' => $sourcePost->id,
-            'type' => 'image',
+            'type' => $isVideo ? 'video' : 'image',
             'position' => $position,
             'original_url' => 'manual-upload://'.$image->getClientOriginalName(),
             'url_hash' => hash('sha256', $path.'|'.$position),
             'file_path' => $path,
-            'mime_type' => $image->getMimeType(),
+            'mime_type' => $mimeType,
             'width' => is_array($size) ? (int) $size[0] : null,
             'height' => is_array($size) ? (int) $size[1] : null,
             'metadata' => [
