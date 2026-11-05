@@ -254,6 +254,7 @@ class QuickPostWorkflowTest extends TestCase
             ->assertSee('name="ai_prompt_profile_id"', false)
             ->assertSee('Perfil para redes')
             ->assertSee('Muy corto (150–200 palabras)')
+            ->assertDontSee('>Perfiles<', false)
             ->assertSee('name="publication_profile_ids[]"', false)
             ->assertSee('Mi sitio principal')
             ->assertSee('Facebook Noticias')

@@ -81,22 +81,6 @@
                                 <div class="d-flex justify-content-between gap-3 mt-2"><div class="form-text" id="manual-post-content-help">Mínimo 80 caracteres.</div><div class="text-muted fs-8"><span id="manual-post-count">0</span>/20000</div></div>
                             </div>
 
-                            <div class="separator my-7"></div>
-                            <div class="row align-items-end g-4" data-ai-profile-workspace>
-                                <div class="col-md-8">
-                                    <label for="manual-post-profile" class="form-label required fw-bold" data-ai-profile-label>Perfil de generación</label>
-                                    <select id="manual-post-profile" name="ai_prompt_profile_id" class="form-select form-select-solid @error('ai_prompt_profile_id') is-invalid @enderror" required>
-                                        @foreach ($profiles as $profile)
-                                            <option value="{{ $profile->id }}" @selected((string) $defaultProfileId === (string) $profile->id)>{{ $profile->name }} · {{ \App\Models\AiPromptProfile::lengthOptions()[$profile->content_length] ?? $profile->content_length }}{{ $profile->is_default ? ' · predeterminado' : '' }}</option>
-                                        @endforeach
-                                    </select>
-                                    @error('ai_prompt_profile_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                                </div>
-                                @unless (auth()->user()->isOperator())
-                                    <div class="col-md-4 text-md-end"><a href="{{ route('admin.settings.index') }}" class="btn btn-light w-100 w-md-auto">Perfiles</a></div>
-                                @endunless
-                            </div>
-
                             <div data-mode-media-workspace>
                                 <div class="separator my-7"></div>
                                 <label for="manual-post-images" class="form-label fw-bold">Imágenes</label>
@@ -111,6 +95,17 @@
                                     <span class="fw-bold text-gray-900">Generar imágenes con IA</span>
                                 </label>
                                 <div id="manual-post-preview" class="manual-post-preview-grid mt-4"></div>
+                            </div>
+
+                            <div class="separator my-7"></div>
+                            <div data-ai-profile-workspace>
+                                <label for="manual-post-profile" class="form-label required fw-bold" data-ai-profile-label>Perfil de generación</label>
+                                <select id="manual-post-profile" name="ai_prompt_profile_id" class="form-select form-select-solid @error('ai_prompt_profile_id') is-invalid @enderror" required>
+                                    @foreach ($profiles as $profile)
+                                        <option value="{{ $profile->id }}" @selected((string) $defaultProfileId === (string) $profile->id)>{{ $profile->name }} · {{ \App\Models\AiPromptProfile::lengthOptions()[$profile->content_length] ?? $profile->content_length }}{{ $profile->is_default ? ' · predeterminado' : '' }}</option>
+                                    @endforeach
+                                </select>
+                                @error('ai_prompt_profile_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
                             </div>
                         </div>
                     </div>
@@ -271,6 +266,7 @@
 .manual-post-voice { padding: 1rem; border: 1px dashed var(--bs-primary); border-radius: .5rem; background: var(--bs-primary-light); }.manual-post-voice-controls { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .65rem; }
 .manual-post-auto-publish { min-height: 42px; }
 .review-post-image { width: 100%; max-height: 420px; object-fit: cover; }.review-image-empty { display: flex; align-items: center; gap: 1rem; padding: 1rem; border: 1px dashed var(--bs-primary); border-radius: .5rem; background: var(--bs-primary-light); }
+@media (min-width: 768px) { .manual-post-page .card-footer { align-items: center; flex-wrap: wrap; }.manual-post-page .card-footer > .btn { flex: 0 0 auto; width: auto !important; min-width: 0; padding-inline: 1.25rem; white-space: nowrap; }.manual-post-auto-publish { flex: 0 0 auto; margin-right: auto; justify-content: flex-start; }.manual-post-auto-publish > .text-end { text-align: left !important; white-space: nowrap; } }
 @media (max-width: 767.98px) { .manual-post-page .row { --bs-gutter-y: 1rem; }.manual-post-page .card-body { padding: 1.15rem; }.manual-post-mode-button { flex-direction: column; gap: .1rem; font-size: .75rem; }.manual-post-textarea { min-height: 320px; font-size: 1rem; }.manual-post-preview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.manual-post-company { padding: 1rem !important; }.manual-post-destination { align-items: flex-start !important; }.manual-post-page .card-footer { padding: 1rem 1.15rem; }.manual-post-page .card-footer .btn, .manual-post-page .btn-light-primary { width: 100%; }.manual-post-auto-publish { width: 100%; justify-content: space-between; padding: .2rem 0; }.manual-post-voice-controls .btn { flex: 1 1 auto; } }
 </style>
 @endpush
