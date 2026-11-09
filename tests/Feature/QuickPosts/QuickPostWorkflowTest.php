@@ -175,6 +175,32 @@ class QuickPostWorkflowTest extends TestCase
         Queue::assertPushedOn('publication', PublishQuickPost::class);
     }
 
+    public function test_direct_manual_post_with_an_uploaded_image_can_target_instagram(): void
+    {
+        Queue::fake();
+        Storage::fake('local');
+        $user = User::factory()->create();
+        $company = $user->companies()->create(['name' => 'Empresa Instagram', 'active' => true]);
+        $instagram = $this->publicationProfile($user, [
+            'company_id' => $company->id,
+            'type' => WordPressSite::TYPE_INSTAGRAM,
+            'name' => 'Instagram de prueba',
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('admin.manual-posts.store'), [
+                'content' => 'Nota directa con una imagen cargada para Instagram.',
+                'publish_as_is' => true,
+                'company_ids' => [$company->id],
+                'publication_profile_ids' => [$instagram->id],
+                'images' => [UploadedFile::fake()->image('imagen.jpg', 1200, 630)],
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('admin.quick-posts.index'));
+
+        Queue::assertPushedOn('publication', PublishQuickPost::class);
+    }
+
     public function test_manual_post_returns_json_validation_errors_to_the_ajax_form(): void
     {
         Queue::fake();

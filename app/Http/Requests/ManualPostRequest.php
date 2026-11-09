@@ -147,6 +147,7 @@ class ManualPostRequest extends FormRequest
 
             if ($this->boolean('publish_as_is')
                 && WordPressSite::query()->whereIn('id', $profileIds)->where('type', WordPressSite::TYPE_INSTAGRAM)->exists()
+                && count($this->file('images', [])) === 0
                 && ! $this->generatesImageIfMissing()) {
                 $validator->errors()->add('images', 'Agrega al menos una imagen para publicar directamente en Instagram.');
             }
