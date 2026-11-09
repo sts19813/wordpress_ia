@@ -797,6 +797,8 @@ class QuickPostWorkflowTest extends TestCase
         $this->actingAs($user)
             ->get(route('admin.quick-posts.index'))
             ->assertOk()
+            ->assertSee('Mostrando 1 a 50 de 51 publicaciones')
+            ->assertSee('Página 1 de 2')
             ->assertViewHas('tasks', fn ($tasks): bool => $tasks->total() === 51
                 && $tasks->perPage() === 50
                 && $tasks->count() === 50);

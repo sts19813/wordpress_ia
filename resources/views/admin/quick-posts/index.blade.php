@@ -100,9 +100,30 @@
         @endforelse
     </div>
 
-    @if ($tasks->hasPages())
-        <div class="d-flex justify-content-center mt-8">{{ $tasks->onEachSide(1)->links() }}</div>
-    @endif
+    <div class="quick-history-pagination d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3 mt-8">
+        <div class="text-muted fs-7">
+            @if ($tasks->total())
+                Mostrando {{ number_format($tasks->firstItem()) }} a {{ number_format($tasks->lastItem()) }} de {{ number_format($tasks->total()) }} publicaciones
+            @else
+                No hay publicaciones para mostrar
+            @endif
+        </div>
+        @if ($tasks->hasPages())
+            <nav class="d-flex align-items-center gap-2" aria-label="Paginación de la bitácora">
+                @if ($tasks->onFirstPage())
+                    <span class="btn btn-sm btn-light disabled">Anterior</span>
+                @else
+                    <a href="{{ $tasks->previousPageUrl() }}" class="btn btn-sm btn-light">Anterior</a>
+                @endif
+                <span class="quick-history-page-number">Página {{ $tasks->currentPage() }} de {{ $tasks->lastPage() }}</span>
+                @if ($tasks->hasMorePages())
+                    <a href="{{ $tasks->nextPageUrl() }}" class="btn btn-sm btn-light-primary">Siguiente</a>
+                @else
+                    <span class="btn btn-sm btn-light disabled">Siguiente</span>
+                @endif
+            </nav>
+        @endif
+    </div>
 @endsection
 
 @push('styles')
@@ -121,6 +142,7 @@
 .quick-history-alert { display: flex; gap: .5rem; align-items: flex-start; padding: .7rem .8rem; border-radius: .5rem; background: var(--bs-light-danger); color: var(--bs-danger); font-size: .78rem; line-height: 1.4; }
 .quick-history-destinations { border-top: 1px solid var(--bs-gray-200); }.quick-history-destinations summary { display: flex; justify-content: space-between; align-items: center; padding: .85rem 0 .15rem; cursor: pointer; color: var(--bs-gray-700); font-size: .78rem; font-weight: 700; list-style: none; }.quick-history-destinations summary::-webkit-details-marker { display: none; }.quick-history-destinations[open] summary i { transform: rotate(180deg); }
 .quick-history-destination-list { display: flex; flex-direction: column; gap: .35rem; padding-top: .65rem; }.quick-history-destination { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .45rem .55rem; border-radius: .4rem; background: var(--bs-gray-100); color: var(--bs-gray-700); font-size: .72rem; }.quick-history-destination .badge { flex: 0 0 auto; }
+.quick-history-pagination { padding: 1rem 1.25rem; border: 1px solid var(--bs-gray-200); border-radius: .65rem; background: #fff; }.quick-history-page-number { color: var(--bs-gray-600); font-size: .78rem; font-weight: 600; white-space: nowrap; }
 @media (max-width: 767.98px) { .quick-history-media { aspect-ratio: 16 / 9; }.quick-history-title { min-height: 0; }.quick-history-card .card-body { padding: 1rem !important; } }
 </style>
 @endpush
