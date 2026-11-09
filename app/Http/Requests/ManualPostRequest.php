@@ -16,8 +16,17 @@ class ManualPostRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        $encodedContent = $this->input('encoded_content');
+        $decodedContent = is_string($encodedContent)
+            ? base64_decode($encodedContent, true)
+            : false;
+
         $this->merge([
-            'content' => trim((string) $this->input('content')),
+            // The browser sends manual text encoded when uploading media. Some
+            // shared-hosting WAF rules inspect multipart text fields and may
+            // reject perfectly valid editorial content before Laravel receives
+            // the request. Decode it here, before normal validation and storage.
+            'content' => trim((string) ($decodedContent !== false ? $decodedContent : $this->input('content'))),
             'publish_as_is' => $this->boolean('publish_as_is'),
             'generate_image_if_missing' => $this->boolean('generate_image_if_missing'),
             'publish_without_review' => $this->boolean('publish_without_review'),

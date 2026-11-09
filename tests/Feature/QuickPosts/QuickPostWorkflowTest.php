@@ -153,6 +153,28 @@ class QuickPostWorkflowTest extends TestCase
         Queue::assertNotPushed(GenerateAiArticle::class);
     }
 
+    public function test_manual_post_decodes_transport_encoded_content_before_direct_publication(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        $company = $user->companies()->create(['name' => 'Empresa directa', 'active' => true]);
+        $destination = $this->publicationProfile($user, ['company_id' => $company->id]);
+        $content = "LA DEMOCRACIA SÍ FUNCIONA\n\nTexto con acentos y caracteres editoriales.";
+
+        $this->actingAs($user)
+            ->post(route('admin.manual-posts.store'), [
+                'encoded_content' => base64_encode($content),
+                'publish_as_is' => true,
+                'company_ids' => [$company->id],
+                'publication_profile_ids' => [$destination->id],
+            ])
+            ->assertRedirect(route('admin.quick-posts.index'));
+
+        $this->assertSame($content, SourcePost::query()->sole()->content);
+        $this->assertSame('manual_direct_publication', AiArticle::query()->sole()->full_response);
+        Queue::assertPushedOn('publication', PublishQuickPost::class);
+    }
+
     public function test_manual_video_is_kept_original_and_is_only_accepted_for_direct_publication(): void
     {
         Queue::fake();

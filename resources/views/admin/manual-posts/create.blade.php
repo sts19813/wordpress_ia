@@ -362,6 +362,13 @@ document.addEventListener('DOMContentLoaded', function () {
         if (toggle) toggle.checked = destinations.length > 0 && destinations.some((input) => input.checked);
     };
     const swalError = (title, message) => Swal.fire({ icon: 'error', title, text: message || 'No fue posible continuar. Intenta nuevamente.' });
+    const encodeUtf8ForTransport = (value) => {
+        const bytes = new TextEncoder().encode(value);
+        let binary = '';
+        bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+
+        return btoa(binary);
+    };
     const readJsonResponse = async (response, fallbackMessage) => {
         const contentType = response.headers.get('content-type') || '';
 
@@ -466,6 +473,13 @@ document.addEventListener('DOMContentLoaded', function () {
         Swal.fire({ title: directSubmission ? 'Publicando contenido' : 'Generando post', html: '<div class="text-muted">Enviando la información...</div><div class="progress h-8px mt-4"><div class="progress-bar progress-bar-striped progress-bar-animated" style="width:5%"></div></div>', allowEscapeKey: false, allowOutsideClick: false, didOpen: () => Swal.showLoading() });
         try {
             const formData = new FormData(form);
+            if (mode !== 'url') {
+                // Avoid shared-hosting WAF rules rejecting long editorial text
+                // inside multipart uploads. Laravel decodes this value before it
+                // validates or stores the note, so the published text is intact.
+                formData.delete('content');
+                formData.set('encoded_content', encodeUtf8ForTransport(textarea.value));
+            }
             if (directSubmission) formData.set('publish_as_is', '1');
             const response = await fetch(form.action, { method: 'POST', body: formData, headers: { 'X-CSRF-TOKEN': csrfToken, Accept: 'application/json' }, credentials: 'same-origin' });
             const body = await readJsonResponse(response, 'No fue posible iniciar la publicación.');
