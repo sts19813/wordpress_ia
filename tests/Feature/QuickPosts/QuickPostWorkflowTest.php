@@ -175,6 +175,21 @@ class QuickPostWorkflowTest extends TestCase
         Queue::assertPushedOn('publication', PublishQuickPost::class);
     }
 
+    public function test_manual_post_returns_json_validation_errors_to_the_ajax_form(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->postJson(route('admin.manual-posts.store'), [
+                'publish_as_is' => true,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('content');
+
+        Queue::assertNothingPushed();
+    }
+
     public function test_manual_video_is_kept_original_and_is_only_accepted_for_direct_publication(): void
     {
         Queue::fake();
