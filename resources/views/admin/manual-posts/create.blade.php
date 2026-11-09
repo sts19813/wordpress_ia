@@ -362,6 +362,21 @@ document.addEventListener('DOMContentLoaded', function () {
         if (toggle) toggle.checked = destinations.length > 0 && destinations.some((input) => input.checked);
     };
     const swalError = (title, message) => Swal.fire({ icon: 'error', title, text: message || 'No fue posible continuar. Intenta nuevamente.' });
+    const readJsonResponse = async (response, fallbackMessage) => {
+        const contentType = response.headers.get('content-type') || '';
+
+        if (contentType.includes('application/json')) return response.json();
+
+        await response.text();
+        if (response.status === 419) {
+            throw new Error('Tu sesión expiró. Recarga la página e inténtalo nuevamente.');
+        }
+        if (response.status >= 500) {
+            throw new Error('El servidor tuvo un problema temporal. Intenta publicar nuevamente en unos segundos.');
+        }
+
+        throw new Error(fallbackMessage);
+    };
     const updateGeneratingAlert = (progress, step) => {
         const container = Swal.getHtmlContainer();
         if (container) container.innerHTML = '<div class="text-muted mb-4">' + (step || 'Preparando la nota...') + '</div><div class="progress h-8px"><div class="progress-bar progress-bar-striped progress-bar-animated" style="width:' + Math.max(5, Number(progress) || 5) + '%"></div></div>';
@@ -369,7 +384,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const pollTask = async (statusUrl) => {
         try {
             const response = await fetch(statusUrl, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
-            const task = await response.json();
+            const task = await readJsonResponse(response, 'No se pudo consultar el estado de la publicación.');
             if (!response.ok) throw new Error(task.message || 'No se pudo consultar la generación.');
             updateGeneratingAlert(task.progress, task.step);
             if (task.status === 'completed' && (task.review_url || task.preview_url || task.article_url)) {
@@ -392,7 +407,7 @@ document.addEventListener('DOMContentLoaded', function () {
         try {
             const data = new FormData(); data.append('audio', file, file.name || 'nota.webm');
             const response = await fetch(form.dataset.transcribeUrl, { method: 'POST', body: data, headers: { 'X-CSRF-TOKEN': csrfToken, Accept: 'application/json' }, credentials: 'same-origin' });
-            const body = await response.json();
+            const body = await readJsonResponse(response, 'No se pudo transcribir el audio.');
             if (!response.ok) throw new Error(body.message || Object.values(body.errors || {}).flat()[0] || 'No se pudo transcribir el audio.');
             textarea.value = [textarea.value.trim(), body.text.trim()].filter(Boolean).join(textarea.value.trim() ? '\n\n' : '');
             refreshCounter(); voiceStatus.textContent = 'Transcripción lista. Puedes editarla antes de generar.';
@@ -453,7 +468,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const formData = new FormData(form);
             if (directSubmission) formData.set('publish_as_is', '1');
             const response = await fetch(form.action, { method: 'POST', body: formData, headers: { 'X-CSRF-TOKEN': csrfToken, Accept: 'application/json' }, credentials: 'same-origin' });
-            const body = await response.json();
+            const body = await readJsonResponse(response, 'No fue posible iniciar la publicación.');
             if (!response.ok) throw new Error(body.message || Object.values(body.errors || {}).flat()[0] || 'Revisa los datos de la nota.');
             updateGeneratingAlert(10, body.message); pollTask(body.status_url);
         } catch (error) {
