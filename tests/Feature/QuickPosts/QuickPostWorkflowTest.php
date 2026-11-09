@@ -776,6 +776,32 @@ class QuickPostWorkflowTest extends TestCase
             ->assertDontSee('Nuevo desde URL');
     }
 
+    public function test_history_is_paginated_in_groups_of_fifty(): void
+    {
+        $user = User::factory()->create();
+
+        foreach (range(1, 51) as $index) {
+            Scheduler::query()->create([
+                'user_id' => $user->id,
+                'type' => Scheduler::TYPE_QUICK_POST,
+                'name' => "Post {$index}",
+                'status' => Scheduler::STATUS_COMPLETED,
+                'step' => 'Finalizado',
+                'progress' => 100,
+                'max_attempts' => 3,
+                'payload' => [],
+                'events' => [],
+            ]);
+        }
+
+        $this->actingAs($user)
+            ->get(route('admin.quick-posts.index'))
+            ->assertOk()
+            ->assertViewHas('tasks', fn ($tasks): bool => $tasks->total() === 51
+                && $tasks->perPage() === 50
+                && $tasks->count() === 50);
+    }
+
     public function test_invalid_or_unsupported_urls_never_start_capture(): void
     {
         $user = User::factory()->create();

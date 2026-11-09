@@ -12,15 +12,21 @@ class QuickPostController extends Controller
     {
         return view('admin.quick-posts.index', [
             'tasks' => Scheduler::query()
+                ->select([
+                    'id', 'user_id', 'ai_article_id', 'source_post_id', 'type', 'status',
+                    'step', 'progress', 'payload', 'last_error', 'created_at',
+                ])
                 ->with([
                     'user:id,name',
-                    'article.images',
+                    'article:id,title',
+                    'article.images:id,ai_article_id,type,status,file_path,mime_type',
+                    'article.publications:id,ai_article_id,wordpress_site_id,status,remote_url,error_message',
                     'article.publications.wordpressSite:id,name,type',
-                    'sourcePost.media',
+                    'sourcePost:id,title',
                 ])
                 ->where('type', Scheduler::TYPE_QUICK_POST)
                 ->latest()
-                ->get(),
+                ->paginate(50),
         ]);
     }
 }
