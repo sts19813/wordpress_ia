@@ -4,6 +4,7 @@ namespace App\Services\QuickPosts;
 
 use App\Models\SourcePost;
 use App\Models\SourcePostMedia;
+use App\Services\Images\SourceBrandingSanitizer;
 use App\Support\SocialPostUrl;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -12,6 +13,8 @@ use Throwable;
 
 class SourcePostMediaArchiver
 {
+    public function __construct(private readonly SourceBrandingSanitizer $branding) {}
+
     /**
      * @param  array<int, array<string, mixed>>  $images
      */
@@ -71,6 +74,20 @@ class SourcePostMediaArchiver
 
         if (! str_starts_with($mimeType, 'image/')) {
             throw new RuntimeException('La URL de medios no devolvió una imagen.');
+        }
+
+        $sanitized = $this->branding->sanitize(
+            $contents,
+            $sourcePost->sourceSite?->url ?? $media->original_url,
+        );
+        $contents = $sanitized['binary'];
+        $mimeType = $sanitized['mime_type'] ?: $mimeType;
+        if ($sanitized['sanitized']) {
+            $media->metadata = [
+                ...($media->metadata ?: []),
+                'source_branding_removed' => true,
+                'source_branding_domains' => $sanitized['domains'],
+            ];
         }
 
         $extension = match ($mimeType) {

@@ -6,6 +6,7 @@ use App\Models\AiArticle;
 use App\Models\AiImage;
 use App\Models\AiPromptProfile;
 use App\Models\SourcePost;
+use App\Services\Images\SourceBrandingSanitizer;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -16,6 +17,8 @@ class SourcePostImageImporter
     private const MAX_DOWNLOAD_BYTES = 20 * 1024 * 1024;
 
     private const MAX_SOURCE_PIXELS = 50_000_000;
+
+    public function __construct(private readonly SourceBrandingSanitizer $branding) {}
 
     /**
      * Descarga la primera imagen utilizable de las notas fuente, la recorta al
@@ -31,7 +34,7 @@ class SourcePostImageImporter
             }
 
             try {
-                $image = $this->downloadAndTransform((string) $sourcePost->image_url, $profile);
+                $image = $this->downloadAndTransform($sourcePost, $profile);
 
                 if ($image === null) {
                     continue;
@@ -60,6 +63,7 @@ class SourcePostImageImporter
                         'source_image_url' => $sourcePost->image_url,
                         'original_resolution' => $image['original_resolution'],
                         'transformation' => 'center_crop',
+                        'source_branding_removed' => $image['source_branding_removed'],
                     ],
                     'full_response' => json_encode([
                         'source' => 'original_post',
@@ -89,9 +93,9 @@ class SourcePostImageImporter
     }
 
     /**
-     * @return array{binary: string, extension: string, mime_type: string, format: string, compression: int, resolution: string, original_resolution: string, duration_ms: int}|null
+     * @return array{binary: string, extension: string, mime_type: string, format: string, compression: int, resolution: string, original_resolution: string, duration_ms: int, source_branding_removed: bool}|null
      */
-    private function downloadAndTransform(string $url, AiPromptProfile $profile): ?array
+    private function downloadAndTransform(SourcePost $sourcePost, AiPromptProfile $profile): ?array
     {
         if (! function_exists('imagecreatefromstring') || ! function_exists('imagecopyresampled')) {
             return null;
@@ -101,7 +105,7 @@ class SourcePostImageImporter
         $response = Http::withHeaders([
             'Accept' => 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
             'User-Agent' => 'Mozilla/5.0 (compatible; WordPressIA/1.0)',
-        ])->connectTimeout(10)->timeout(30)->get($url);
+        ])->connectTimeout(10)->timeout(30)->get((string) $sourcePost->image_url);
 
         if (! $response->successful()) {
             return null;
@@ -114,6 +118,8 @@ class SourcePostImageImporter
             return null;
         }
 
+        $sanitized = $this->branding->sanitize($binary, $sourcePost->sourceSite?->url ?? $sourcePost->url);
+        $binary = $sanitized['binary'];
         $info = @getimagesizefromstring($binary);
 
         if (! is_array($info) || ($info[0] * $info[1]) > self::MAX_SOURCE_PIXELS || $info[0] < 200 || $info[1] < 120) {
@@ -204,6 +210,7 @@ class SourcePostImageImporter
             'resolution' => $targetWidth.'x'.$targetHeight,
             'original_resolution' => $info[0].'x'.$info[1],
             'duration_ms' => (int) round((hrtime(true) - $startedAt) / 1_000_000),
+            'source_branding_removed' => $sanitized['sanitized'],
         ];
     }
 
