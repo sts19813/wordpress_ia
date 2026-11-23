@@ -41,7 +41,6 @@ class SourceBrandingSanitizer
         }
 
         $encoded = $this->encode($image, $mimeType);
-        imagedestroy($image);
 
         if ($encoded === null || $encoded === '') {
             return $this->unchanged($binary, $mimeType);
@@ -105,7 +104,6 @@ class SourceBrandingSanitizer
         }
 
         imagecopy($image, $crop, $x, $y, 0, 0, $width, $height);
-        imagedestroy($crop);
     }
 
     private function encode(\GdImage $image, string $mimeType): ?string
